@@ -23,7 +23,7 @@ description: "在专用 macOS 和 Windows runner 上发布留存的 Desktop 安�
 
 保持 `DSH_PACKAGING_CONFIG_DIR` 指向现有机器打包目录。完成的构建复制到其同级 `releases/<run-id>/<attempt>/`；`DSH_DESKTOP_RELEASES_DIR` 可用绝对路径覆盖该根目录。文件清单包含安装包、更新归档、blockmap、完成记录和不含凭据的 manifest。调试包会留存，但不能发布。复制内容通过校验后才开放 attempt 目录，已有 attempt 不能被替换。GitHub 保留相同文件清单 14 天。本地文件保留到操作员删除；校验或发布期间不要删除对应 attempt。
 
-在配置目录下创建 `publishing/test.json`，获得授权后再创建 `publishing/production.json`。每份配置声明 `bucket`、不带路径的 HTTPS `origin` 和绝对路径 `credentialsFile`。凭据文件只包含 `secretId` 和 `secretKey`。macOS 还需 `macOS.signingIdentity` 和 `macOS.teamId`；Windows 需要 `windows.certificateThumbprint`。production 必须使用 origin `https://download.deepseek.com`，并提供 `githubApp.clientId` 和绝对路径 `githubApp.privateKeyFile`。这些文件不进入 Git。上传器支持长期 COS 凭据，不支持 STS 会话凭据。不可覆盖的二进制写入要求 bucket 版本控制关闭。
+在配置目录下创建 `publishing/test.json`，获得授权后再创建 `publishing/production.json`。每份配置声明 `bucket`、不带路径的 HTTPS `origin` 和绝对路径 `credentialsFile`。凭据文件只包含 `secretId` 和 `secretKey`。macOS 还需 `macOS.signingIdentity` 和 `macOS.teamId`；Windows 需要 `windows.certificateThumbprint`。production 必须使用 origin `https://download.deepseek.com`，并提供 `githubApp.clientId` 和绝对路径 `githubApp.privateKeyFile`。这些文件不进入 Git。上传器支持长期 COS 凭据，不支持 STS 会话凭据。管理员必须维持 test 和 production bucket 未启用版本控制（不能是已启用或已暂停状态）。发布流程以此为部署前提，不调用 `GetBucketVersioning`，也不要求该权限。二进制 PUT 仍携带 `x-cos-forbid-overwrite`；防覆盖保证依赖管理员维持桶配置。
 
 将仓库变量 `DESKTOP_PUBLISH_RUNNERS` 配置为已注册 runner 名称到唯一标签和目标的 JSON 映射，例如 `{"mini":{"label":"dsh-mini-publish","target":"mac-arm64"}}`。该标签只能分配给这台 runner。Windows 使用目标 `win-x64`。路由 job 检查原构建成功的 job，发布器再检查自身 runner 名称与记录一致。机器之间不需要共享文件系统或局域网连接。
 
@@ -49,7 +49,7 @@ Environment 审批限制此工作流，不限制同一机器账户运行的任�
 
 解决故障后重跑失败的发布 job，以保持准备阶段选定的打包尝试；也可显式填写原打包运行和尝试，发起新的发布。尝试留空时重跑所有 job 会重新解析最新打包尝试，并需要重新审批。不要仅为重试上传而重新打包。缺失对象会上传，相同对象跳过，同名但字节不同的对象会停止操作。写入结果不明时通过读取远端字节核对。频道已有更高版本时，旧上传不能替换它。每个包只更新自身内置通道：nightly 写入 `nightly.yml` / `nightly-mac.yml`，latest 写入 `latest.yml` / `latest-mac.yml`。latest 二进制位于目标二进制前缀下的 `latest/` 子目录，与已有 nightly 对象分离。同一源码和版本发布到两个通道需要分别打包；已有发布 tag 仅在源码提交相同时复用。
 
-同级 `upload-records/` 目录保留操作标识、逐行事件和最终结果。频道写入意图同时记录先前和目标 YAML。失败记录阶段、安全错误分类与诊断，不保存原始服务响应。审计初始化在文件完整后才可见；遗留的 `.initializing-*` 目录不参与已完成发布的扫描。写入和回读在继续操作前落盘；没有最终结果代表中断，不代表成功。Actions 还将操作记录保存为诊断 artifact，保留 30 天。这些本地记录不防篡改。COS 回读验证存储字节，不代表公开 CDN 行为；公开下载需单独验收。
+同级 `upload-records/` 目录保留操作标识、逐行事件和最终结果。频道写入意图同时记录先前和目标 YAML。失败记录阶段、安全错误分类与诊断；COS 失败还标明 `GetObject` 或 `PutObject`，并在可用时记录经过校验的 HTTP 状态码和 request ID。访问拒绝提示会指出需检查的权限。不保存原始服务响应或凭据。审计初始化在文件完整后才可见；遗留的 `.initializing-*` 目录不参与已完成发布的扫描。写入和回读在继续操作前落盘；没有最终结果代表中断，不代表成功。Actions 还将操作记录保存为诊断 artifact，保留 30 天。这些本地记录不防篡改。COS 回读验证存储字节，不代表公开 CDN 行为；公开下载需单独验收。
 
 频道更新完成但 tag 失败时，结果为 `published-tag-pending`，job 明确失败。重试时，已落盘的频道完成证据只允许恢复 tag，即使后来发布已推进频道，也不会重新发布旧 YAML。已有冲突 tag 需要管理员调查，不会自动移动。
 
