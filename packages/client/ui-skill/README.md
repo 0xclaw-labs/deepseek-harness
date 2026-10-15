@@ -104,7 +104,8 @@ These limits define where the reference and the row fall back to generic behavio
 - **Result-only history pages use the generic row** — keyed dispatch needs the paired call in the runtime window; pagination that leaves the call outside has no tool identity. This client presentation feature does not extend the history wire contract to recover it.
 - **Text is the truth** — the reference is plain draft text; a hand-typed identical token is the same reference, and the host gesture boundary judges the sent text, not the menu interaction. Chip visuals derive from the lexicon scan; no occurrence identity, position tracking, or structured reference payload exists on the prompt wire.
 - **A menu opened before the prewarm settles** shows no skill candidates for that keystroke; the next keystroke re-polls the settled cache.
-- **Profile changes outside the plugin manager keep cached catalogs** — an HMR reload after a CLI or hand edit announces no `plugin-manager/changed` event, so an open session lists its previous skills until a preset switch or connection reset.
+- **Catalog changes without a forwarded event keep cached catalogs** — an HMR reload after a CLI or hand edit announces no `plugin-manager/changed` event, and adding or removing a `SKILL.md` on disk forwards no event at all, so an open session lists its previous skills until a preset switch, plugin manager operation, or connection reset.
+- **Draft skill highlighting waits for the next catalog fetch** — a preset switch, plugin manager operation, or connection reset empties the session's lexicon, so with the menu closed an existing `/name` in the draft loses its skill highlight until the `/` menu fetches the catalog again; an open menu fetches it immediately.
 
 <a id="dev-note"></a>
 ### Dev Note

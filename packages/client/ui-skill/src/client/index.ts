@@ -249,8 +249,9 @@ export function apply(ctx: ClientContext): void {
   // A preset decides which skill providers an agent reads, so a switched
   // session's cached catalog belongs to the composition it no longer runs.
   ctx.remote.$on('agent-preset/selected', invalidate)
-  // The Host announces a manager operation after its reload, and the plugins
-  // it switched may register providers in the global layer every session reads.
+  // The Host announces every manager operation after its reload without
+  // naming what changed, and a switched plugin may register providers in the
+  // global layer every session reads, so each one drops every cached catalog.
   ctx.remote.$on('plugin-manager/changed', clearAll)
   ctx.on('connection/reset', clearAll)
   ctx.effect(() => {
