@@ -1,5 +1,8 @@
 # Repeating Task Scheduler triggers recover an exited launcher without relying on action exit-code retries.
 $ErrorActionPreference = 'Stop'
+$runnerRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot)).TrimEnd('\','/')
+$digest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($runnerRoot.ToUpperInvariant())))
+$taskName = 'DSH-Packaging-' + $digest.Substring(0,16)
 $log = Join-Path $PSScriptRoot ('run-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ') + '-' + $PID + '.log')
 try {
     @{ Pid = $PID; Started = (Get-Process -Id $PID).StartTime.ToUniversalTime().Ticks } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'process.json')
@@ -16,9 +19,11 @@ try {
     & (Join-Path $PSHOME 'pwsh.exe') -NoProfile -NonInteractive -File (Join-Path $PSScriptRoot 'start.ps1') -RunnerRoot $config.RunnerRoot -ConfigRoot $config.ConfigRoot *> $log
     $code = $LASTEXITCODE
     Add-Content -LiteralPath $log -Value "Runner launcher exited with code $code."
-    # run.cmd maps several listener failures to zero; a persistent task must stay alive until explicitly stopped.
+    # An unexpected exit is a task failure even when run.cmd hides the listener's nonzero status; the log retains its code.
     exit 1
 } catch {
+    # A missing or unwritable counter cannot bound retries; the task name must not depend on readable configuration.
+    $null = Disable-ScheduledTask -TaskName $taskName -TaskPath '\'
     $message = 'Runner task failed: ' + $_.Exception.Message
     [Console]::Error.WriteLine($message)
     Add-Content -LiteralPath $log -Value $message

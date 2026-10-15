@@ -9,6 +9,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'This command requires PowerShell 7 on Windows.' }
+if ($Action -ne 'install' -and @('ConfigRoot','RestartMinutes','RestartCount').Where({ $PSBoundParameters.ContainsKey($_) }).Count) {
+    throw 'ConfigRoot, RestartMinutes and RestartCount apply only to install; reinstall to change them.'
+}
 if ($RunnerRoot -notmatch '^[A-Za-z]:[\\/]') { throw 'RunnerRoot must be an absolute local directory.' }
 $RunnerRoot = [IO.Path]::GetFullPath($RunnerRoot).TrimEnd('\','/')
 if (-not (Test-Path -LiteralPath (Join-Path $RunnerRoot '.runner') -PathType Leaf)) { throw 'Register the runner before managing its task.' }
@@ -55,7 +58,9 @@ if (-not $task) { throw 'Task is not installed for this runner directory.' }
 switch ($Action) {
     'status' {
         $info = Get-ScheduledTaskInfo -InputObject $task
-        [pscustomobject]@{ TaskName = $taskName; State = $task.State; LastRunTime = $info.LastRunTime; LastTaskResult = $info.LastTaskResult; Launches = (Get-Content -LiteralPath (Join-Path $serviceDir 'attempts.txt') -Raw).Trim(); Logs = $serviceDir }
+        $launches = [int](Get-Content -LiteralPath (Join-Path $serviceDir 'attempts.txt') -Raw)
+        $config = Get-Content -LiteralPath (Join-Path $serviceDir 'config.json') -Raw | ConvertFrom-Json
+        [pscustomobject]@{ TaskName = $taskName; State = $task.State; LastRunTime = $info.LastRunTime; LastTaskResult = $info.LastTaskResult; Launches = $launches; RemainingLaunches = [Math]::Max(0, 1 + $config.RestartCount - $launches); Logs = $serviceDir }
     }
     'start' {
         if ($task.State -eq 'Running') { Write-Output "$taskName is already running."; break }
@@ -73,12 +78,16 @@ switch ($Action) {
             }
         }
         $null = Disable-ScheduledTask -InputObject $task
+        $task = Get-ScheduledTask -TaskName $taskName -TaskPath '\'
         if ($task.State -eq 'Running') {
-            $record = Get-Content -LiteralPath (Join-Path $serviceDir 'process.json') -Raw | ConvertFrom-Json
+            $recordFile = Join-Path $serviceDir 'process.json'
+            if (-not (Test-Path -LiteralPath $recordFile)) { throw 'Running task process identity is unavailable. Automatic starts are disabled; inspect the task before stopping it.' }
+            $record = Get-Content -LiteralPath $recordFile -Raw | ConvertFrom-Json
             $owner = Get-Process -Id $record.Pid -ErrorAction SilentlyContinue
             if (-not $owner -or $owner.StartTime.ToUniversalTime().Ticks -ne $record.Started) {
                 throw 'Running task process identity is unavailable. Automatic starts are disabled; inspect the task before stopping it.'
             }
+            # Parent IDs can be reused; this snapshot supplies wait handles, not termination authority.
             $processes = @(Get-CimInstance Win32_Process)
             $ownedIds = [Collections.Generic.HashSet[int]]::new()
             $null = $ownedIds.Add($owner.Id)

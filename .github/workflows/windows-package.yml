@@ -10,7 +10,7 @@ on:
         default: test
         required: true
       signing:
-        description: '签名方式：unsigned 仅供内部测试；signed 使用机器配置的 EV 硬件令牌'
+        description: '签名方式：unsigned 仅限内部调试，禁止发布到 test / production 或用于自动更新；需要发布请选择 signed（EV 硬件令牌）'
         type: choice
         options: [unsigned, signed]
         default: unsigned
