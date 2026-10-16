@@ -249,7 +249,7 @@ export function jsonSchemaToTs(schema: unknown, indent = 0): string {
 /** The fixed model-facing usage contract rendered above the declarations (see the PTC mode Agent Note's "What the model sees"). */
 const SDK_INSTRUCTIONS = `## Writing code for run_code
 
-\`run_code\` takes two required arguments: \`description\`, a short summary of what the program does, and \`code\`, the program to execute. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly.`
+\`run_code\` takes two required arguments: \`code\`, the program to execute, and \`description\`, a short summary of what the program does. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly.`
 
 const SDK_PROGRAM_INSTRUCTIONS = `Inside the program:
 
@@ -268,7 +268,7 @@ function acceptsExampleString(schema: JsonSchemaNode | undefined, value: string)
 }
 
 /** Render the bash example only when its literal arguments satisfy the current parameter schema. */
-function renderBashExample(schemas: ToolSdkSchema[]): string {
+function renderBashExample(schemas: ToolSdkSchema[], programFormat: 'function-body' | 'repl'): string {
   const bash = schemas.find(schema => schema.name === 'bash')
   if (bash === undefined) return ''
   const parameters = bash.parameters as JsonSchemaNode
@@ -279,7 +279,10 @@ function renderBashExample(schemas: ToolSdkSchema[]): string {
   const needsDescription = required.includes('description')
   if (needsDescription && !acceptsExampleString(parameters.properties?.description, 'Show current directory')) return ''
   const description = needsDescription ? "description: 'Show current directory', " : ''
-  return ` When no separate \`bash\` schema is supplied, invoke a declared \`bash\` binding inside \`run_code\`:\n\n\`run_code({ description: "Show current directory", code: "console.log(await tools.bash({ ${description}command: 'pwd' }))" })\``
+  const program = programFormat === 'function-body'
+    ? `return await tools.bash({ ${description}command: 'pwd' })`
+    : `console.log(await tools.bash({ ${description}command: 'pwd' }))`
+  return ` When no separate \`bash\` schema is supplied, invoke a declared \`bash\` binding inside \`run_code\`:\n\n\`run_code({ code: "${program}", description: "Show current directory" })\``
 }
 
 /**
@@ -292,9 +295,10 @@ function renderBashExample(schemas: ToolSdkSchema[]): string {
  * by name, so the input never carries a duplicate.
  * @param schemas - the tool schemas to declare (the caller excludes
  *   `run_code` itself).
+ * @param programFormat - Runtime syntax; function bodies support returning a result, REPLs print it.
  * @returns the complete section text.
  */
-export function renderToolsSdk(schemas: ToolSdkSchema[]): string {
+export function renderToolsSdk(schemas: ToolSdkSchema[], programFormat: 'function-body' | 'repl' = 'function-body'): string {
   const sorted = [...schemas].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
   const argsMembers: string[] = []
   const outputMembers: string[] = []
@@ -313,5 +317,11 @@ export function renderToolsSdk(schemas: ToolSdkSchema[]): string {
     ['declare const tools: {', '  [K in ToolName]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]>;', '}'].join('\n'),
   ].join('\n\n')
   const jsonValue = 'type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }'
-  return `${SDK_INSTRUCTIONS}${renderBashExample(sorted)}\n\n${SDK_PROGRAM_INSTRUCTIONS}\n\n\`\`\`ts\n${jsonValue}\n\n${declaration}\n\`\`\``
+  const instructions = programFormat === 'function-body'
+    ? SDK_INSTRUCTIONS.replace('the program to execute', 'the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped)')
+    : SDK_INSTRUCTIONS
+  const programInstructions = programFormat === 'function-body'
+    ? SDK_PROGRAM_INSTRUCTIONS.replace('Only values emitted as program output enter the conversation.', 'Emit results with `return` and/or `console.log(...)`. Only what you print or return is program output.')
+    : SDK_PROGRAM_INSTRUCTIONS
+  return `${instructions}${renderBashExample(sorted, programFormat)}\n\n${programInstructions}\n\n\`\`\`ts\n${jsonValue}\n\n${declaration}\n\`\`\``
 }

@@ -50,7 +50,7 @@ interface RunCodeFlavor {
 function runCodeFlavor(language: string): RunCodeFlavor {
   return {
     description: `Execute a ${language} program against the available tools. Takes two required arguments: `
-      + '`description`, a short summary of what the program does, and `code`, the program to execute. '
+      + '`code`, the program to execute, and `description`, a short summary of what the program does. '
       + 'Call tools as `await tools.name(args)` per the declarations in the system prompt. '
       + 'Curate the program output. Image-bearing subtool results are attached after the run.',
     codeDescription: `The ${language} program to execute, following this tool's execution instructions.`,
@@ -58,6 +58,12 @@ function runCodeFlavor(language: string): RunCodeFlavor {
 }
 
 const TYPESCRIPT_FLAVOR = runCodeFlavor('TypeScript')
+const TYPESCRIPT_FUNCTION_FLAVOR: RunCodeFlavor = {
+  description: TYPESCRIPT_FLAVOR.description
+    .replace('`code`, the program to execute', '`code`, the BODY of an async function (erasable syntax only; top-level `await` and `return` work)')
+    .replace('Curate the program output.', 'Only what you print or return is program output — curate it.'),
+  codeDescription: 'The program: the body of an async TypeScript function.',
+}
 const PYTHON_FLAVOR = runCodeFlavor('Python')
 
 /**
@@ -85,7 +91,7 @@ const RUN_CODE_FLAVORS: Record<string, RunCodeFlavor> = {
  */
 const RUN_CODE_DESCRIPTION_PARAM_DESCRIPTION
   = 'Clear, concise description of what this program does in active voice, '
-    + '5-10 words (shown in the UI). Provide `description` before `code` in the arguments. '
+    + '5-10 words (shown in the UI). '
     + 'Examples: "Count TODO markers across packages"; '
     + '"Read failing test and its fixture"; "Rename config key in every cordis.yml".'
 
@@ -145,7 +151,8 @@ function resolveFlavor(peekRuntime: () => PtcRuntime | undefined): RunCodeFlavor
     const known = Object.keys(RUN_CODE_FLAVORS).map(name => JSON.stringify(name)).join(', ')
     throw new Error(`dsh-tools: no run_code schema flavor registered for runtime language ${JSON.stringify(runtime.language)} (known: ${known})`)
   }
-  return flavor
+  return runtime.language === 'typescript' && runtime.programFormat === 'function-body'
+    ? TYPESCRIPT_FUNCTION_FLAVOR : flavor
 }
 
 /**
@@ -306,8 +313,8 @@ export interface RunCodeBridgeOptions {
 }
 
 /**
- * Build the `run_code` {@link ToolDefinition}: required `description` and
- * `code` parameters, executed through the dispatch bridge described
+ * Build the `run_code` {@link ToolDefinition}: required `code` and
+ * `description` parameters, executed through the dispatch bridge described
  * above. The
  * registry reserves it as presentation infrastructure under non-native modes,
  * outside the filterable global/scoped capability layers.
@@ -331,12 +338,12 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
     // independent (one required string `code`).
     description: TYPESCRIPT_FLAVOR.description,
     parameters: {
+      code: { type: 'string', required: true, description: TYPESCRIPT_FLAVOR.codeDescription },
       description: {
         type: 'string',
         required: true,
         description: RUN_CODE_DESCRIPTION_PARAM_DESCRIPTION,
       },
-      code: { type: 'string', required: true, description: TYPESCRIPT_FLAVOR.codeDescription },
       ...RUN_CODE_CONTROLS,
     },
     output: {
@@ -773,8 +780,8 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
     // Recompile through the same spec→schema projection defineTool used, so
     // the emitted schema always matches the validated specification.
     get: () => parameterSchemaSpecToJsonSchema({
-      description: { type: 'string', required: true, description: RUN_CODE_DESCRIPTION_PARAM_DESCRIPTION },
       code: { type: 'string', required: true, description: resolveFlavor(peekRuntime).codeDescription },
+      description: { type: 'string', required: true, description: RUN_CODE_DESCRIPTION_PARAM_DESCRIPTION },
       ...controlParameters(peekRuntime()),
     }),
   })
