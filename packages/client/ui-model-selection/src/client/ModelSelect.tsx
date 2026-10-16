@@ -91,7 +91,14 @@ export function ModelSelect(
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
 
-  const groups = useMemo(() => orderModelProviders(state.groups), [state.groups])
+  const accountProviderName = t('provider.account')
+  const groups = useMemo(() => orderModelProviders(state.groups).map(group => ({
+    ...group,
+    provider: {
+      id: group.id,
+      name: group.id === 'deepseek-account' ? accountProviderName : group.name,
+    },
+  })), [state.groups, accountProviderName])
   const choices = useMemo(() => groups.flatMap(group =>
     group.models.map(model => ({
       group,
@@ -431,8 +438,7 @@ export function ModelSelect(
   ) => (
     <span data-provider-id={provider.id} data-model-id={model.id}>
       {renderSlot('conversation.input.model.label', {
-        provider: { id: provider.id, name: provider.id === 'deepseek-account' ? t('provider.account') : provider.name },
-        model, placement, selected,
+        provider, model, placement, selected,
       }, { fallback: model.name })}
     </span>
   )
@@ -477,7 +483,7 @@ export function ModelSelect(
       >
         <IconDataOutlineRegular className={css.triggerIcon} size={16} />
         <span className={css.triggerLabel}>
-          {currentChoice === undefined ? modelLabel : renderModelLabel(currentChoice.group, currentChoice.model, 'trigger', true)}
+          {currentChoice === undefined ? modelLabel : renderModelLabel(currentChoice.group.provider, currentChoice.model, 'trigger', true)}
         </span>
         {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
         {busy
@@ -503,7 +509,7 @@ export function ModelSelect(
               <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { drill('model') }}>
                 <span className={css.cellLabel}>{t('menu.model')}</span>
                 <span className={css.cellValue}>
-                  {currentChoice === undefined ? modelLabel : renderModelLabel(currentChoice.group, currentChoice.model, 'menu', true)}
+                  {currentChoice === undefined ? modelLabel : renderModelLabel(currentChoice.group.provider, currentChoice.model, 'menu', true)}
                 </span>
                 <IconChevronRightOutlineRegular className={css.cellChevron} />
               </button>
@@ -573,7 +579,7 @@ export function ModelSelect(
               >
                 {filteredGroups.map((group) => {
                   return (
-                    <MenuGroup key={group.id} label={group.id === 'deepseek-account' ? t('provider.account') : group.name}>
+                    <MenuGroup key={group.id} label={group.provider.name}>
                       {group.models.map((model) => {
                         const index = modelIndex++
                         const selected = state.current?.provider === group.id && state.current.model === model.id
@@ -600,7 +606,7 @@ export function ModelSelect(
                             onClick={() => { choose({ provider: group.id, model: model.id }) }}
                           >
                             <span className={css.optionCopy}>
-                              <span className={css.modelName}>{renderModelLabel(group, model, 'option', selected)}</span>
+                              <span className={css.modelName}>{renderModelLabel(group.provider, model, 'option', selected)}</span>
                             </span>
                             <span className={css.check}>
                               {pending?.provider === group.id && pending.model === model.id
