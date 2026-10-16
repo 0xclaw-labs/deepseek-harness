@@ -588,3 +588,25 @@ it('publishes a title-only refresh without acknowledging the same card twice', a
   expect(acknowledge).toHaveBeenCalledTimes(1)
   controller.end()
 })
+
+it('does not read or acknowledge when refreshed outside an active account lifecycle', async () => {
+  const { controller, read, acknowledge } = setup()
+  await controller.refresh()
+  expect(read).not.toHaveBeenCalled()
+  expect(acknowledge).not.toHaveBeenCalled()
+})
+
+it('closes the visible notice when the preceding card expires before its display callback', async () => {
+  const { controller, read, acknowledge, stacks } = setup()
+  read.mockResolvedValue({ accountId: 'account-a' as AccountUserId, bonuses: [
+    ...batch('account-a', 'first', '2099-01-01T00:00:00Z').bonuses,
+    ...batch('account-a', 'second', '').bonuses,
+  ] })
+  controller.begin()
+  await vi.waitFor(() => { expect(stacks.at(-1)).toHaveLength(2) })
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2100-01-01T00:00:00Z'))
+  controller.dismiss('second' as AccountBonusOrderId)
+  expect(stacks.at(-1)).toEqual([])
+  await vi.waitFor(() => { expect(acknowledge).toHaveBeenCalledExactlyOnceWith('account-a', 'second') })
+  controller.end()
+})

@@ -257,10 +257,10 @@ export function createBonusNoticeController(options: BonusNoticeControllerOption
     shown(orderId) {
       setCurrent(current.filter(notice => !expired(notice.expiresAt, Date.now())))
       if (current[0]?.orderId !== orderId) return
-      if (expired(current[0].expiresAt, Date.now())) return
       report(orderId)
     },
     dismiss(orderId) {
+      setCurrent(current.filter(notice => !expired(notice.expiresAt, Date.now())))
       if (current[0]?.orderId !== orderId) return
       // Closing the card is the user seeing it, so queue its acknowledgement before withdrawing.
       report(orderId)

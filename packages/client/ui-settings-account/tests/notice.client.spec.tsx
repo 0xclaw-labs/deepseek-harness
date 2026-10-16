@@ -156,16 +156,26 @@ it('keeps back cards mounted but inaccessible and reports them only after promot
   const second = screen.getByText('second copy').closest('aside')
   expect(document.querySelectorAll('aside')).toHaveLength(3)
   expect(screen.getAllByRole('status')).toHaveLength(1)
-  expect(second?.inert).toBe(true)
+  expect(second?.querySelector('button')?.tabIndex).toBe(-1)
   await presentFrames()
   expect(onShown).toHaveBeenCalledExactlyOnceWith('first')
   fireEvent.click(screen.getByRole('button', { name: 'Close' }))
   expect(onDismiss).toHaveBeenCalledExactlyOnceWith('first')
   view.rerender(tree(notices.slice(1)))
   expect(screen.getByText('second copy').closest('aside')).toBe(second)
-  expect(second?.inert).toBe(false)
+  expect(second?.querySelector('button')?.tabIndex).toBe(0)
   expect(onShown).toHaveBeenCalledTimes(1)
   await presentFrames()
   expect(onShown).toHaveBeenLastCalledWith('second')
   expect(onShown).toHaveBeenCalledTimes(2)
+})
+
+it('does not acknowledge a notice before an anchor is mounted', async () => {
+  const onShown = vi.fn()
+  render(<AccountNoticeStack anchor={createRef<HTMLDivElement>()} title="News" closeLabel="Close"
+    notices={[{ orderId: 'notice' as AccountBonusOrderId, message: 'News', expiresAt: '' }]}
+    onShown={onShown} onDismiss={vi.fn()} />)
+  await presentFrames()
+  expect(onShown).not.toHaveBeenCalled()
+  expect(screen.queryByRole('status')).toBeNull()
 })

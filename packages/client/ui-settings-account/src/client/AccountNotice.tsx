@@ -98,10 +98,6 @@ function NoticeCard({ notice, depth, ready, title, closeLabel, onShown, onDismis
 }) {
   const foreground = depth === 0
   const reported = useRef(false)
-  const card = useRef<HTMLElement>(null)
-  useLayoutEffect(() => {
-    if (card.current) card.current.inert = !foreground
-  }, [foreground])
   useEffect(() => {
     if (!ready || !foreground || reported.current || !live(notice.expiresAt)) return
     let cancel: (() => void) | undefined
@@ -122,7 +118,7 @@ function NoticeCard({ notice, depth, ready, title, closeLabel, onShown, onDismis
       cancel?.()
     }
   }, [ready, foreground, notice.orderId, notice.expiresAt, onShown])
-  return <aside ref={card} className={css.card} data-front={foreground} aria-hidden={!foreground}
+  return <aside className={css.card} data-front={foreground} aria-hidden={!foreground}
     style={{ '--notice-depth': depth, '--notice-scale': Math.pow(272 / 280, depth) } as CSSProperties}>
     <div role="status" className={css.copy}>
       <div className={css.title}><span className={css.icon} aria-hidden="true">
@@ -133,6 +129,6 @@ function NoticeCard({ notice, depth, ready, title, closeLabel, onShown, onDismis
       </span><span>{title}</span></div>
       <p>{notice.message}</p>
     </div>
-    <button type="button" className={css.close} aria-label={closeLabel} onClick={() => { onDismiss(notice.orderId) }}><IconCloseOutlineRegular size={10} /></button>
+    <button type="button" tabIndex={foreground ? undefined : -1} className={css.close} aria-label={closeLabel} onClick={() => { onDismiss(notice.orderId) }}><IconCloseOutlineRegular size={10} /></button>
   </aside>
 }

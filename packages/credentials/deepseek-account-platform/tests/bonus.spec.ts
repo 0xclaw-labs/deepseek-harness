@@ -401,3 +401,16 @@ it('refuses a cached identity that carries no Platform id', async () => {
   f.failProfile()
   await expect(f.account.ackBonusNotified(USER as AccountUserId, ORDER as AccountBonusOrderId, clientMetadata('en'))).rejects.toThrow('account: protocol')
 })
+
+it('treats a null title as absent without rejecting other notifications', async () => {
+  const f = await fixture()
+  await f.grant('test-account-token')
+  f.bonuses([
+    { order_id: 'untitled', title: null, msg: 'News' },
+    { order_id: 'titled', title: 'Update', msg: 'Details' },
+  ])
+  expect((await f.account.getUnnotifiedBonuses(clientMetadata('en')))?.bonuses).toEqual([
+    { orderId: 'untitled', expiresAt: '', message: 'News' },
+    { orderId: 'titled', title: 'Update', expiresAt: '', message: 'Details' },
+  ])
+})

@@ -16,7 +16,7 @@ const wallet = z.object({
 })
 const summary = z.object({ normal_wallets: z.array(wallet), bonus_wallets: z.array(wallet) })
 const bonus = z.object({
-  order_id: z.string(), title: z.string().optional(), expires_at: z.string().nullish().transform(value => value ?? ''), msg: z.string(),
+  order_id: z.string(), title: z.string().nullish().transform(value => value ?? undefined), expires_at: z.string().nullish().transform(value => value ?? ''), msg: z.string(),
 })
 // The shared response reader already unwraps biz_data, so the payload is the bonus list itself.
 const unnotified = z.array(bonus)
