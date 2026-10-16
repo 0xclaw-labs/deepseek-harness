@@ -37,8 +37,8 @@ import {
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconCloseFillRegular,
   IconDataOutlineRegular, IconWarningOutlineRegular, Input, rankByName, StateDot, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ModelSelectInjected } from './slots.ts'
+import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ModelLabelOwner, ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
 import { orderModelProviders } from './provider-order.ts'
 
@@ -62,8 +62,9 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * @returns the trigger and, while open, the two-level menu.
  */
 export function ModelSelect(
-  { locked, available, directory, load, select, t }:
-  ModelSelectInjected & { locked: boolean } & PropsLocale<'model'>,
+  { locked, available, directory, load, select, t, renderSlot }:
+  ModelSelectInjected & Pick<PropsRuntime<'conversation.input.model'>, 'locked'> & PropsLocale<'model'>
+    & Omit<PropsRenderSlots<'conversation.input.model.label'>, 'SessionProvider'>,
 ) {
   const state = useSyncExternalStore(
     fn => directory.subscribe(fn),
@@ -426,6 +427,17 @@ export function ModelSelect(
       : effortLabel === undefined
         ? t('trigger.aria', { model: modelLabel })
         : t('trigger.ariaEffort', { model: modelLabel, effort: effortLabel })
+  const renderModelLabel = (
+    provider: ModelLabelOwner['provider'], model: ModelLabelOwner['model'],
+    placement: ModelLabelOwner['placement'], selected: boolean,
+  ) => (
+    <span data-provider-id={provider.id} data-model-id={model.id}>
+      {renderSlot('conversation.input.model.label', {
+        provider: { id: provider.id, name: provider.id === 'deepseek-account' ? t('provider.account') : provider.name },
+        model, placement, selected,
+      }, { fallback: model.name })}
+    </span>
+  )
   itemRefs.current = []
   let itemIndex = 0
   let modelIndex = 0
@@ -467,7 +479,9 @@ export function ModelSelect(
         }}
       >
         <IconDataOutlineRegular className={css.triggerIcon} size={16} />
-        <span className={css.triggerLabel}>{modelLabel}</span>
+        <span className={css.triggerLabel}>
+          {currentChoice === undefined ? modelLabel : renderModelLabel(currentChoice.group, currentChoice.model, 'trigger', true)}
+        </span>
         {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
         {busy
           ? <StateDot state="ongoing" />
@@ -491,7 +505,9 @@ export function ModelSelect(
             <>
               <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { drill('model') }}>
                 <span className={css.cellLabel}>{t('menu.model')}</span>
-                <span className={css.cellValue}>{modelLabel}</span>
+                <span className={css.cellValue}>
+                  {currentChoice === undefined ? modelLabel : renderModelLabel(currentChoice.group, currentChoice.model, 'menu', true)}
+                </span>
                 <IconChevronRightOutlineRegular className={css.cellChevron} />
               </button>
               {reasoning !== undefined && (
@@ -587,7 +603,7 @@ export function ModelSelect(
                             onClick={() => { choose({ provider: group.id, model: model.id }) }}
                           >
                             <span className={css.optionCopy}>
-                              <span className={css.modelName}>{model.name}</span>
+                              <span className={css.modelName}>{renderModelLabel(group, model, 'option', selected)}</span>
                             </span>
                             <span className={css.check}>
                               {pending?.provider === group.id && pending.model === model.id

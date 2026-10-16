@@ -92,6 +92,36 @@ describe('web e2e: the composer model switch is the default for later sessions',
     await scaffold?.close()
   })
 
+  it('exposes inline model labels with exact routes throughout the composer picker', async () => {
+    const trigger = page.getByRole('button', { name: /^选择模型/ })
+    const label = '[data-provider-id][data-model-id]'
+    const readLabels = (surface: Locator) => surface.locator(label).evaluateAll(nodes => nodes.map(node => ({
+      provider: node.getAttribute('data-provider-id'), model: node.getAttribute('data-model-id'),
+      name: node.textContent, slot: node.querySelector('[data-slot]')?.getAttribute('data-slot'),
+      inline: node.tagName === 'SPAN' && node.querySelector('div') === null,
+    })))
+    const current = {
+      provider: START_ROUTE, model: START_MODEL, name: 'Origin Large',
+      slot: 'conversation.input.model.label', inline: true,
+    }
+    expect(await readLabels(trigger)).toEqual([current])
+    try {
+      await trigger.click()
+      const cell = page.getByRole('menuitem', { name: /^模型/ })
+      expect(await readLabels(cell)).toEqual([current])
+      await cell.click()
+      const menu = page.getByRole('menu', { name: '模型', exact: true })
+      await compareOrRefreshGolden(
+        fileURLToPath(new URL('./expected/default-model/model-labels.expected.md', import.meta.url)),
+        JSON.stringify(await readLabels(menu), null, 2),
+        webSnapshotMode(),
+      )
+    } finally {
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+    }
+  })
+
   it('keeps command popup search borders transparent in both palettes', async () => {
     const composer = page.locator('[data-composer-input]').first()
     await page.getByRole('button', { name: '添加文件或调用指令', exact: true }).click()
