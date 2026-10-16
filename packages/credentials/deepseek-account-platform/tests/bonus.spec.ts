@@ -192,8 +192,10 @@ it('reads unnotified bonuses with the platform origin, grant header, and locale 
   expect(batch).toEqual<AccountBonusBatch>({
     accountId: USER as AccountUserId,
     bonuses: [
-      { orderId: ORDER as AccountBonusOrderId, expiresAt: '2026-10-21T12:00:00Z', message: '已赠送您 5.00 元 DSH 体验赠金。' },
-      { orderId: SECOND_ORDER as AccountBonusOrderId, expiresAt: '2026-10-20T12:00:00Z', message: '已赠送您 1.50 元 DSH 体验赠金。' },
+      { orderId: ORDER as AccountBonusOrderId, campaign: 'dsh_login_bonus', amount: '5.00', currency: 'CNY',
+        grantedAt: '2026-09-21T12:00:00Z', expiresAt: '2026-10-21T12:00:00Z', message: '已赠送您 5.00 元 DSH 体验赠金。' },
+      { orderId: SECOND_ORDER as AccountBonusOrderId, campaign: 'dsh_login_bonus', amount: '1.50', currency: 'CNY',
+        grantedAt: '2026-09-20T12:00:00Z', expiresAt: '2026-10-20T12:00:00Z', message: '已赠送您 1.50 元 DSH 体验赠金。' },
     ],
   })
   expect(f.requests).toEqual([
@@ -205,15 +207,16 @@ it('reads unnotified bonuses with the platform origin, grant header, and locale 
 })
 
 it.each([
-  ['absent', {}],
-  ['unvalidated', { campaign: null, amount: 'not-a-number', currency: 'EUR', granted_at: 42 }],
-])('accepts opaque order IDs with %s unused fields and acknowledges the same ID', async (_name, extra) => {
+  ['absent', {}, {}],
+  ['unvalidated', { campaign: null, amount: 'not-a-number', currency: 'EUR', granted_at: 42 },
+    { campaign: null, amount: 'not-a-number', currency: 'EUR', grantedAt: 42 }],
+])('accepts opaque order IDs with %s unused fields and acknowledges the same ID', async (_name, extra, expected) => {
   const f = await fixture()
   await f.grant('test-account-token')
   f.bonuses([{ order_id: 'model-update-1', expires_at: '2099-01-01T00:00:00Z', title: 'Model news', msg: 'Model updated', ...extra }])
   const batch = await f.account.getUnnotifiedBonuses(clientMetadata('en'))
   expect(batch?.bonuses).toEqual([
-    { orderId: 'model-update-1', expiresAt: '2099-01-01T00:00:00Z', title: 'Model news', message: 'Model updated' },
+    { orderId: 'model-update-1', expiresAt: '2099-01-01T00:00:00Z', title: 'Model news', message: 'Model updated', ...expected },
   ])
   const notice = batch!.bonuses[0]!
   expect(await f.account.ackBonusNotified(batch!.accountId, notice.orderId, clientMetadata('en'))).toBe(true)
