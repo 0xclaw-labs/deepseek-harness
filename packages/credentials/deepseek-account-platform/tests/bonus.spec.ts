@@ -192,10 +192,8 @@ it('reads unnotified bonuses with the platform origin, grant header, and locale 
   expect(batch).toEqual<AccountBonusBatch>({
     accountId: USER as AccountUserId,
     bonuses: [
-      { orderId: ORDER as AccountBonusOrderId, campaign: 'dsh_login_bonus', amount: '5.00', currency: 'CNY',
-        grantedAt: '2026-09-21T12:00:00Z', expiresAt: '2026-10-21T12:00:00Z', message: '已赠送您 5.00 元 DSH 体验赠金。' },
-      { orderId: SECOND_ORDER as AccountBonusOrderId, campaign: 'dsh_login_bonus', amount: '1.50', currency: 'CNY',
-        grantedAt: '2026-09-20T12:00:00Z', expiresAt: '2026-10-20T12:00:00Z', message: '已赠送您 1.50 元 DSH 体验赠金。' },
+      { orderId: ORDER as AccountBonusOrderId, expiresAt: '2026-10-21T12:00:00Z', message: '已赠送您 5.00 元 DSH 体验赠金。' },
+      { orderId: SECOND_ORDER as AccountBonusOrderId, expiresAt: '2026-10-20T12:00:00Z', message: '已赠送您 1.50 元 DSH 体验赠金。' },
     ],
   })
   expect(f.requests).toEqual([
@@ -206,17 +204,33 @@ it('reads unnotified bonuses with the platform origin, grant header, and locale 
   ])
 })
 
-it('accepts exponent and full-precision bonus amounts through the Platform numeric grammar', async () => {
+it.each([
+  ['absent', {}],
+  ['unvalidated', { campaign: null, amount: 'not-a-number', currency: 'EUR', granted_at: 42 }],
+])('accepts opaque order IDs with %s unused fields and acknowledges the same ID', async (_name, extra) => {
   const f = await fixture()
   await f.grant('test-account-token')
-  f.bonuses([
-    { order_id: ORDER, campaign: 'dsh_login_bonus', amount: '5.0000000000000000', currency: 'CNY',
-      granted_at: '2026-09-21T12:00:00Z', expires_at: '2026-10-21T12:00:00Z', msg: 'fixture' },
-    { order_id: SECOND_ORDER, campaign: 'dsh_login_bonus', amount: '1E+3', currency: 'CNY',
-      granted_at: '2026-09-20T12:00:00Z', expires_at: '2026-10-20T12:00:00Z', msg: 'fixture' },
-  ])
+  f.bonuses([{ order_id: 'model-update-1', expires_at: '2099-01-01T00:00:00Z', title: 'Model news', msg: 'Model updated', ...extra }])
   const batch = await f.account.getUnnotifiedBonuses(clientMetadata('en'))
-  expect(batch?.bonuses.map(bonus => bonus.amount)).toEqual(['5.0000000000000000', '1E+3'])
+  expect(batch?.bonuses).toEqual([
+    { orderId: 'model-update-1', expiresAt: '2099-01-01T00:00:00Z', title: 'Model news', message: 'Model updated' },
+  ])
+  const notice = batch!.bonuses[0]!
+  expect(await f.account.ackBonusNotified(batch!.accountId, notice.orderId, clientMetadata('en'))).toBe(true)
+  expect(f.requests.at(-1)?.body).toBe(JSON.stringify({ order_id: 'model-update-1' }))
+})
+
+it.each([
+  ['empty', { expires_at: '' }],
+  ['null', { expires_at: null }],
+  ['absent', {}],
+])('accepts %s expiry as a notice that never expires', async (_name, expiry) => {
+  const f = await fixture()
+  await f.grant('test-account-token')
+  f.bonuses([{ order_id: 'notice', msg: 'News', ...expiry }])
+  expect((await f.account.getUnnotifiedBonuses(clientMetadata('en')))?.bonuses).toEqual([
+    { orderId: 'notice', expiresAt: '', message: 'News' },
+  ])
 })
 
 it.each([
@@ -234,9 +248,9 @@ it.each([
 })
 
 it.each([
-  ['a non-UUID order id', [{ order_id: 'order', campaign: 'c', amount: '5.00', currency: 'CNY', granted_at: 'a', expires_at: 'b', msg: 'm' }]],
-  ['a non-decimal amount', [{ order_id: ORDER, campaign: 'c', amount: 'five', currency: 'CNY', granted_at: 'a', expires_at: 'b', msg: 'm' }]],
-  ['an unknown currency', [{ order_id: ORDER, campaign: 'c', amount: '5.00', currency: 'EUR', granted_at: 'a', expires_at: 'b', msg: 'm' }]],
+  ['a non-string title', [{ order_id: 'order', title: 42, expires_at: 'b', msg: 'm' }]],
+  ['a non-string order id', [{ order_id: 42, expires_at: 'b', msg: 'm' }]],
+  ['a non-string expiry', [{ order_id: 'order', expires_at: 42, msg: 'm' }]],
   ['a missing message', [{ order_id: ORDER, campaign: 'c', amount: '5.00', currency: 'CNY', granted_at: 'a', expires_at: 'b' }]],
   ['a payload that is not a list', { bonuses: [] }],
 ])('rejects a malformed unnotified payload: %s', async (_name, payload) => {
