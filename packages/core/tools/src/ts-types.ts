@@ -246,19 +246,30 @@ export function jsonSchemaToTs(schema: unknown, indent = 0): string {
   }
 }
 
-/** The fixed model-facing usage contract rendered above the declarations (see the PTC mode Agent Note's "What the model sees"). */
-const SDK_INSTRUCTIONS = `## Writing code for run_code
+/** Render the argument and call instructions for the selected execution syntax. */
+function renderSdkInstructions(programFormat: 'function-body' | 'repl'): string {
+  const programDescription = programFormat === 'function-body'
+    ? 'the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped)'
+    : 'the program to execute'
+  return `## Writing code for run_code
 
-\`run_code\` takes two required arguments: \`code\`, the program to execute, and \`description\`, a short summary of what the program does. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly.`
+\`run_code\` takes two required arguments: \`code\`, ${programDescription}, and \`description\`, a short summary of what the program does. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly.`
+}
 
-const SDK_PROGRAM_INSTRUCTIONS = `Inside the program:
+/** Render tool execution and output instructions for the selected execution syntax. */
+function renderSdkProgramInstructions(programFormat: 'function-body' | 'repl'): string {
+  const outputInstruction = programFormat === 'function-body'
+    ? 'Emit results with `return` and/or `console.log(...)`. Only what you print or return is program output.'
+    : 'Only values emitted as program output enter the conversation.'
+  return `Inside the program:
 
 - Call tools as \`await tools.name(args)\` — quoted access for exotic names: \`tools["my-tool"](args)\`. Every call resolves to the tool's typed canonical JSON value. Tool arguments must be lossless JSON.
 - A FAILED tool call rejects with \`ToolCallError\`, whose \`toolName\` identifies the failed tool and whose \`message\` is human-readable — \`try/catch\` it to handle and continue.
 - Independent read-only calls MAY overlap under \`Promise.all\` (safe calls run concurrently; mutating calls run alone, in submission order). Sequence dependent work with \`await\`.
-- Only values emitted as program output enter the conversation. A successful tool result containing an image is attached after the run so you can inspect it on the next step; every other intermediate result stays out of the conversation, so extract just what you need.
+- ${outputInstruction} A successful tool result containing an image is attached after the run so you can inspect it on the next step; every other intermediate result stays out of the conversation, so extract just what you need.
 
 Program-only SDK bindings:`
+}
 
 /** Whether one string schema accepts the literal used by the bash example. */
 function acceptsExampleString(schema: JsonSchemaNode | undefined, value: string): boolean {
@@ -317,11 +328,7 @@ export function renderToolsSdk(schemas: ToolSdkSchema[], programFormat: 'functio
     ['declare const tools: {', '  [K in ToolName]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]>;', '}'].join('\n'),
   ].join('\n\n')
   const jsonValue = 'type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }'
-  const instructions = programFormat === 'function-body'
-    ? SDK_INSTRUCTIONS.replace('the program to execute', 'the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped)')
-    : SDK_INSTRUCTIONS
-  const programInstructions = programFormat === 'function-body'
-    ? SDK_PROGRAM_INSTRUCTIONS.replace('Only values emitted as program output enter the conversation.', 'Emit results with `return` and/or `console.log(...)`. Only what you print or return is program output.')
-    : SDK_PROGRAM_INSTRUCTIONS
+  const instructions = renderSdkInstructions(programFormat)
+  const programInstructions = renderSdkProgramInstructions(programFormat)
   return `${instructions}${renderBashExample(sorted, programFormat)}\n\n${programInstructions}\n\n\`\`\`ts\n${jsonValue}\n\n${declaration}\n\`\`\``
 }

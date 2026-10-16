@@ -47,23 +47,26 @@ interface RunCodeFlavor {
 }
 
 /** Keep tool-call rules here; the runtime owns evaluation syntax and state retention. */
-function runCodeFlavor(language: string): RunCodeFlavor {
+function runCodeFlavor(language: string, execution = {
+  programDescription: 'the program to execute',
+  outputInstruction: 'Curate the program output.',
+  codeDescription: `The ${language} program to execute, following this tool's execution instructions.`,
+}): RunCodeFlavor {
   return {
     description: `Execute a ${language} program against the available tools. Takes two required arguments: `
-      + '`code`, the program to execute, and `description`, a short summary of what the program does. '
+      + `\`code\`, ${execution.programDescription}, and \`description\`, a short summary of what the program does. `
       + 'Call tools as `await tools.name(args)` per the declarations in the system prompt. '
-      + 'Curate the program output. Image-bearing subtool results are attached after the run.',
-    codeDescription: `The ${language} program to execute, following this tool's execution instructions.`,
+      + `${execution.outputInstruction} Image-bearing subtool results are attached after the run.`,
+    codeDescription: execution.codeDescription,
   }
 }
 
 const TYPESCRIPT_FLAVOR = runCodeFlavor('TypeScript')
-const TYPESCRIPT_FUNCTION_FLAVOR: RunCodeFlavor = {
-  description: TYPESCRIPT_FLAVOR.description
-    .replace('`code`, the program to execute', '`code`, the BODY of an async function (erasable syntax only; top-level `await` and `return` work)')
-    .replace('Curate the program output.', 'Only what you print or return is program output — curate it.'),
+const TYPESCRIPT_FUNCTION_FLAVOR = runCodeFlavor('TypeScript', {
+  programDescription: 'the BODY of an async function (erasable syntax only; top-level `await` and `return` work)',
+  outputInstruction: 'Only what you print or return is program output — curate it.',
   codeDescription: 'The program: the body of an async TypeScript function.',
-}
+})
 const PYTHON_FLAVOR = runCodeFlavor('Python')
 
 /**
