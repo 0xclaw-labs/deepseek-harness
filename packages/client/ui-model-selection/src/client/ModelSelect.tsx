@@ -25,7 +25,7 @@
  * chevron, and each row whose value that selection carries shows one in place
  * of its check mark.
  */
-import { MenuGroup, MenuSurface, observeStickyMenuGroups } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MenuGroup, MenuSurface, observeStickyMenuGroups, useAnchoredPosition } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type CSSProperties, type KeyboardEvent, type FocusEvent,
@@ -87,7 +87,15 @@ export function ModelSelect(
   const searchRef = useRef<HTMLInputElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const groupsRef = useRef<HTMLDivElement | null>(null)
-  const [menuPos, setMenuPos] = useState<CSSProperties | null>(null)
+  const menuPos = useAnchoredPosition({
+    open: available && open,
+    anchorRef: triggerRef,
+    panelRef: menuRef,
+    side: 'top',
+    align: 'end',
+    gap: 8,
+    margin: 12,
+  })
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
 
@@ -205,40 +213,6 @@ export function ModelSelect(
       itemRefs.current[activeModelIndex]?.scrollIntoView({ block: 'nearest' })
     }
   }, [open, pane, activeModelIndex, visibleModels])
-
-  // Portaled placement (the Menu primitive's portal rules: fixed from the
-  // anchor rect, measured before paint, clamped inside the viewport): above
-  // the trigger, right edges aligned. Depends on pane and directory state
-  // because pane switches and async catalog loads resize the card.
-  /* jscpd:ignore-start -- deliberate mirror of ui-primitives useAnchoredPosition:
-     that hook only places from the anchor's LEFT edge, while this card aligns
-     right edges (x = rect.right - width), so the measure-and-clamp plumbing repeats. */
-  useLayoutEffect(() => {
-    if (!open) { setMenuPos(null); return }
-    const place = (): void => {
-      /* v8 ignore next 2 -- the trigger ref is attached whenever the menu is open. */
-      const rect = triggerRef.current?.getBoundingClientRect()
-      if (rect === undefined) return
-      const MARGIN = 12
-      const lw = menuRef.current?.offsetWidth ?? 0
-      const lh = menuRef.current?.offsetHeight ?? 0
-      let x = rect.right - lw
-      let y = rect.top - 8 - lh
-      if (lw > 0) x = Math.min(Math.max(x, MARGIN), window.innerWidth - lw - MARGIN)
-      if (lh > 0) y = Math.min(Math.max(y, MARGIN), window.innerHeight - lh - MARGIN)
-      setMenuPos({ left: x, top: y })
-    }
-    // First run measures the hidden pre-render (same commit as `open`), so
-    // the card lands placed before anything paints.
-    place()
-    window.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
-    return () => {
-      window.removeEventListener('scroll', place, true)
-      window.removeEventListener('resize', place)
-    }
-  }, [open, pane, state, query])
-  /* jscpd:ignore-end */
 
   if (!available) return null
 
@@ -438,7 +412,6 @@ export function ModelSelect(
       }, { fallback: model.name })}
     </span>
   )
-  itemRefs.current = []
   let itemIndex = 0
   let modelIndex = 0
   const itemRef = () => {

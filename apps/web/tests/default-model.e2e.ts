@@ -104,7 +104,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
       provider: START_ROUTE, model: START_MODEL, name: 'Origin Large',
       slot: 'conversation.input.model.label', inline: true,
     }
-    expect(await readLabels(trigger)).toEqual([current])
+    await expect.poll(() => readLabels(trigger)).toEqual([current])
     try {
       await trigger.click()
       const cell = page.getByRole('menuitem', { name: /^模型/ })
@@ -119,6 +119,40 @@ describe('web e2e: the composer model switch is the default for later sessions',
     } finally {
       await page.keyboard.press('Escape')
       await page.keyboard.press('Escape')
+    }
+  })
+
+  it.each(['root', 'model'])('reanchors the %s menu when a label grows and shrinks without a window resize', async (pane) => {
+    const viewport = page.viewportSize()!
+    const trigger = page.getByRole('button', { name: /^选择模型/ })
+    try {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await trigger.click()
+      if (pane === 'model') await page.getByRole('menuitem', { name: /^模型/ }).click()
+      const surface = page.getByRole(pane === 'model' ? 'group' : 'menu', { name: '模型与推理等级', exact: true })
+      const label = surface.locator('[data-provider-id="origin-gateway"][data-model-id="origin-large"]')
+      await label.waitFor()
+      const original = await surface.boundingBox()
+      expect(original).not.toBeNull()
+      // A Slot descendant can resize independently of ModelSelect's props and state.
+      await label.evaluate((node) => {
+        const badge = node.ownerDocument.createElement('span')
+        badge.dataset.modelLabelResizeProbe = ''
+        badge.textContent = ' — Provider identification badge with a long channel name'
+        node.appendChild(badge)
+      })
+      await expect.poll(async () => (await surface.boundingBox())!.width).toBeGreaterThan(original!.width + 50)
+      await expect.poll(async () => {
+        const box = (await surface.boundingBox())!
+        return box.x >= 12 && box.x + box.width <= 378
+      }).toBe(true)
+      await label.locator('[data-model-label-resize-probe]').evaluate((node) => { node.remove() })
+      await expect.poll(async () => (await surface.boundingBox())!.width).toBeCloseTo(original!.width)
+      await expect.poll(async () => (await surface.boundingBox())!.x).toBeCloseTo(original!.x)
+    } finally {
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+      await page.setViewportSize(viewport)
     }
   })
 
