@@ -80,11 +80,11 @@ async function mockPlatform() {
   let failSummary = false
   /** Reply held back while the test controls when a read can answer. */
   let heldReply: (() => void) | undefined
-  const grant = (orderId: string, amount: string): void => {
+  const grant = (orderId: string, amount: string, extraCopy = ''): void => {
     unnotified.unshift({
       orderId, amount,
-      zh_CN: `已赠送您 ${amount} 元 DSH 体验赠金。`,
-      en_US: `You received a CNY ${amount} DSH trial credit.`,
+      zh_CN: `已赠送您 ${amount} 元 DSH 体验赠金。${extraCopy}`,
+      en_US: `You received a CNY ${amount} DSH trial credit.${extraCopy}`,
     })
   }
   /** @param value - granted bonus. @param locale - request language. @returns its wire fields. */
@@ -581,7 +581,7 @@ describe.skipIf(MODE === 'record')('web e2e: bonus notice', () => {
     await webPage.close()
     platform.clearUnnotified()
     platform.grant('stack-third', '23.00')
-    platform.grant('stack-second', '22.00')
+    platform.grant('stack-second', '22.00', '\nMore details'.repeat(8))
     platform.grant('stack-first', '21.00')
     const ackStart = platform.acks.length
     const stackPage = await openDesktopPage('zh-CN')
@@ -611,7 +611,29 @@ describe.skipIf(MODE === 'record')('web e2e: bonus notice', () => {
     await stackPage.emulateMedia({ colorScheme: 'dark' })
     await expect.poll(() => stackPage.locator('body').getAttribute('data-ds-dark-theme')).not.toBeNull()
     await stackPage.screenshot({ path: join(artifactDir, 'bonus-notice-stack-dark.png') })
-    await cards.filter({ has: stackPage.getByRole('button', { name: '关闭', exact: true }) }).getByRole('button').click()
+    const promotion = await stackPage.evaluate(() => {
+      const front = document.querySelector<HTMLElement>('aside[data-front="true"]')!
+      const next = front.nextElementSibling as HTMLElement
+      const before = next.getBoundingClientRect()
+      front.querySelector('button')!.click()
+      const animation = next.getAnimations()[0]!
+      animation.pause()
+      animation.currentTime = 0
+      const start = next.getBoundingClientRect()
+      animation.currentTime = 125
+      const middle = next.getBoundingClientRect()
+      animation.finish()
+      const end = next.getBoundingClientRect()
+      return { before: { y: before.y, height: before.height }, start: { y: start.y, height: start.height },
+        middle: { y: middle.y, height: middle.height }, end: { y: end.y, height: end.height } }
+    })
+    expect(promotion.start.y).toBeCloseTo(promotion.before.y, 0)
+    expect(promotion.start.height).toBeCloseTo(promotion.before.height, 0)
+    expect(promotion.end.height).toBeGreaterThan(promotion.start.height + 100)
+    expect(promotion.middle.height).toBeGreaterThan(promotion.start.height)
+    expect(promotion.middle.height).toBeLessThan(promotion.end.height)
+    expect(promotion.middle.y).toBeLessThan(promotion.start.y)
+    expect(promotion.middle.y).toBeGreaterThan(promotion.end.y)
     await expect.poll(() => cards.count()).toBe(2)
     await expect.poll(async () => Math.round((await second.boundingBox())!.width)).toBe(280)
     expect(await second.evaluate((element, previous) => element === previous, secondNode)).toBe(true)
@@ -625,6 +647,7 @@ describe.skipIf(MODE === 'record')('web e2e: bonus notice', () => {
     await cards.filter({ hasText: '23.00' }).getByRole('button', { name: '关闭', exact: true }).click()
     await expect.poll(() => cards.count()).toBe(0)
     observations.push('stack.dismissed cards=0 acks=stack-first,stack-second,stack-third')
+    await stackPage.close()
 
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'notice-flow.expected.md'), observations.join('\n'), MODE)
     for (const tripwire of tripwires) {

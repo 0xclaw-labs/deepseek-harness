@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import { IconCloseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { BonusNotice } from './bonus-notices.ts'
 import css from './AccountNotice.module.css'
+import { dismissNotice } from './notice-transition.ts'
 
 /** @param expiresAt - server expiration timestamp. @returns whether the award can still be spent. */
 function live(expiresAt: string): boolean {
@@ -129,6 +130,6 @@ function NoticeCard({ notice, depth, ready, title, closeLabel, onShown, onDismis
       </span><span>{title}</span></div>
       <p>{notice.message}</p>
     </div>
-    <button type="button" tabIndex={foreground ? undefined : -1} className={css.close} aria-label={closeLabel} onClick={() => { onDismiss(notice.orderId) }}><IconCloseOutlineRegular size={10} /></button>
+    <button type="button" tabIndex={foreground ? undefined : -1} className={css.close} aria-label={closeLabel} onClick={(event) => { dismissNotice(event.currentTarget.parentElement as HTMLElement, () => { onDismiss(notice.orderId) }) }}><IconCloseOutlineRegular size={10} /></button>
   </aside>
 }

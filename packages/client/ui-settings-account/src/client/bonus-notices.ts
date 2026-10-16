@@ -157,7 +157,6 @@ export function createBonusNoticeController(options: BonusNoticeControllerOption
       return
     }
     setCurrent(candidates)
-
   }
 
   /**
