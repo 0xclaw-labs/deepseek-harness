@@ -138,6 +138,12 @@ if (desktopProfileDirectory !== undefined) {
   mkdirSync(profile, { recursive: true })
   app.setPath('userData', profile)
   mkdirSync(join(profile, 'logs'), { recursive: true })
+  // Brand isolation: a rebranded package owns a private Harness home. Without it
+  // the Host would read `~/.dsh` — the user's upstream/npm-installed DeepSeek
+  // Harness profile, sessions, credentials, plugins and model settings. A caller
+  // that explicitly sets DSH_HOME (development/tests) keeps it.
+  if (process.env.DSH_HOME === undefined) process.env.DSH_HOME = join(profile, 'dsh-home')
+  mkdirSync(process.env.DSH_HOME, { recursive: true })
 }
 // Platform-conventional logs directory (macOS ~/Library/Logs/<name>, otherwise under userData);
 // set before ready so the first fatal report already resolves under it. A branded package keeps
@@ -508,7 +514,13 @@ async function main(): Promise<void> {
     return result.environment
   })
   let hostEnvironment: NodeJS.ProcessEnv = process.env
-  const prepareHostEnvironment = async (): Promise<void> => { hostEnvironment = await loginShell }
+  const brandDshHome = process.env.DSH_HOME
+  const prepareHostEnvironment = async (): Promise<void> => {
+    hostEnvironment = await loginShell
+    // A login-shell rc file must not redirect a branded package back to ~/.dsh.
+    if (desktopProfileDirectory !== undefined && brandDshHome !== undefined) hostEnvironment.DSH_HOME = brandDshHome
+    if (process.env.DSH_PAINUO_TOKEN !== undefined) hostEnvironment.DSH_PAINUO_TOKEN = process.env.DSH_PAINUO_TOKEN
+  }
   let quitting = false
   let startup: Promise<void> | undefined
   let workspaceRecovery: Promise<void> | undefined
