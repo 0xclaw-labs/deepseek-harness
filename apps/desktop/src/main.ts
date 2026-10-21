@@ -385,36 +385,61 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
  * Brand identity bootstrap (随身搭子): the PaiNuo ecosystem login replaces the
  * upstream DeepSeek account. The account shim stores its sealed grant in
  * `$DSH_HOME/.credentials.yaml`; the pi-ai provider below reads it through
- * DSH_PAINUO_TOKEN (never a model key). The provider patch is seeded once, and
- * a fresh login triggers one relaunch so the already-started Host picks the
- * token up from its environment.
+ * DSH_PAINUO_TOKEN (never a model key). The provider patch is generated at
+ * startup from the live PaiNuo model catalog so the picker shows every chat
+ * model the ecosystem serves. A fresh login triggers one relaunch so the
+ * already-started Host picks the token up from its environment.
  */
-function bootstrapPaiNuoBrand(): void {
+async function fetchPaiNuoModels(grant: string): Promise<Array<{ id: string; name: string }>> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => { controller.abort() }, 5000)
+  try {
+    const response = await fetch('https://auth.modelxing.com/pi/v1/models', {
+      headers: { authorization: `Bearer ${grant}` }, signal: controller.signal,
+    })
+    if (!response.ok) return []
+    const payload = await response.json() as { data?: Array<{ id?: unknown; endpoint?: unknown; object?: unknown }> }
+    const seen = new Set<string>()
+    const models: Array<{ id: string; name: string }> = []
+    for (const item of payload.data ?? []) {
+      if (typeof item?.id !== 'string' || item.id.length === 0 || seen.has(item.id)) continue
+      if (item.endpoint !== undefined && item.endpoint !== '/v1/chat/completions') continue
+      if (item.endpoint === undefined && item.object !== 'model') continue
+      seen.add(item.id)
+      models.push({ id: item.id, name: item.id })
+    }
+    return models
+  } catch (_error) {
+    return []
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function paiNuoProviderPatch(models: ReadonlyArray<{ id: string; name: string }>): string {
+  if (models.length === 0) return ''
+  const list = models.map(model => JSON.stringify({ id: model.id, name: model.name })).join(',')
+  return '# paiNuo-model-provider: PaiNuo ecosystem model catalog (auth.modelxing.com proxy).\n' +
+    '- id: llm-pi-ai\n' +
+    '  config:\n' +
+    '    providers:\n' +
+    '      painuo:\n' +
+    '        displayName: 派诺生态\n' +
+    '        apiKeyEnv: DSH_PAINUO_TOKEN\n' +
+    '        api: openai-completions\n' +
+    '        baseURL: https://auth.modelxing.com/pi/v1\n' +
+    '        defaultContextWindow: 131072\n' +
+    '        defaultMaxTokens: 8192\n' +
+    `        models: [${list}]\n`
+}
+
+async function bootstrapPaiNuoBrand(): Promise<void> {
   try {
     const home = resolveDshHome()
     const profileDir = join(home, 'profiles', 'desktop')
     mkdirSync(profileDir, { recursive: true })
     const patchPath = join(profileDir, 'cordis.patch.yml')
-    const marker = 'painuo-model-provider'
-    let patch = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '# dsh profile patch layer\n[]\n'
-    if (!patch.includes(marker)) {
-      const block = `# ${marker}: PaiNuo ecosystem model provider (auth.modelxing.com proxy).\n` +
-        '- id: llm-pi-ai\n' +
-        '  config:\n' +
-        '    providers:\n' +
-        '      painuo:\n' +
-        '        displayName: 派诺生态\n' +
-        '        apiKeyEnv: DSH_PAINUO_TOKEN\n' +
-        '        api: openai-completions\n' +
-        '        baseURL: https://auth.modelxing.com/pi/v1\n' +
-        '        models:\n' +
-        '          - id: MiniMax-M2.5\n' +
-        '            name: MiniMax M2.5\n' +
-        '            contextWindow: 262144\n' +
-        '            maxTokens: 32768\n'
-      patch = patch.trim() === '[]' ? block : `${patch.trimEnd()}\n${block}`
-      writeFileSync(patchPath, patch, { mode: 0o600 })
-    }
+    const marker = 'paiNuo-model-provider'
     const credentialsPath = join(home, '.credentials.yaml')
     const readGrant = (): string | undefined => {
       try {
@@ -424,6 +449,23 @@ function bootstrapPaiNuoBrand(): void {
     }
     const grant = readGrant()
     if (grant !== undefined && process.env.DSH_PAINUO_TOKEN === undefined) process.env.DSH_PAINUO_TOKEN = grant
+    const catalog = grant === undefined ? [] : await fetchPaiNuoModels(grant)
+    const block = paiNuoProviderPatch(catalog)
+    if (block !== '') {
+      let patch = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '# dsh profile patch layer\n[]\n'
+      // Replace an earlier generated block (or the untouched empty profile) and
+      // leave any user-authored rows after the marker intact.
+      if (patch.includes(marker)) {
+        const head = patch.slice(0, patch.indexOf('#' + marker))
+        const rest = patch.slice(patch.indexOf('#' + marker))
+        const nextRow = rest.indexOf('\n- id:', 1)
+        patch = head + (nextRow === -1 ? '' : rest.slice(nextRow + 1))
+      } else if (patch.trim() === '[]') {
+        patch = ''
+      }
+      const next = `${block}${patch.trim() === '' ? '' : patch.startsWith('#') ? patch : `\n${patch}`}`
+      if (next !== readFileSync(patchPath, 'utf8')) writeFileSync(patchPath, next, { mode: 0o600 })
+    }
     if (process.env.DSH_PAINUO_TOKEN === undefined) {
       let relaunched = false
       watchFile(credentialsPath, { interval: 1500 }, () => {
@@ -446,7 +488,7 @@ async function main(): Promise<void> {
   const updateJournal = journalDirectory === undefined ? undefined : new DesktopUpdateJournal(journalDirectory, app.getVersion())
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
-  bootstrapPaiNuoBrand()
+  await bootstrapPaiNuoBrand()
   const development = !app.isPackaged
   const primaryRuntime = development
     ? developmentPrimaryRuntime()
