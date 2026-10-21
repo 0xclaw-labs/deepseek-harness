@@ -28,7 +28,10 @@ const FILE_SETTINGS = ['DSH_DESKTOP_WINDOWS_CER_FILE', 'DSH_DESKTOP_WINDOWS_SIGN
 export function localMacOSPackageEnvironment(environment = process.env) {
   return {
     ...Object.fromEntries(Object.entries(environment).filter(([name]) => !AMBIENT_RELEASE_SETTING.test(name))),
-    DSH_DESKTOP_APP_ID: 'com.deepseek.harness',
+    // Fork customization: local unsigned builds otherwise pin the upstream
+    // bundle id, and ambient DSH_DESKTOP_APP_ID is filtered as a release-only
+    // setting. A rebranded build supplies DSH_DESKTOP_BRAND_APP_ID instead.
+    DSH_DESKTOP_APP_ID: (environment.DSH_DESKTOP_BRAND_APP_ID ?? '').trim() || 'com.deepseek.harness',
     DSH_DESKTOP_UNSIGNED: '1',
   }
 }

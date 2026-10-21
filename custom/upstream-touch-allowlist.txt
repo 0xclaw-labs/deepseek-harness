@@ -11,3 +11,4 @@ apps/desktop/scripts/electron-builder-config.mjs
 apps/desktop/scripts/smoke-packaged-runtime.ts
 apps/desktop/scripts/package-target.ts
 apps/desktop/scripts/package-macos.ts
+apps/desktop/scripts/desktop-package-environment.mjs
