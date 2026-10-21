@@ -452,19 +452,21 @@ async function bootstrapPaiNuoBrand(): Promise<void> {
     const catalog = grant === undefined ? [] : await fetchPaiNuoModels(grant)
     const block = paiNuoProviderPatch(catalog)
     if (block !== '') {
-      let patch = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '# dsh profile patch layer\n[]\n'
-      // Replace an earlier generated block (or the untouched empty profile) and
-      // leave any user-authored rows after the marker intact.
-      if (patch.includes(marker)) {
-        const head = patch.slice(0, patch.indexOf('#' + marker))
-        const rest = patch.slice(patch.indexOf('#' + marker))
-        const nextRow = rest.indexOf('\n- id:', 1)
-        patch = head + (nextRow === -1 ? '' : rest.slice(nextRow + 1))
-      } else if (patch.trim() === '[]') {
-        patch = ''
+      const existing = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : ''
+      // Drop a previously generated block, then drop the empty-sequence
+      // placeholder. Comments and user-authored entries are preserved; our
+      // block is appended last so the profile patch stays a valid sequence.
+      let rest = existing
+      if (rest.includes(marker)) {
+        const markerIndex = rest.indexOf('#' + marker)
+        const afterMarker = rest.slice(markerIndex)
+        const firstRow = afterMarker.indexOf('\n- id:')
+        const secondRow = firstRow === -1 ? -1 : afterMarker.indexOf('\n- id:', firstRow + 1)
+        rest = rest.slice(0, markerIndex) + (secondRow === -1 ? '' : afterMarker.slice(secondRow + 1))
       }
-      const next = `${block}${patch.trim() === '' ? '' : patch.startsWith('#') ? patch : `\n${patch}`}`
-      if (next !== readFileSync(patchPath, 'utf8')) writeFileSync(patchPath, next, { mode: 0o600 })
+      rest = rest.split('\n').filter(line => line.trim() !== '[]').join('\n').trimEnd()
+      const next = rest === '' ? block : `${rest}\n${block}`
+      if (next !== existing) writeFileSync(patchPath, next, { mode: 0o600 })
     }
     if (process.env.DSH_PAINUO_TOKEN === undefined) {
       let relaunched = false
