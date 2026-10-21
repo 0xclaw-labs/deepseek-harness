@@ -47,9 +47,14 @@ esac
 BRAND_JSON="$(node -e 'const fs=require("node:fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(JSON.stringify(b))' "$BRAND_DIR/brand.json")"
 read -r PRODUCT_NAME APP_ID SCHEME ARTIFACT_PREFIX < <(node -e '
 const b = JSON.parse(process.argv[1]);
-process.stdout.write([b.productName, b.appId, b.protocolScheme, b.artifactPrefix].join("\n"));
-process.stdout.write("\n");
+process.stdout.write([b.productName, b.appId, b.protocolScheme, b.artifactPrefix].join("\t"));
 ' "$BRAND_JSON")
+for value in "$PRODUCT_NAME" "$APP_ID" "$SCHEME" "$ARTIFACT_PREFIX"; do
+  if [[ -z "$value" ]]; then
+    echo "build-unsigned: brand.json is missing productName/appId/protocolScheme/artifactPrefix" >&2
+    exit 2
+  fi
+done
 
 WORK="${WORK:-$(mktemp -d -t dsh-brand-build-XXXXXX)}"
 if [[ ! -d "$WORK/.git" && ! -f "$WORK/.git" ]]; then
