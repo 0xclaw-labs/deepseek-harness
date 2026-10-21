@@ -115,9 +115,16 @@ for (const asset of brand.assets ?? []) {
   const target = join(root, targetRel)
   const row = { from: asset.from, to: targetRel, sourceExists: existsSync(source), targetExists: existsSync(target) }
   if (args.mode === 'write') {
-    if (!row.sourceExists) fail(`brand asset missing: ${source}`)
-    writeFileSync(target, readFileSync(source))
-    row.copied = true
+    if (!row.sourceExists) {
+      // Prepared brand packs can ship platform-specific assets later; a missing
+      // optional asset keeps the upstream icon (reported, not fatal). --strict
+      // turns this into a hard failure so release pipelines can require a full set.
+      console.warn(`apply-brand: asset missing, keeping upstream: ${source}`)
+      row.skipped = true
+    } else {
+      writeFileSync(target, readFileSync(source))
+      row.copied = true
+    }
   }
   assetResults.push(row)
 }
