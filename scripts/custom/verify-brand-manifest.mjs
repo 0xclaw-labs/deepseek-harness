@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process'
 
 const worktree = process.argv[2]
 if (!worktree) { console.error('verify-brand-manifest: missing worktree argument'); process.exit(2) }
-const brand = JSON.parse(readFileSync(new URL('../branding/brand.json', import.meta.url), 'utf8'))
+const brand = JSON.parse(readFileSync(new URL('../../custom/branding/brand.json', import.meta.url), 'utf8'))
 const desktop = join(worktree, 'apps', 'desktop')
 const artifactsRoot = process.argv[3] ?? join(desktop, '.desktop-build', 'targets', 'mac-arm64', 'unsigned-artifacts')
 const appName = `${brand.productName}.app`
