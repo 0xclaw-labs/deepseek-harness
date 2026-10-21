@@ -129,18 +129,18 @@ index 6c3c12c857..1c2d8b2dc5 100644
    resolveDesktopPackageTarget(target))
  if (windows && !values.unsigned) await verifyWindowsCode(application)
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 2afdfd7194..ae1a1250f0 100644
+index 2afdfd7194..acf9cd9e09 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
 @@ -2,6 +2,7 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
  import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
  /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
  
-+import { readFileSync } from 'node:fs'
++import { mkdirSync, readFileSync } from 'node:fs'
  import { readFile, writeFile } from 'node:fs/promises'
  import { join } from 'node:path'
  import { fileURLToPath } from 'node:url'
-@@ -80,9 +81,39 @@ let backendReady = false
+@@ -80,9 +81,43 @@ let backendReady = false
  /** Error-level console output of the primary window, attached to crash reports. */
  const rendererConsole = new RendererConsoleTail()
  
@@ -170,7 +170,11 @@ index 2afdfd7194..ae1a1250f0 100644
 +// single-instance lock at the end of this module.
 +const desktopProfileDirectory = resolveDesktopProfileDirectory()
 +if (desktopProfileDirectory !== undefined) {
-+  app.setPath('userData', join(app.getPath('appData'), desktopProfileDirectory))
++  // `setPath` rejects a directory that does not exist, so the first branded launch creates it.
++  const profile = join(app.getPath('appData'), desktopProfileDirectory)
++  mkdirSync(profile, { recursive: true })
++  app.setPath('userData', profile)
++  mkdirSync(join(profile, 'logs'), { recursive: true })
 +}
  // Platform-conventional logs directory (macOS ~/Library/Logs/<name>, otherwise under userData);
 -// set before ready so the first fatal report already resolves under it.
