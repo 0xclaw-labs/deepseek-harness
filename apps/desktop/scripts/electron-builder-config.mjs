@@ -124,6 +124,8 @@ export function createElectronBuilderConfig(
     protocols: [{ name: productName, schemes: [brandScheme] }],
     extraMetadata: {
       dshDesktopAppId: appId,
+      // The runtime registers exactly the scheme the bundle declares; upstream reads `dsh` by omission.
+      dshDesktopProtocolScheme: brandScheme,
       ...(branded ? { productName, dshDesktopProfileDirectory: appId } : {}),
       dshDesktopUpdateChannel: update?.channel ?? 'nightly',
       ...(policy === undefined ? {} : { dshMandatoryUpdatePolicy: policy }),

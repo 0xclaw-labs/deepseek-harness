@@ -43,6 +43,7 @@ import { pruneCrashReports, RendererConsoleTail, writeCrashReport, type CrashRep
 import { openWelcomeWindow } from './welcome-window.ts'
 import { WELCOME_IPC, needsWelcome, type WelcomeNotice } from './welcome-api.ts'
 import { connectDesktopWelcome, type DesktopWelcomeBackend } from './welcome-backend.ts'
+import { parseDeepLink, resolveDeepLinkScheme } from './deep-link.ts'
 import { DesktopUpdateJournal } from './update-journal.ts'
 import { DesktopUpdatePreparationError } from './update-error.ts'
 import { DesktopUpdateSchedule, resolveDesktopUpdateScheduleConfig } from './update-schedule.ts'
@@ -103,9 +104,33 @@ function resolveDesktopProfileDirectory(): string | undefined {
   }
 }
 
+/**
+ * Protocol scheme declared by the package manifest.
+ *
+ * The packaging config writes the deployment scheme into the manifest as
+ * `dshDesktopProtocolScheme`; upstream packages omit it and keep `dsh`. Reading
+ * the manifest keeps runtime registration aligned with `CFBundleURLTypes`
+ * instead of registering a scheme the bundle does not declare.
+ * @returns the declared scheme, or the upstream scheme when absent.
+ */
+function resolveDesktopProtocolScheme(): string {
+  try {
+    const manifest: unknown = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8'))
+    if (typeof manifest === 'object' && manifest !== null) {
+      return resolveDeepLinkScheme((manifest as { dshDesktopProtocolScheme?: unknown }).dshDesktopProtocolScheme)
+    }
+  } catch (error: unknown) {
+    // A missing manifest keeps the upstream scheme; artifact verification reports it later.
+    console.warn('desktop protocol: manifest unavailable', error)
+  }
+  // Development launches have no packaged manifest field; honor the build environment when present.
+  return resolveDeepLinkScheme(process.env.DSH_DESKTOP_PROTOCOL_SCHEME)
+}
+
 // Claim the branded profile before ready and before any profile access, including the
 // single-instance lock at the end of this module.
 const desktopProfileDirectory = resolveDesktopProfileDirectory()
+const desktopProtocolScheme = resolveDesktopProtocolScheme()
 if (desktopProfileDirectory !== undefined) {
   // `setPath` rejects a directory that does not exist, so the first branded launch creates it.
   const profile = join(app.getPath('appData'), desktopProfileDirectory)
@@ -247,6 +272,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     minWidth: 520,
     minHeight: 600,
     show,
+    ...(primary ? { title: app.name } : {}),
     ...(process.platform === 'win32' && primary ? {
       titleBarStyle: 'hidden' as const,
       titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
@@ -273,6 +299,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
       devTools: true,
     },
   })
+  if (primary) {
+    // The workspace document title is upstream product copy. A rebranded package
+    // keeps the manifest-derived application name instead of adopting it.
+    window.on('page-title-updated', (event) => { event.preventDefault() })
+  }
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
     return { action: 'deny' }
@@ -967,7 +998,8 @@ async function main(): Promise<void> {
   const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
     : join(process.resourcesPath, 'icon.png')
   app.setAboutPanelOptions({
-    applicationName: 'DeepSeek Harness',
+    // The locale dictionary is branded by the build transform; upstream keeps its own copy.
+    applicationName: currentDesktopLocale().messages.aboutProduct,
     applicationVersion: app.getVersion(),
     // The release has no separate build number; omit Electron's bundle version.
     version: '',
@@ -1267,10 +1299,14 @@ async function main(): Promise<void> {
     window.focus()
   }
 
-  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') app.setAsDefaultProtocolClient('dsh')
+  // Register only the scheme this bundle declares. A rebrand must not claim upstream's
+  // dsh:// handler; legacy dsh://open links stay readable when LaunchServices delivers them.
+  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') {
+    app.setAsDefaultProtocolClient(desktopProtocolScheme)
+  }
   app.on('open-url', (event, url) => {
     event.preventDefault()
-    if (url === 'dsh://open' || url === 'dsh://open/') focusPrimaryWindow()
+    if (parseDeepLink(url, desktopProtocolScheme) !== undefined) focusPrimaryWindow()
   })
 
   app.on('activate', (_event, hasVisibleWindows) => {

@@ -17,3 +17,8 @@ apps/desktop/scripts/desktop-package-environment.mjs
 # main.ts claims the manifest's dshDesktopProfileDirectory as userData before the
 # single-instance lock, so a branded build launches while upstream DeepSeek Harness runs.
 apps/desktop/src/main.ts
+#
+# 2026-10-21: the bundle declares one URL scheme; runtime registration and the
+# open-url handler must use it. Parsing lives in a focused desktop module so the
+# registration/handler behavior is unit-tested without Electron's app lifecycle.
+apps/desktop/src/deep-link.ts
