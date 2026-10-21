@@ -2,6 +2,7 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
+import { readFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -80,9 +81,39 @@ let backendReady = false
 /** Error-level console output of the primary window, attached to crash reports. */
 const rendererConsole = new RendererConsoleTail()
 
+/**
+ * Profile directory declared by a rebranded package manifest.
+ *
+ * Electron derives `userData` from the npm `name` when the manifest has no product name, so a
+ * rebranded package that only changes the bundle would share Chromium state and the
+ * single-instance lock with upstream DeepSeek Harness. The packaging config writes the bundle id
+ * into the manifest as `dshDesktopProfileDirectory`; upstream packages omit it.
+ * @returns The directory name, or `undefined` for an upstream package.
+ */
+function resolveDesktopProfileDirectory(): string | undefined {
+  try {
+    const manifest: unknown = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8'))
+    if (typeof manifest !== 'object' || manifest === null) return undefined
+    const directory = (manifest as { dshDesktopProfileDirectory?: unknown }).dshDesktopProfileDirectory
+    return typeof directory === 'string' && directory.length > 0 ? directory : undefined
+  } catch (error: unknown) {
+    // A missing or unreadable manifest keeps upstream's profile; startup reports it later.
+    console.warn('desktop profile: manifest unavailable', error)
+    return undefined
+  }
+}
+
+// Claim the branded profile before ready and before any profile access, including the
+// single-instance lock at the end of this module.
+const desktopProfileDirectory = resolveDesktopProfileDirectory()
+if (desktopProfileDirectory !== undefined) {
+  app.setPath('userData', join(app.getPath('appData'), desktopProfileDirectory))
+}
 // Platform-conventional logs directory (macOS ~/Library/Logs/<name>, otherwise under userData);
-// set before ready so the first fatal report already resolves under it.
-app.setAppLogsPath()
+// set before ready so the first fatal report already resolves under it. A branded package keeps
+// its reports beside its own profile instead of upstream's.
+if (desktopProfileDirectory === undefined) app.setAppLogsPath()
+else app.setAppLogsPath(join(app.getPath('userData'), 'logs'))
 
 function currentDesktopLocale(): ReturnType<typeof resolveDesktopLocale> {
   return resolveDesktopLocale(windowsLanguage ?? app.getLocale())

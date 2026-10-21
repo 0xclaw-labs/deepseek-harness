@@ -107,6 +107,12 @@ export function createElectronBuilderConfig(
   // product identity and brand assets are deployment configuration. Upstream keeps
   // its defaults; a rebranded build supplies env vars instead of editing UI files.
   const productName = (env.DSH_DESKTOP_PRODUCT_NAME ?? '').trim() || 'DeepSeek Harness'
+  // A rebranded package must not inherit upstream's Electron identity: with the bare npm `name`,
+  // Electron derives userData and the single-instance lock from `@deepseek-ai/dsh-desktop`, so a
+  // branded build shares its profile with upstream DeepSeek Harness and quits at startup whenever
+  // upstream is running. The packaged manifest therefore carries the brand name and a dedicated
+  // profile directory derived from the bundle id; upstream builds keep their manifest untouched.
+  const branded = productName !== 'DeepSeek Harness'
   const brandScheme = (env.DSH_DESKTOP_PROTOCOL_SCHEME ?? '').trim() || 'dsh'
   const artifactPrefix = (env.DSH_DESKTOP_ARTIFACT_PREFIX ?? '').trim() || 'deepseek-harness'
   const brandResourcesDir =
@@ -118,6 +124,7 @@ export function createElectronBuilderConfig(
     protocols: [{ name: productName, schemes: [brandScheme] }],
     extraMetadata: {
       dshDesktopAppId: appId,
+      ...(branded ? { productName, dshDesktopProfileDirectory: appId } : {}),
       dshDesktopUpdateChannel: update?.channel ?? 'nightly',
       ...(policy === undefined ? {} : { dshMandatoryUpdatePolicy: policy }),
       ...buildVersion === productVersion ? {} : { version: buildVersion },

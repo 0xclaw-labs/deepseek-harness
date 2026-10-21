@@ -12,3 +12,8 @@ apps/desktop/scripts/smoke-packaged-runtime.ts
 apps/desktop/scripts/package-target.ts
 apps/desktop/scripts/package-macos.ts
 apps/desktop/scripts/desktop-package-environment.mjs
+#
+# 2026-10-21: a branded package must not inherit upstream's Electron profile identity.
+# main.ts claims the manifest's dshDesktopProfileDirectory as userData before the
+# single-instance lock, so a branded build launches while upstream DeepSeek Harness runs.
+apps/desktop/src/main.ts
