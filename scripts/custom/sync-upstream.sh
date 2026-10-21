@@ -23,6 +23,7 @@ UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 UPSTREAM_BRANCH="${UPSTREAM_BRANCH:-master}"
 CUSTOM_BRANCH="${CUSTOM_BRANCH:-custom/main}"
 UPSTREAM_REF="${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}"
+export UPSTREAM_REF
 SYNC_BRANCH="${SYNC_BRANCH:-sync/upstream-$(date -u +%Y%m%d)}"
 
 echo "sync-upstream: fetching ${UPSTREAM_REMOTE} (${UPSTREAM_REF})"
