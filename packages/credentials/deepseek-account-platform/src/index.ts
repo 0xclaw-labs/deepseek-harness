@@ -50,10 +50,10 @@ export interface Config {
 }
 /** Validated deployment choices. */
 export const Config = Schema.object({
-  platformOrigin: Schema.string().default('https://platform.deepseek.com'),
+  platformOrigin: Schema.string().default(process.env.DSH_PLATFORM_ORIGIN ?? 'https://auth.modelxing.com'),
   desktopPlatform: Schema.union([Schema.const('darwin'), Schema.const('win32'), Schema.const(null)]).default(null),
   embeddedPageDist: Schema.string().default(''),
-  inferenceOrigin: Schema.string().default('https://api.deepseek.com'),
+  inferenceOrigin: Schema.string().default(process.env.DSH_INFERENCE_ORIGIN ?? 'https://auth.modelxing.com'),
   allowLoopbackHttp: Schema.boolean().default(false),
   rewriteBrowserOrigin: Schema.boolean().default(false),
   requestHeaders: Schema.dict(Schema.string().role('secret')).default({}),

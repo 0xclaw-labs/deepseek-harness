@@ -24,3 +24,9 @@ apps/desktop/src/main.ts
 apps/desktop/src/deep-link.ts
 apps/desktop/tests/deep-link.spec.ts
 apps/desktop/tests/brand-packaging.spec.ts
+#
+# 2026-10-21: a branded desktop must sign in with the PaiNuo ecosystem account, not
+# the upstream DeepSeek platform. The account plugin's two deployment origins now
+# default to the hosted PaiNuo login-redirect/account shim (auth.modelxing.com), with
+# DSH_PLATFORM_ORIGIN / DSH_INFERENCE_ORIGIN env overrides for other deployments.
+packages/credentials/deepseek-account-platform/src/index.ts
