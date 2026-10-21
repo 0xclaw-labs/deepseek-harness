@@ -22,3 +22,5 @@ apps/desktop/src/main.ts
 # open-url handler must use it. Parsing lives in a focused desktop module so the
 # registration/handler behavior is unit-tested without Electron's app lifecycle.
 apps/desktop/src/deep-link.ts
+apps/desktop/tests/deep-link.spec.ts
+apps/desktop/tests/brand-packaging.spec.ts

@@ -15,10 +15,10 @@ index 8116dea245..4c00ac32d2 100644
    }
  }
 diff --git a/apps/desktop/scripts/electron-builder-config.mjs b/apps/desktop/scripts/electron-builder-config.mjs
-index 4b9cd27a8d..e9c2319c63 100644
+index 4b9cd27a8d..abe1f2b174 100644
 --- a/apps/desktop/scripts/electron-builder-config.mjs
 +++ b/apps/desktop/scripts/electron-builder-config.mjs
-@@ -103,19 +103,36 @@ export function createElectronBuilderConfig(
+@@ -103,19 +103,38 @@ export function createElectronBuilderConfig(
    const buildVersion = resolveDesktopBuildVersion(env, productVersion)
    if (update?.channel === 'latest' && buildVersion.includes('-')) throw new Error('desktop package: latest requires a stable version')
    const packaged = resolveDesktopBuildCommit(env)
@@ -44,6 +44,8 @@ index 4b9cd27a8d..e9c2319c63 100644
 +    protocols: [{ name: productName, schemes: [brandScheme] }],
      extraMetadata: {
        dshDesktopAppId: appId,
++      // The runtime registers exactly the scheme the bundle declares; upstream reads `dsh` by omission.
++      dshDesktopProtocolScheme: brandScheme,
 +      ...(branded ? { productName, dshDesktopProfileDirectory: appId } : {}),
        dshDesktopUpdateChannel: update?.channel ?? 'nightly',
        ...(policy === undefined ? {} : { dshMandatoryUpdatePolicy: policy }),
@@ -58,7 +60,7 @@ index 4b9cd27a8d..e9c2319c63 100644
      directories: { output: output.directory },
      asar: true,
      electronDist: buildPaths.electron,
-@@ -152,12 +169,12 @@ export function createElectronBuilderConfig(
+@@ -152,12 +171,12 @@ export function createElectronBuilderConfig(
      asarUnpack: unpack,
      extraResources: [
        { from: buildPaths.runtime, to: 'runtime' },
@@ -74,7 +76,7 @@ index 4b9cd27a8d..e9c2319c63 100644
        category: 'public.app-category.developer-tools',
        // macOS matches the application locale against this bundle, not Electron Framework resources.
        extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'] },
-@@ -165,7 +182,7 @@ export function createElectronBuilderConfig(
+@@ -165,7 +184,7 @@ export function createElectronBuilderConfig(
        identity: unsigned ? '-' : macOSSigning?.signingIdentity,
        forceCodeSigning: !unsigned,
        hardenedRuntime: true,
@@ -128,8 +130,65 @@ index 6c3c12c857..1c2d8b2dc5 100644
  const descriptor = await verifyDesktopRuntime(paths.dsh, readDesktopRuntime(paths.dsh).release.version,
    resolveDesktopPackageTarget(target))
  if (windows && !values.unsigned) await verifyWindowsCode(application)
+diff --git a/apps/desktop/src/deep-link.ts b/apps/desktop/src/deep-link.ts
+new file mode 100644
+index 0000000000..7a6cc20d7c
+--- /dev/null
++++ b/apps/desktop/src/deep-link.ts
+@@ -0,0 +1,51 @@
++/** Deep-link classification for the Electron shell. */
++
++/** Upstream DeepSeek Harness scheme. Read for compatibility; never registered by a rebrand. */
++export const LEGACY_DEEP_LINK_SCHEME = 'dsh'
++
++/** A deep link action the shell knows how to perform. */
++export type DeepLinkAction = 'focus-primary-window'
++
++/**
++ * Validate a protocol scheme supplied by the package manifest or environment.
++ * @param value - untrusted manifest or environment value.
++ * @param fallback - scheme used when the value is absent or malformed.
++ * @returns a lower-case RFC 3986 scheme, or the fallback.
++ */
++export function resolveDeepLinkScheme(value: unknown, fallback = LEGACY_DEEP_LINK_SCHEME): string {
++  if (typeof value !== 'string') return fallback
++  const scheme = value.trim().toLowerCase()
++  return /^[a-z][a-z0-9+.-]*$/u.test(scheme) ? scheme : fallback
++}
++
++/**
++ * Classify a macOS `open-url` payload.
++ *
++ * The packaged bundle declares exactly one scheme (`CFBundleURLTypes`). A
++ * rebranded bundle registers that scheme and keeps reading upstream
++ * `dsh://open` for links LaunchServices still delivers to it, without ever
++ * claiming `dsh://` as default. URLs on the primary scheme focus the app —
++ * including a future OAuth callback path; the current sign-in flow uses a
++ * loopback HTTP callback instead. Legacy URLs are limited to upstream's
++ * `/open` route so unrelated `dsh://` links do not activate the app.
++ *
++ * @param raw - URL received from the operating system.
++ * @param primaryScheme - scheme declared by this bundle.
++ * @returns the action to perform, or undefined for an unrelated URL.
++ */
++export function parseDeepLink(raw: string, primaryScheme: string): DeepLinkAction | undefined {
++  let url: URL
++  try {
++    url = new URL(raw)
++  } catch {
++    return undefined
++  }
++  const scheme = url.protocol.slice(0, -1).toLowerCase()
++  const primary = resolveDeepLinkScheme(primaryScheme)
++  if (scheme !== primary && scheme !== LEGACY_DEEP_LINK_SCHEME) return undefined
++  // A rebrand may receive any path on its own scheme (including a future OAuth callback).
++  if (scheme === primary && scheme !== LEGACY_DEEP_LINK_SCHEME) return 'focus-primary-window'
++  // Custom-scheme URLs put the first segment in the host (`dsh://open` has host `open`).
++  const target = `${url.hostname}${url.pathname}`.replace(/\/+$/u, '')
++  return target === 'open' || target === '' ? 'focus-primary-window' : undefined
++}
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 2afdfd7194..acf9cd9e09 100644
+index 2afdfd7194..b25e9c100f 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
 @@ -2,6 +2,7 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
@@ -140,7 +199,15 @@ index 2afdfd7194..acf9cd9e09 100644
  import { readFile, writeFile } from 'node:fs/promises'
  import { join } from 'node:path'
  import { fileURLToPath } from 'node:url'
-@@ -80,9 +81,43 @@ let backendReady = false
+@@ -42,6 +43,7 @@ import { pruneCrashReports, RendererConsoleTail, writeCrashReport, type CrashRep
+ import { openWelcomeWindow } from './welcome-window.ts'
+ import { WELCOME_IPC, needsWelcome, type WelcomeNotice } from './welcome-api.ts'
+ import { connectDesktopWelcome, type DesktopWelcomeBackend } from './welcome-backend.ts'
++import { parseDeepLink, resolveDeepLinkScheme } from './deep-link.ts'
+ import { DesktopUpdateJournal } from './update-journal.ts'
+ import { DesktopUpdatePreparationError } from './update-error.ts'
+ import { DesktopUpdateSchedule, resolveDesktopUpdateScheduleConfig } from './update-schedule.ts'
+@@ -80,9 +82,67 @@ let backendReady = false
  /** Error-level console output of the primary window, attached to crash reports. */
  const rendererConsole = new RendererConsoleTail()
  
@@ -166,9 +233,33 @@ index 2afdfd7194..acf9cd9e09 100644
 +  }
 +}
 +
++/**
++ * Protocol scheme declared by the package manifest.
++ *
++ * The packaging config writes the deployment scheme into the manifest as
++ * `dshDesktopProtocolScheme`; upstream packages omit it and keep `dsh`. Reading
++ * the manifest keeps runtime registration aligned with `CFBundleURLTypes`
++ * instead of registering a scheme the bundle does not declare.
++ * @returns the declared scheme, or the upstream scheme when absent.
++ */
++function resolveDesktopProtocolScheme(): string {
++  try {
++    const manifest: unknown = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8'))
++    if (typeof manifest === 'object' && manifest !== null) {
++      return resolveDeepLinkScheme((manifest as { dshDesktopProtocolScheme?: unknown }).dshDesktopProtocolScheme)
++    }
++  } catch (error: unknown) {
++    // A missing manifest keeps the upstream scheme; artifact verification reports it later.
++    console.warn('desktop protocol: manifest unavailable', error)
++  }
++  // Development launches have no packaged manifest field; honor the build environment when present.
++  return resolveDeepLinkScheme(process.env.DSH_DESKTOP_PROTOCOL_SCHEME)
++}
++
 +// Claim the branded profile before ready and before any profile access, including the
 +// single-instance lock at the end of this module.
 +const desktopProfileDirectory = resolveDesktopProfileDirectory()
++const desktopProtocolScheme = resolveDesktopProtocolScheme()
 +if (desktopProfileDirectory !== undefined) {
 +  // `setPath` rejects a directory that does not exist, so the first branded launch creates it.
 +  const profile = join(app.getPath('appData'), desktopProfileDirectory)
@@ -186,3 +277,139 @@ index 2afdfd7194..acf9cd9e09 100644
  
  function currentDesktopLocale(): ReturnType<typeof resolveDesktopLocale> {
    return resolveDesktopLocale(windowsLanguage ?? app.getLocale())
+@@ -212,6 +272,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+     minWidth: 520,
+     minHeight: 600,
+     show,
++    ...(primary ? { title: app.name } : {}),
+     ...(process.platform === 'win32' && primary ? {
+       titleBarStyle: 'hidden' as const,
+       titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
+@@ -238,6 +299,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+       devTools: true,
+     },
+   })
++  if (primary) {
++    // The workspace document title is upstream product copy. A rebranded package
++    // keeps the manifest-derived application name instead of adopting it.
++    window.on('page-title-updated', (event) => { event.preventDefault() })
++  }
+   window.webContents.setWindowOpenHandler(({ url }) => {
+     if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
+     return { action: 'deny' }
+@@ -932,7 +998,8 @@ async function main(): Promise<void> {
+   const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
+     : join(process.resourcesPath, 'icon.png')
+   app.setAboutPanelOptions({
+-    applicationName: 'DeepSeek Harness',
++    // The locale dictionary is branded by the build transform; upstream keeps its own copy.
++    applicationName: currentDesktopLocale().messages.aboutProduct,
+     applicationVersion: app.getVersion(),
+     // The release has no separate build number; omit Electron's bundle version.
+     version: '',
+@@ -1232,10 +1299,14 @@ async function main(): Promise<void> {
+     window.focus()
+   }
+ 
+-  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') app.setAsDefaultProtocolClient('dsh')
++  // Register only the scheme this bundle declares. A rebrand must not claim upstream's
++  // dsh:// handler; legacy dsh://open links stay readable when LaunchServices delivers them.
++  if (app.isPackaged || process.env.DSH_DESKTOP_DEV_APP === '1') {
++    app.setAsDefaultProtocolClient(desktopProtocolScheme)
++  }
+   app.on('open-url', (event, url) => {
+     event.preventDefault()
+-    if (url === 'dsh://open' || url === 'dsh://open/') focusPrimaryWindow()
++    if (parseDeepLink(url, desktopProtocolScheme) !== undefined) focusPrimaryWindow()
+   })
+ 
+   app.on('activate', (_event, hasVisibleWindows) => {
+diff --git a/apps/desktop/tests/brand-packaging.spec.ts b/apps/desktop/tests/brand-packaging.spec.ts
+new file mode 100644
+index 0000000000..f44ee8d1a2
+--- /dev/null
++++ b/apps/desktop/tests/brand-packaging.spec.ts
+@@ -0,0 +1,35 @@
++import { describe, expect, it } from 'vitest'
++
++const UNSIGNED_MAC = {
++  DSH_DESKTOP_APP_ID: 'cc.example.app',
++  DSH_DESKTOP_UNSIGNED: '1',
++  DSH_DESKTOP_TARGET_PLATFORM: 'darwin',
++  DSH_DESKTOP_TARGET_ARCH: 'arm64',
++}
++
++describe('branded packaging identity', () => {
++  it('keeps upstream protocol metadata when no brand environment is supplied', async () => {
++    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
++    const config = createElectronBuilderConfig(UNSIGNED_MAC, 'darwin', 'arm64')
++    expect(config.protocols).toEqual([{ name: 'DeepSeek Harness', schemes: ['dsh'] }])
++    expect(config.extraMetadata).toMatchObject({ dshDesktopProtocolScheme: 'dsh' })
++    expect(config.extraMetadata).not.toHaveProperty('productName')
++    expect(config.extraMetadata).not.toHaveProperty('dshDesktopProfileDirectory')
++  })
++
++  it('writes the declared scheme into the manifest used by runtime registration', async () => {
++    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
++    const config = createElectronBuilderConfig({
++      ...UNSIGNED_MAC,
++      DSH_DESKTOP_PRODUCT_NAME: '随身搭子',
++      DSH_DESKTOP_PROTOCOL_SCHEME: 'suishendazi',
++      DSH_DESKTOP_ARTIFACT_PREFIX: 'suishendazi-harness',
++    }, 'darwin', 'arm64')
++    expect(config.protocols).toEqual([{ name: '随身搭子', schemes: ['suishendazi'] }])
++    expect(config.extraMetadata).toMatchObject({
++      dshDesktopProtocolScheme: 'suishendazi',
++      productName: '随身搭子',
++      dshDesktopProfileDirectory: 'cc.example.app',
++    })
++  })
++})
+diff --git a/apps/desktop/tests/deep-link.spec.ts b/apps/desktop/tests/deep-link.spec.ts
+new file mode 100644
+index 0000000000..472612ee4b
+--- /dev/null
++++ b/apps/desktop/tests/deep-link.spec.ts
+@@ -0,0 +1,42 @@
++import { describe, expect, it } from 'vitest'
++import { LEGACY_DEEP_LINK_SCHEME, parseDeepLink, resolveDeepLinkScheme } from '../src/deep-link.ts'
++
++describe('deep-link schemes', () => {
++  it('normalizes a declared scheme and falls back for absent or malformed values', () => {
++    expect(resolveDeepLinkScheme(' SUISHENDAZI ')).toBe('suishendazi')
++    expect(resolveDeepLinkScheme('dsh')).toBe(LEGACY_DEEP_LINK_SCHEME)
++    expect(resolveDeepLinkScheme(undefined)).toBe(LEGACY_DEEP_LINK_SCHEME)
++    expect(resolveDeepLinkScheme('')).toBe(LEGACY_DEEP_LINK_SCHEME)
++    expect(resolveDeepLinkScheme('not a scheme')).toBe(LEGACY_DEEP_LINK_SCHEME)
++    expect(resolveDeepLinkScheme('1dsh')).toBe(LEGACY_DEEP_LINK_SCHEME)
++    expect(resolveDeepLinkScheme(undefined, 'suishendazi')).toBe('suishendazi')
++  })
++})
++
++describe('open-url classification', () => {
++  it('focuses the app for the bundle scheme, including a future callback path', () => {
++    expect(parseDeepLink('suishendazi://open', 'suishendazi')).toBe('focus-primary-window')
++    expect(parseDeepLink('suishendazi://open/', 'suishendazi')).toBe('focus-primary-window')
++    expect(parseDeepLink('suishendazi://auth/callback?code=redacted', 'suishendazi')).toBe('focus-primary-window')
++  })
++
++  it('keeps reading legacy dsh://open without claiming unrelated dsh paths', () => {
++    expect(parseDeepLink('dsh://open', 'suishendazi')).toBe('focus-primary-window')
++    expect(parseDeepLink('dsh://open/', 'suishendazi')).toBe('focus-primary-window')
++    expect(parseDeepLink('dsh://', 'suishendazi')).toBe('focus-primary-window')
++    expect(parseDeepLink('dsh://auth/callback?code=redacted', 'suishendazi')).toBeUndefined()
++    expect(parseDeepLink('dsh://evil', 'suishendazi')).toBeUndefined()
++  })
++
++  it('keeps upstream behavior when the bundle itself declares dsh', () => {
++    expect(parseDeepLink('dsh://open', 'dsh')).toBe('focus-primary-window')
++    expect(parseDeepLink('dsh://evil', 'dsh')).toBeUndefined()
++  })
++
++  it('ignores other schemes and malformed payloads', () => {
++    expect(parseDeepLink('https://example.com/open', 'suishendazi')).toBeUndefined()
++    expect(parseDeepLink('suishendazi-evil://open', 'suishendazi')).toBeUndefined()
++    expect(parseDeepLink('not a url', 'suishendazi')).toBeUndefined()
++    expect(parseDeepLink('', 'suishendazi')).toBeUndefined()
++  })
++})
