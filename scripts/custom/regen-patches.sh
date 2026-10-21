@@ -33,7 +33,10 @@ if [[ ${#PATHS[@]} -eq 0 ]]; then
   exit 2
 fi
 
-git diff --no-color --binary "$UPSTREAM_REF"...HEAD -- ${PATHS[@]+"${PATHS[@]}"} > "$TMP/upstream-touch.patch"
+git diff --no-color --binary "$UPSTREAM_REF"...HEAD -- ${PATHS[@]+"${PATHS[@]}"} > "$TMP/raw.patch"
+# Generated diffs can carry trailing spaces on context lines; normalize them so
+# the snapshot stays stable across editors and the staged-file whitespace hook.
+sed -E 's/[[:space:]]+$//' "$TMP/raw.patch" > "$TMP/upstream-touch.patch"
 if [[ ! -s "$TMP/upstream-touch.patch" ]]; then
   echo "regen-patches: no upstream-file changes in range $UPSTREAM_REF...HEAD" >&2
   exit 1
@@ -50,7 +53,8 @@ case "$MODE" in
       echo "regen-patches: patches/upstream-touch.patch missing; run: bash scripts/custom/regen-patches.sh --write" >&2
       exit 1
     fi
-    if ! diff -u "$OUT/upstream-touch.patch" "$TMP/upstream-touch.patch" >/dev/null; then
+    sed -E 's/[[:space:]]+$//' "$OUT/upstream-touch.patch" > "$TMP/current.patch"
+    if ! diff -u "$TMP/current.patch" "$TMP/upstream-touch.patch" >/dev/null; then
       echo "regen-patches: snapshot is stale; run: bash scripts/custom/regen-patches.sh --write" >&2
       diff -u "$OUT/upstream-touch.patch" "$TMP/upstream-touch.patch" | head -40 >&2 || true
       exit 1
