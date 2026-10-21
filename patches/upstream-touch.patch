@@ -15,10 +15,10 @@ index 8116dea245..4c00ac32d2 100644
    }
  }
 diff --git a/apps/desktop/scripts/electron-builder-config.mjs b/apps/desktop/scripts/electron-builder-config.mjs
-index 4b9cd27a8d..a49f889dab 100644
+index 4b9cd27a8d..e9c2319c63 100644
 --- a/apps/desktop/scripts/electron-builder-config.mjs
 +++ b/apps/desktop/scripts/electron-builder-config.mjs
-@@ -103,9 +103,19 @@ export function createElectronBuilderConfig(
+@@ -103,19 +103,36 @@ export function createElectronBuilderConfig(
    const buildVersion = resolveDesktopBuildVersion(env, productVersion)
    if (update?.channel === 'latest' && buildVersion.includes('-')) throw new Error('desktop package: latest requires a stable version')
    const packaged = resolveDesktopBuildCommit(env)
@@ -26,6 +26,12 @@ index 4b9cd27a8d..a49f889dab 100644
 +  // product identity and brand assets are deployment configuration. Upstream keeps
 +  // its defaults; a rebranded build supplies env vars instead of editing UI files.
 +  const productName = (env.DSH_DESKTOP_PRODUCT_NAME ?? '').trim() || 'DeepSeek Harness'
++  // A rebranded package must not inherit upstream's Electron identity: with the bare npm `name`,
++  // Electron derives userData and the single-instance lock from `@deepseek-ai/dsh-desktop`, so a
++  // branded build shares its profile with upstream DeepSeek Harness and quits at startup whenever
++  // upstream is running. The packaged manifest therefore carries the brand name and a dedicated
++  // profile directory derived from the bundle id; upstream builds keep their manifest untouched.
++  const branded = productName !== 'DeepSeek Harness'
 +  const brandScheme = (env.DSH_DESKTOP_PROTOCOL_SCHEME ?? '').trim() || 'dsh'
 +  const artifactPrefix = (env.DSH_DESKTOP_ARTIFACT_PREFIX ?? '').trim() || 'deepseek-harness'
 +  const brandResourcesDir =
@@ -38,8 +44,9 @@ index 4b9cd27a8d..a49f889dab 100644
 +    protocols: [{ name: productName, schemes: [brandScheme] }],
      extraMetadata: {
        dshDesktopAppId: appId,
++      ...(branded ? { productName, dshDesktopProfileDirectory: appId } : {}),
        dshDesktopUpdateChannel: update?.channel ?? 'nightly',
-@@ -113,9 +123,9 @@ export function createElectronBuilderConfig(
+       ...(policy === undefined ? {} : { dshMandatoryUpdatePolicy: policy }),
        ...buildVersion === productVersion ? {} : { version: buildVersion },
        ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
      },
@@ -51,7 +58,7 @@ index 4b9cd27a8d..a49f889dab 100644
      directories: { output: output.directory },
      asar: true,
      electronDist: buildPaths.electron,
-@@ -152,12 +162,12 @@ export function createElectronBuilderConfig(
+@@ -152,12 +169,12 @@ export function createElectronBuilderConfig(
      asarUnpack: unpack,
      extraResources: [
        { from: buildPaths.runtime, to: 'runtime' },
@@ -67,7 +74,7 @@ index 4b9cd27a8d..a49f889dab 100644
        category: 'public.app-category.developer-tools',
        // macOS matches the application locale against this bundle, not Electron Framework resources.
        extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'] },
-@@ -165,7 +175,7 @@ export function createElectronBuilderConfig(
+@@ -165,7 +182,7 @@ export function createElectronBuilderConfig(
        identity: unsigned ? '-' : macOSSigning?.signingIdentity,
        forceCodeSigning: !unsigned,
        hardenedRuntime: true,
@@ -121,3 +128,57 @@ index 6c3c12c857..1c2d8b2dc5 100644
  const descriptor = await verifyDesktopRuntime(paths.dsh, readDesktopRuntime(paths.dsh).release.version,
    resolveDesktopPackageTarget(target))
  if (windows && !values.unsigned) await verifyWindowsCode(application)
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 2afdfd7194..ae1a1250f0 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -2,6 +2,7 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
+ import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
+ /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
+ 
++import { readFileSync } from 'node:fs'
+ import { readFile, writeFile } from 'node:fs/promises'
+ import { join } from 'node:path'
+ import { fileURLToPath } from 'node:url'
+@@ -80,9 +81,39 @@ let backendReady = false
+ /** Error-level console output of the primary window, attached to crash reports. */
+ const rendererConsole = new RendererConsoleTail()
+ 
++/**
++ * Profile directory declared by a rebranded package manifest.
++ *
++ * Electron derives `userData` from the npm `name` when the manifest has no product name, so a
++ * rebranded package that only changes the bundle would share Chromium state and the
++ * single-instance lock with upstream DeepSeek Harness. The packaging config writes the bundle id
++ * into the manifest as `dshDesktopProfileDirectory`; upstream packages omit it.
++ * @returns The directory name, or `undefined` for an upstream package.
++ */
++function resolveDesktopProfileDirectory(): string | undefined {
++  try {
++    const manifest: unknown = JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8'))
++    if (typeof manifest !== 'object' || manifest === null) return undefined
++    const directory = (manifest as { dshDesktopProfileDirectory?: unknown }).dshDesktopProfileDirectory
++    return typeof directory === 'string' && directory.length > 0 ? directory : undefined
++  } catch (error: unknown) {
++    // A missing or unreadable manifest keeps upstream's profile; startup reports it later.
++    console.warn('desktop profile: manifest unavailable', error)
++    return undefined
++  }
++}
++
++// Claim the branded profile before ready and before any profile access, including the
++// single-instance lock at the end of this module.
++const desktopProfileDirectory = resolveDesktopProfileDirectory()
++if (desktopProfileDirectory !== undefined) {
++  app.setPath('userData', join(app.getPath('appData'), desktopProfileDirectory))
++}
+ // Platform-conventional logs directory (macOS ~/Library/Logs/<name>, otherwise under userData);
+-// set before ready so the first fatal report already resolves under it.
+-app.setAppLogsPath()
++// set before ready so the first fatal report already resolves under it. A branded package keeps
++// its reports beside its own profile instead of upstream's.
++if (desktopProfileDirectory === undefined) app.setAppLogsPath()
++else app.setAppLogsPath(join(app.getPath('userData'), 'logs'))
+ 
+ function currentDesktopLocale(): ReturnType<typeof resolveDesktopLocale> {
+   return resolveDesktopLocale(windowsLanguage ?? app.getLocale())
