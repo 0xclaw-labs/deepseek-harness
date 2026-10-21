@@ -15,6 +15,25 @@
 #   5. DSH_DESKTOP_UNSIGNED=1 + brand env + package:desktop:<target>:unsigned
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Upstream requires Node "^22.19.0 || >=24.0.0" (import.meta.main and TypeScript
+# type stripping). Prefer a Homebrew node when the default `node` is too old so
+# scripts/build.ts actually runs instead of exiting 0 as a no-op.
+NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
+NODE_MINOR="$(node -p 'Number(process.versions.node.split(".")[1])' 2>/dev/null || echo 0)"
+if { [[ "$NODE_MAJOR" -eq 22 ]] && [[ "$NODE_MINOR" -lt 19 ]]; } || [[ "$NODE_MAJOR" -lt 22 ]]; then
+  if [[ -x /opt/homebrew/bin/node ]]; then
+    export PATH="/opt/homebrew/bin:$PATH"
+    echo "build-unsigned: default node is too old for upstream; using $(node --version) from /opt/homebrew/bin"
+  else
+    echo "build-unsigned: node >=22.19 required by upstream; aborting (install a newer node)" >&2
+    exit 2
+  fi
+fi
+
+# Electron binaries are otherwise fetched from GitHub; the npmmirror is much
+# faster on this network. Override ELECTRON_MIRROR to use another mirror.
+export ELECTRON_MIRROR="${ELECTRON_MIRROR:-https://npmmirror.com/mirrors/electron/}"
 BRAND_DIR="$ROOT/custom/branding"
 TARGET="${1:-mac-arm64}"
 
