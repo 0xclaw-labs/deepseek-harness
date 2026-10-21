@@ -1,0 +1,14 @@
+{
+  "schema": "sdz-fork-brand/v1",
+  "productName": "随身搭子",
+  "appId": "cc.suishendazi.app",
+  "protocolScheme": "suishendazi",
+  "artifactPrefix": "suishendazi-harness",
+  "publisher": "Pino Ecosystem",
+  "vendorNotice": "Forked from deepseek-ai/deepseek-harness. Upstream LICENSE and THIRD_PARTY_NOTICES are retained.",
+  "assets": [
+    { "from": "assets/icon-macos.png", "to": "apps/desktop/resources/icon-macos.png" },
+    { "from": "assets/icon-windows.png", "to": "apps/desktop/resources/icon-windows.png" },
+    { "from": "assets/tray-windows.ico", "to": "apps/desktop/resources/tray-windows.ico" }
+  ]
+}

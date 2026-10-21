@@ -1,0 +1,9 @@
+{
+  "schema": "sdz-fork-brand-replacements/v1",
+  "includeDirs": ["apps/web/src", "apps/desktop/src", "packages"],
+  "extensions": [".ts", ".tsx", ".css", ".json", ".mjs", ".md"],
+  "excludeSegments": ["node_modules", "dist", "build", ".next", "coverage", "tests", "__tests__", "fixtures", "fixture"],
+  "replacements": [
+    { "from": "DeepSeek Harness", "to": "随身搭子" }
+  ]
+}

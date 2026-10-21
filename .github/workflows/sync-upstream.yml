@@ -1,0 +1,55 @@
+name: upstream-sync
+
+# Keep the fork close to upstream without letting custom commits block the
+# merge: the script creates sync/upstream-<id>, merges upstream/master, runs
+# the customization guards, pushes the branch and opens a PR against custom/main.
+on:
+  schedule:
+    - cron: "23 2 * * *" # daily, 02:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout custom/main with full history
+        uses: actions/checkout@v4
+        with:
+          ref: custom/main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/deepseek-ai/deepseek-harness.git || true
+
+      - name: Configure git identity
+        run: |
+          git config user.name "sdz-fork-bot"
+          git config user.email "sdz-fork-bot@users.noreply.github.com"
+
+      - name: Merge upstream through sync branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPEN_PR: "1"
+          SYNC_BRANCH: sync/upstream-${{ github.run_id }}
+        run: bash scripts/custom/sync-upstream.sh
+
+      - name: Report unresolved conflict as an issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="upstream sync conflict $(date -u +%F)"
+          body=$(printf 'Automated upstream merge failed.\n\nRun: %s/%s/actions/runs/%s\n\nResolve manually per UPSTREAM.md (only allowlisted upstream files may conflict), then push the sync branch or rerun.\n' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body" || true

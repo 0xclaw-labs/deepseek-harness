@@ -1,0 +1,36 @@
+name: custom-guards
+
+# Fast, deterministic guards for fork customizations. They fail when a commit
+# touches a non-allowlisted upstream file, when branding data breaks, or when
+# patches/upstream-touch.patch is stale. No product build runs here.
+on:
+  push:
+    branches: [custom/main]
+  pull_request:
+    branches: [custom/main]
+
+permissions:
+  contents: read
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream refs
+        run: |
+          git remote add upstream https://github.com/deepseek-ai/deepseek-harness.git || true
+          git fetch --no-tags upstream master
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Upstream touch policy + branding + patch snapshot
+        run: bash scripts/custom/check-guards.sh

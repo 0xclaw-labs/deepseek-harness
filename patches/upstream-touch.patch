@@ -1,0 +1,62 @@
+diff --git a/apps/desktop/scripts/electron-builder-config.mjs b/apps/desktop/scripts/electron-builder-config.mjs
+index 4b9cd27a8d..a49f889dab 100644
+--- a/apps/desktop/scripts/electron-builder-config.mjs
++++ b/apps/desktop/scripts/electron-builder-config.mjs
+@@ -103,9 +103,19 @@ export function createElectronBuilderConfig(
+   const buildVersion = resolveDesktopBuildVersion(env, productVersion)
+   if (update?.channel === 'latest' && buildVersion.includes('-')) throw new Error('desktop package: latest requires a stable version')
+   const packaged = resolveDesktopBuildCommit(env)
++  // Fork customization (0xclaw-labs/deepseek-harness, branch custom/main):
++  // product identity and brand assets are deployment configuration. Upstream keeps
++  // its defaults; a rebranded build supplies env vars instead of editing UI files.
++  const productName = (env.DSH_DESKTOP_PRODUCT_NAME ?? '').trim() || 'DeepSeek Harness'
++  const brandScheme = (env.DSH_DESKTOP_PROTOCOL_SCHEME ?? '').trim() || 'dsh'
++  const artifactPrefix = (env.DSH_DESKTOP_ARTIFACT_PREFIX ?? '').trim() || 'deepseek-harness'
++  const brandResourcesDir =
++    (env.DSH_DESKTOP_BRAND_RESOURCES_DIR ?? '').trim() ||
++    fileURLToPath(new URL('../resources', import.meta.url))
++
+   return {
+     appId,
+-    protocols: [{ name: 'DeepSeek Harness', schemes: ['dsh'] }],
++    protocols: [{ name: productName, schemes: [brandScheme] }],
+     extraMetadata: {
+       dshDesktopAppId: appId,
+       dshDesktopUpdateChannel: update?.channel ?? 'nightly',
+@@ -113,9 +123,9 @@ export function createElectronBuilderConfig(
+       ...buildVersion === productVersion ? {} : { version: buildVersion },
+       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
+     },
+-    productName: 'DeepSeek Harness',
++    productName,
+     // Unsigned builds carry their own suffix so a shared file can never pass for a release artifact.
+-    artifactName: `deepseek-harness-\${version}-\${os}-\${arch}${output.suffix}.\${ext}`,
++    artifactName: `${artifactPrefix}-\${version}-\${os}-\${arch}${output.suffix}.\${ext}`,
+     directories: { output: output.directory },
+     asar: true,
+     electronDist: buildPaths.electron,
+@@ -152,12 +162,12 @@ export function createElectronBuilderConfig(
+     asarUnpack: unpack,
+     extraResources: [
+       { from: buildPaths.runtime, to: 'runtime' },
+-      { from: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)), to: 'icon.png' },
++      { from: join(brandResourcesDir, 'icon-windows.png'), to: 'icon.png' },
+       // Windows tray bitmaps; macOS keeps the Dock and ships no menu bar icon.
+-      ...(packagesWindows ? [{ from: fileURLToPath(new URL('../resources/tray-windows.ico', import.meta.url)), to: 'tray.ico' }] : []),
++      ...(packagesWindows ? [{ from: join(brandResourcesDir, 'tray-windows.ico'), to: 'tray.ico' }] : []),
+     ],
+     mac: {
+-      icon: fileURLToPath(new URL('../resources/icon-macos.png', import.meta.url)),
++      icon: join(brandResourcesDir, 'icon-macos.png'),
+       category: 'public.app-category.developer-tools',
+       // macOS matches the application locale against this bundle, not Electron Framework resources.
+       extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'] },
+@@ -165,7 +175,7 @@ export function createElectronBuilderConfig(
+       identity: unsigned ? '-' : macOSSigning?.signingIdentity,
+       forceCodeSigning: !unsigned,
+       hardenedRuntime: true,
+-      extendInfo: { NSMicrophoneUsageDescription: 'DeepSeek Harness uses your microphone to transcribe speech into message drafts.' },
++      extendInfo: { NSMicrophoneUsageDescription: `${productName} uses your microphone to transcribe speech into message drafts.` },
+       entitlements: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
+       entitlementsInherit: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
+       // Prepared runtime files retain their signatures; PAK resources are sealed by their enclosing bundle.
