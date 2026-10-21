@@ -188,7 +188,7 @@ index 0000000000..7a6cc20d7c
 +  return target === 'open' || target === '' ? 'focus-primary-window' : undefined
 +}
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 2afdfd7194..278ea37ddd 100644
+index 2afdfd7194..e7f5981718 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
 @@ -2,6 +2,7 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
@@ -215,7 +215,7 @@ index 2afdfd7194..278ea37ddd 100644
  import { DesktopUpdateJournal } from './update-journal.ts'
  import { DesktopUpdatePreparationError } from './update-error.ts'
  import { DesktopUpdateSchedule, resolveDesktopUpdateScheduleConfig } from './update-schedule.ts'
-@@ -80,9 +83,67 @@ let backendReady = false
+@@ -80,9 +83,73 @@ let backendReady = false
  /** Error-level console output of the primary window, attached to crash reports. */
  const rendererConsole = new RendererConsoleTail()
 
@@ -274,6 +274,12 @@ index 2afdfd7194..278ea37ddd 100644
 +  mkdirSync(profile, { recursive: true })
 +  app.setPath('userData', profile)
 +  mkdirSync(join(profile, 'logs'), { recursive: true })
++  // Brand isolation: a rebranded package owns a private Harness home. Without it
++  // the Host would read `~/.dsh` — the user's upstream/npm-installed DeepSeek
++  // Harness profile, sessions, credentials, plugins and model settings. A caller
++  // that explicitly sets DSH_HOME (development/tests) keeps it.
++  if (process.env.DSH_HOME === undefined) process.env.DSH_HOME = join(profile, 'dsh-home')
++  mkdirSync(process.env.DSH_HOME, { recursive: true })
 +}
  // Platform-conventional logs directory (macOS ~/Library/Logs/<name>, otherwise under userData);
 -// set before ready so the first fatal report already resolves under it.
@@ -285,7 +291,7 @@ index 2afdfd7194..278ea37ddd 100644
 
  function currentDesktopLocale(): ReturnType<typeof resolveDesktopLocale> {
    return resolveDesktopLocale(windowsLanguage ?? app.getLocale())
-@@ -212,6 +273,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -212,6 +279,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
      minWidth: 520,
      minHeight: 600,
      show,
@@ -293,7 +299,7 @@ index 2afdfd7194..278ea37ddd 100644
      ...(process.platform === 'win32' && primary ? {
        titleBarStyle: 'hidden' as const,
        titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
-@@ -238,6 +300,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -238,6 +306,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
        devTools: true,
      },
    })
@@ -305,7 +311,7 @@ index 2afdfd7194..278ea37ddd 100644
    window.webContents.setWindowOpenHandler(({ url }) => {
      if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
      return { action: 'deny' }
-@@ -314,6 +381,108 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -314,6 +387,108 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
    return window
  }
 
@@ -414,7 +420,7 @@ index 2afdfd7194..278ea37ddd 100644
  async function main(): Promise<void> {
    const desktopSettings = readDesktopSettings(app.getPath('userData'))
    void pruneCrashReports(app.getPath('logs'))
-@@ -321,6 +490,7 @@ async function main(): Promise<void> {
+@@ -321,6 +496,7 @@ async function main(): Promise<void> {
    const updateJournal = journalDirectory === undefined ? undefined : new DesktopUpdateJournal(journalDirectory, app.getVersion())
    const resources = runtimeResources()
    const paths = resolveDesktopPaths()
@@ -422,7 +428,22 @@ index 2afdfd7194..278ea37ddd 100644
    const development = !app.isPackaged
    const primaryRuntime = development
      ? developmentPrimaryRuntime()
-@@ -932,7 +1102,8 @@ async function main(): Promise<void> {
+@@ -338,7 +514,13 @@ async function main(): Promise<void> {
+     return result.environment
+   })
+   let hostEnvironment: NodeJS.ProcessEnv = process.env
+-  const prepareHostEnvironment = async (): Promise<void> => { hostEnvironment = await loginShell }
++  const brandDshHome = process.env.DSH_HOME
++  const prepareHostEnvironment = async (): Promise<void> => {
++    hostEnvironment = await loginShell
++    // A login-shell rc file must not redirect a branded package back to ~/.dsh.
++    if (desktopProfileDirectory !== undefined && brandDshHome !== undefined) hostEnvironment.DSH_HOME = brandDshHome
++    if (process.env.DSH_PAINUO_TOKEN !== undefined) hostEnvironment.DSH_PAINUO_TOKEN = process.env.DSH_PAINUO_TOKEN
++  }
+   let quitting = false
+   let startup: Promise<void> | undefined
+   let workspaceRecovery: Promise<void> | undefined
+@@ -932,7 +1114,8 @@ async function main(): Promise<void> {
    const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
      : join(process.resourcesPath, 'icon.png')
    app.setAboutPanelOptions({
@@ -432,7 +453,7 @@ index 2afdfd7194..278ea37ddd 100644
      applicationVersion: app.getVersion(),
      // The release has no separate build number; omit Electron's bundle version.
      version: '',
-@@ -1232,10 +1403,14 @@ async function main(): Promise<void> {
+@@ -1232,10 +1415,14 @@ async function main(): Promise<void> {
      window.focus()
    }
 
