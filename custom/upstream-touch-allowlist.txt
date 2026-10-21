@@ -3,4 +3,11 @@
 # Keep this list as small as possible: prefer env-var/config overrides,
 # custom/ overlays, or new files. Every addition must explain itself in the
 # commit message and be mirrored into patches/ (scripts/custom/regen-patches.sh).
+#
+# 2026-10-21: packaging identity (product name/icons/scheme) is env-driven so a
+# rebranded unsigned build needs no forked UI files. Paths that derive the
+# packaged .app/.exe name from a hardcoded string must read the same env.
 apps/desktop/scripts/electron-builder-config.mjs
+apps/desktop/scripts/smoke-packaged-runtime.ts
+apps/desktop/scripts/package-target.ts
+apps/desktop/scripts/package-macos.ts
