@@ -2,7 +2,7 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
-import { mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, watchFile, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,6 +23,7 @@ import {
   type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
 } from 'electron'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { resolveDesktopPaths } from './paths.ts'
 import { DesktopProjectManager } from './project-manager.ts'
 import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
@@ -380,6 +381,64 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
   return window
 }
 
+/**
+ * Brand identity bootstrap (随身搭子): the PaiNuo ecosystem login replaces the
+ * upstream DeepSeek account. The account shim stores its sealed grant in
+ * `$DSH_HOME/.credentials.yaml`; the pi-ai provider below reads it through
+ * DSH_PAINUO_TOKEN (never a model key). The provider patch is seeded once, and
+ * a fresh login triggers one relaunch so the already-started Host picks the
+ * token up from its environment.
+ */
+function bootstrapPaiNuoBrand(): void {
+  try {
+    const home = resolveDshHome()
+    const profileDir = join(home, 'profiles', 'desktop')
+    mkdirSync(profileDir, { recursive: true })
+    const patchPath = join(profileDir, 'cordis.patch.yml')
+    const marker = 'painuo-model-provider'
+    let patch = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '# dsh profile patch layer\n[]\n'
+    if (!patch.includes(marker)) {
+      const block = `# ${marker}: PaiNuo ecosystem model provider (auth.modelxing.com proxy).\n` +
+        '- id: llm-pi-ai\n' +
+        '  config:\n' +
+        '    providers:\n' +
+        '      painuo:\n' +
+        '        displayName: 派诺生态\n' +
+        '        apiKeyEnv: DSH_PAINUO_TOKEN\n' +
+        '        api: openai-completions\n' +
+        '        baseURL: https://auth.modelxing.com/pi/v1\n' +
+        '        models:\n' +
+        '          - id: MiniMax-M2.5\n' +
+        '            name: MiniMax M2.5\n' +
+        '            contextWindow: 262144\n' +
+        '            maxTokens: 32768\n'
+      patch = patch.trim() === '[]' ? block : `${patch.trimEnd()}\n${block}`
+      writeFileSync(patchPath, patch, { mode: 0o600 })
+    }
+    const credentialsPath = join(home, '.credentials.yaml')
+    const readGrant = (): string | undefined => {
+      try {
+        const match = /deepseek-account-platform\/default:[\s\S]*?token:\s*(\S+)/.exec(readFileSync(credentialsPath, 'utf8'))
+        return match?.[1]
+      } catch (_error) { return undefined }
+    }
+    const grant = readGrant()
+    if (grant !== undefined && process.env.DSH_PAINUO_TOKEN === undefined) process.env.DSH_PAINUO_TOKEN = grant
+    if (process.env.DSH_PAINUO_TOKEN === undefined) {
+      let relaunched = false
+      watchFile(credentialsPath, { interval: 1500 }, () => {
+        const token = readGrant()
+        if (relaunched || token === undefined) return
+        relaunched = true
+        process.env.DSH_PAINUO_TOKEN = token
+        setTimeout(() => { app.relaunch(); app.exit(0) }, 1200)
+      })
+    }
+  } catch (error) {
+    console.warn('paiNuo brand bootstrap failed', error)
+  }
+}
+
 async function main(): Promise<void> {
   const desktopSettings = readDesktopSettings(app.getPath('userData'))
   void pruneCrashReports(app.getPath('logs'))
@@ -387,6 +446,7 @@ async function main(): Promise<void> {
   const updateJournal = journalDirectory === undefined ? undefined : new DesktopUpdateJournal(journalDirectory, app.getVersion())
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
+  bootstrapPaiNuoBrand()
   const development = !app.isPackaged
   const primaryRuntime = development
     ? developmentPrimaryRuntime()
