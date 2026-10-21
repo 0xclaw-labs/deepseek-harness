@@ -47,7 +47,7 @@ esac
 BRAND_JSON="$(node -e 'const fs=require("node:fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(JSON.stringify(b))' "$BRAND_DIR/brand.json")"
 read -r PRODUCT_NAME APP_ID SCHEME ARTIFACT_PREFIX < <(node -e '
 const b = JSON.parse(process.argv[1]);
-process.stdout.write([b.productName, b.appId, b.protocolScheme, b.artifactPrefix].join("\t"));
+process.stdout.write([b.productName, b.appId, b.protocolScheme, b.artifactPrefix].join("\t") + "\n");
 ' "$BRAND_JSON")
 for value in "$PRODUCT_NAME" "$APP_ID" "$SCHEME" "$ARTIFACT_PREFIX"; do
   if [[ -z "$value" ]]; then
@@ -87,6 +87,11 @@ DSH_DESKTOP_PROTOCOL_SCHEME="$SCHEME" \
 DSH_DESKTOP_ARTIFACT_PREFIX="$ARTIFACT_PREFIX" \
 DSH_DESKTOP_BRAND_RESOURCES_DIR="$BRAND_DIR/assets" \
 pnpm run "$UPSTREAM_TARGET"
+
+# Fail loud if the packaged identity silently fell back to upstream: that build
+# would share Chromium userData and the dsh:// handler with an installed
+# DeepSeek Harness, and its Host would read the user's ~/.dsh.
+node "$ROOT/scripts/custom/verify-brand-manifest.mjs" "$WORK"
 
 echo "build-unsigned: done (unsigned). Find artifacts under apps/desktop (see electron-builder output above)."
 if [[ "${KEEP:-0}" != "1" ]]; then

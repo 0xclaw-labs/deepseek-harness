@@ -140,10 +140,24 @@ if (desktopProfileDirectory !== undefined) {
   mkdirSync(join(profile, 'logs'), { recursive: true })
   // Brand isolation: a rebranded package owns a private Harness home. Without it
   // the Host would read `~/.dsh` — the user's upstream/npm-installed DeepSeek
-  // Harness profile, sessions, credentials, plugins and model settings. A caller
-  // that explicitly sets DSH_HOME (development/tests) keeps it.
-  if (process.env.DSH_HOME === undefined) process.env.DSH_HOME = join(profile, 'dsh-home')
-  mkdirSync(process.env.DSH_HOME, { recursive: true })
+  // Harness profile, sessions, credentials, plugins and model settings. Packaged
+  // brand launches therefore ignore an inherited DSH_HOME (a terminal or the DSH
+  // host shell can export one); only the explicit test override can redirect it.
+  const privateDshHome = process.env.DSH_DESKTOP_DSH_HOME !== undefined && process.env.DSH_DESKTOP_DSH_HOME !== ''
+    ? process.env.DSH_DESKTOP_DSH_HOME
+    : join(profile, 'dsh-home')
+  process.env.DSH_HOME = privateDshHome
+  mkdirSync(privateDshHome, { recursive: true, mode: 0o700 })
+  // Global agent skills would otherwise still mix with the upstream install's ~/.agents.
+  process.env.DSH_AGENTS_HOME = join(profile, 'agents-home')
+  mkdirSync(process.env.DSH_AGENTS_HOME, { recursive: true, mode: 0o700 })
+  // A DSH host shell can export its own profile/session pointers; never let them
+  // reach a branded Host that now uses a different home.
+  delete process.env.DSH_PROFILE
+  delete process.env.DSH_PROFILE_DIR
+  delete process.env.DSH_SESSION_ID
+  delete process.env.DSH_WEB_URL
+  delete process.env.DSH_SHELL
 }
 // Platform-conventional logs directory (macOS ~/Library/Logs/<name>, otherwise under userData);
 // set before ready so the first fatal report already resolves under it. A branded package keeps
@@ -447,10 +461,19 @@ async function bootstrapPaiNuoBrand(): Promise<void> {
     const patchPath = join(profileDir, 'cordis.patch.yml')
     const marker = 'paiNuo-model-provider'
     const credentialsPath = join(home, '.credentials.yaml')
+    // Only the branded account shim grant may be forwarded. An upstream
+    // DeepSeek token stored in the same document must never become the bearer
+    // for auth.modelxing.com (and must never be overwritten by the brand app).
     const readGrant = (): string | undefined => {
       try {
-        const match = /deepseek-account-platform\/default:[\s\S]*?token:\s*(\S+)/.exec(readFileSync(credentialsPath, 'utf8'))
-        return match?.[1]
+        const text = readFileSync(credentialsPath, 'utf8')
+        const start = text.indexOf('deepseek-account-platform/default:')
+        if (start === -1) return undefined
+        const block = text.slice(start, start + 512)
+        const token = /token:\s*(\S+)/.exec(block)?.[1]
+        const issuer = /issuer:\s*(\S+)/.exec(block)?.[1]
+        if (token === undefined || issuer !== 'https://auth.modelxing.com' || !token.startsWith('sdzdsh_')) return undefined
+        return token
       } catch (_error) { return undefined }
     }
     const grant = readGrant()
@@ -515,10 +538,20 @@ async function main(): Promise<void> {
   })
   let hostEnvironment: NodeJS.ProcessEnv = process.env
   const brandDshHome = process.env.DSH_HOME
+  const brandAgentsHome = process.env.DSH_AGENTS_HOME
   const prepareHostEnvironment = async (): Promise<void> => {
     hostEnvironment = await loginShell
-    // A login-shell rc file must not redirect a branded package back to ~/.dsh.
-    if (desktopProfileDirectory !== undefined && brandDshHome !== undefined) hostEnvironment.DSH_HOME = brandDshHome
+    if (desktopProfileDirectory !== undefined) {
+      // A login-shell rc file must not redirect a branded package back to ~/.dsh,
+      // nor re-introduce the upstream profile/session pointers.
+      if (brandDshHome !== undefined) hostEnvironment.DSH_HOME = brandDshHome
+      if (brandAgentsHome !== undefined) hostEnvironment.DSH_AGENTS_HOME = brandAgentsHome
+      delete hostEnvironment.DSH_PROFILE
+      delete hostEnvironment.DSH_PROFILE_DIR
+      delete hostEnvironment.DSH_SESSION_ID
+      delete hostEnvironment.DSH_WEB_URL
+      delete hostEnvironment.DSH_SHELL
+    }
     if (process.env.DSH_PAINUO_TOKEN !== undefined) hostEnvironment.DSH_PAINUO_TOKEN = process.env.DSH_PAINUO_TOKEN
   }
   let quitting = false
