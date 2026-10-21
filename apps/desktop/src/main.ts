@@ -2,7 +2,7 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -107,7 +107,11 @@ function resolveDesktopProfileDirectory(): string | undefined {
 // single-instance lock at the end of this module.
 const desktopProfileDirectory = resolveDesktopProfileDirectory()
 if (desktopProfileDirectory !== undefined) {
-  app.setPath('userData', join(app.getPath('appData'), desktopProfileDirectory))
+  // `setPath` rejects a directory that does not exist, so the first branded launch creates it.
+  const profile = join(app.getPath('appData'), desktopProfileDirectory)
+  mkdirSync(profile, { recursive: true })
+  app.setPath('userData', profile)
+  mkdirSync(join(profile, 'logs'), { recursive: true })
 }
 // Platform-conventional logs directory (macOS ~/Library/Logs/<name>, otherwise under userData);
 // set before ready so the first fatal report already resolves under it. A branded package keeps
