@@ -7,8 +7,27 @@
   "publisher": "Pino Ecosystem",
   "vendorNotice": "Forked from deepseek-ai/deepseek-harness. Upstream LICENSE and THIRD_PARTY_NOTICES are retained.",
   "assets": [
-    { "from": "assets/icon-macos.png", "to": "apps/desktop/resources/icon-macos.png" },
-    { "from": "assets/icon-windows.png", "to": "apps/desktop/resources/icon-windows.png" },
-    { "from": "assets/tray-windows.ico", "to": "apps/desktop/resources/tray-windows.ico" }
-  ]
+    {
+      "from": "assets/icon-macos.png",
+      "to": "apps/desktop/resources/icon-macos.png"
+    },
+    {
+      "from": "assets/icon-windows.png",
+      "to": "apps/desktop/resources/icon-windows.png"
+    },
+    {
+      "from": "assets/tray-windows.ico",
+      "to": "apps/desktop/resources/tray-windows.ico"
+    }
+  ],
+  "endpoints": {
+    "authOrigin": "https://auth.modelxing.com",
+    "inferenceBaseUrl": "https://auth.modelxing.com/pi/v1",
+    "modelCatalogUrl": "https://auth.modelxing.com/pi/v1/models",
+    "updateFeed": null,
+    "pluginMarketIndexes": [],
+    "webSearch": null,
+    "telemetry": null,
+    "notes": "null/[] means the branded app disables the capability until a PaiNuo-owned service exists."
+  }
 }

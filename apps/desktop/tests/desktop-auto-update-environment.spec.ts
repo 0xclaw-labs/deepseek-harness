@@ -28,9 +28,9 @@ describe('desktop auto-update environment', () => {
   ('uses one test release directory for %s %s feeds and binaries', (platform, arch, target) => {
     expect(resolveDesktopAutoUpdateConfig({ DOWNLOAD_TEST_ORIGIN: 'https://updates.example.com',
       DOWNLOAD_TEST_RELEASE_ID: RELEASE_ID }, platform, arch)).toMatchObject({
-      publicUrl: `https://updates.example.com/dsh-desk/${RELEASE_ID}/feeds/${target}/`,
-      keyPrefix: `dsh-desk/${RELEASE_ID}/feeds/${target}`,
-      binaryKeyPrefix: `dsh-desk/${RELEASE_ID}/bin/${target}`,
+      publicUrl: `https://updates.example.com/suishendazi-desk/${RELEASE_ID}/feeds/${target}/`,
+      keyPrefix: `suishendazi-desk/${RELEASE_ID}/feeds/${target}`,
+      binaryKeyPrefix: `suishendazi-desk/${RELEASE_ID}/bin/${target}`,
     })
   })
 
@@ -43,9 +43,9 @@ describe('desktop auto-update environment', () => {
       environment: 'test', channel: 'nightly',
       target: 'mac-arm64',
       origin: 'https://desktop-updates.example.com',
-      publicUrl: `https://desktop-updates.example.com/dsh-desk/${RELEASE_ID}/feeds/mac-arm64/`,
-      keyPrefix: `dsh-desk/${RELEASE_ID}/feeds/mac-arm64`,
-      binaryKeyPrefix: `dsh-desk/${RELEASE_ID}/bin/mac-arm64`,
+      publicUrl: `https://desktop-updates.example.com/suishendazi-desk/${RELEASE_ID}/feeds/mac-arm64/`,
+      keyPrefix: `suishendazi-desk/${RELEASE_ID}/feeds/mac-arm64`,
+      binaryKeyPrefix: `suishendazi-desk/${RELEASE_ID}/bin/mac-arm64`,
     })
     expect(resolveDesktopUploadConfig({
       DOWNLOAD_TEST_ORIGIN: 'https://desktop-updates.example.com/',
@@ -58,24 +58,41 @@ describe('desktop auto-update environment', () => {
     })
   })
 
-  it.each([undefined, RELEASE_ID, 'unused-test-value'])('keeps production paths independent of test release ID %s', (id) => {
+  it.each([undefined, RELEASE_ID, 'unused-test-value'])('keeps brand production paths independent of test release ID %s', (id) => {
     expect(resolveDesktopAutoUpdateConfig({
       DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+      DSH_DESKTOP_UPDATE_ORIGIN: 'https://updates.modelxing.com',
       DOWNLOAD_TEST_RELEASE_ID: id,
     }, 'win32', 'x64')).toMatchObject({
       environment: 'production',
       target: 'win-x64',
-      publicUrl: 'https://download.deepseek.com/dsh-desk/feeds/win-x64/',
-      binaryKeyPrefix: 'dsh-desk/bin/win-x64',
+      publicUrl: 'https://updates.modelxing.com/suishendazi-desk/feeds/win-x64/',
+      binaryKeyPrefix: 'suishendazi-desk/bin/win-x64',
     })
     expect(resolveDesktopUploadConfig({
       DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+      DSH_DESKTOP_UPDATE_ORIGIN: 'https://updates.modelxing.com',
       DOWNLOAD_PROD_COS_BUCKET: 'production-download-bucket',
     }, 'win32', 'x64')).toMatchObject({
       bucket: 'production-download-bucket',
       secretIdEnvName: 'DOWNLOAD_PROD_COS_SECRET_ID',
       secretKeyEnvName: 'DOWNLOAD_PROD_COS_SECRET_KEY',
     })
+  })
+
+  it('fails closed when production has no brand origin or points at an upstream feed', () => {
+    expect(() => resolveDesktopAutoUpdateConfig({
+      DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+    }, 'win32', 'x64')).toThrow(/DSH_DESKTOP_UPDATE_ORIGIN/u)
+    expect(() => resolveDesktopAutoUpdateConfig({
+      DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+      DSH_DESKTOP_UPDATE_ORIGIN: 'https://download.deepseek.com',
+    }, 'win32', 'x64')).toThrow(/upstream DeepSeek service/u)
+    expect(() => resolveDesktopAutoUpdateConfig({
+      DSH_DESKTOP_AUTO_UPDATE_ENV: 'test',
+      DOWNLOAD_TEST_ORIGIN: 'https://download-test.deepseek.com',
+      DOWNLOAD_TEST_RELEASE_ID: RELEASE_ID,
+    }, 'win32', 'x64')).toThrow(/upstream DeepSeek service/u)
   })
 
   it('requires the selected deployment origin for packages and bucket only for uploads', () => {
@@ -91,6 +108,7 @@ describe('desktop auto-update environment', () => {
     }, 'darwin', 'arm64')).toThrow(/DOWNLOAD_TEST_COS_BUCKET/u)
     expect(() => resolveDesktopUploadConfig({
       DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+      DSH_DESKTOP_UPDATE_ORIGIN: 'https://updates.modelxing.com',
     }, 'win32', 'x64')).toThrow(/DOWNLOAD_PROD_COS_BUCKET/u)
   })
 

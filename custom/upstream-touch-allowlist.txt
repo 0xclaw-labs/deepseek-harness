@@ -41,3 +41,27 @@ packages/api/workspace-controller/src/default-directory.ts
 packages/api/workspace-controller/src/index.ts
 packages/api/workspace-controller/tests/default-directory.host.spec.ts
 packages/api/workspace-controller/tests/workspace-controller.host.spec.ts
+
+# 2026-10-22: brand model/service defaults. The upstream base composition is the
+# one place that mounted official DeepSeek provider, web-search, session-log and
+# telemetry rows; a branded build disables them instead of inheriting official
+# endpoints. The Desktop's brand endpoint manifest is a new focused module, and
+# update/publish destinations now fail closed instead of defaulting to
+# download.deepseek.com. Tests pin the composition and destination guards.
+apps/desktop/src/brand-endpoints.ts
+apps/desktop/tests/brand-endpoints.spec.ts
+apps/desktop/scripts/desktop-auto-update-environment.mjs
+apps/desktop/scripts/desktop-publish-config.ts
+apps/desktop/tests/desktop-auto-update-environment.spec.ts
+apps/desktop/tests/desktop-publish-config.spec.ts
+packages/bundle/base/cordis.patch.yml
+packages/bundle/base/tests/base.spec.ts
+packages/bundle/web-app/cordis.patch.yml
+packages/bundle/web-app/tests/product-analytics.spec.ts
+packages/credentials/deepseek-account-platform/tests/brand-defaults.spec.ts
+packages/host/product-telemetry-otel/src/index.ts
+packages/host/product-telemetry-otel/tests/telemetry.spec.ts
+# 2026-10-22: account settings copy still told users to sign in to DeepSeek.
+# The host account flow now labels itself 派诺生态; the visible sign-in/status
+# copy follows the same brand without changing the wire protocol.
+packages/client/ui-settings-account/src/client/locales.ts

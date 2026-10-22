@@ -26,6 +26,7 @@ import {
 } from 'electron'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { resolveDesktopPaths } from './paths.ts'
+import { assertNoUpstreamEndpointOverrides, fetchPaiNuoModels, paiNuoProviderPatch, readPaiNuoGrant } from './brand-endpoints.ts'
 import { DesktopProjectManager } from './project-manager.ts'
 import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
 import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-view.ts'
@@ -431,49 +432,6 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
  * model the ecosystem serves. A fresh login triggers one relaunch so the
  * already-started Host picks the token up from its environment.
  */
-async function fetchPaiNuoModels(grant: string): Promise<Array<{ id: string; name: string }>> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => { controller.abort() }, 5000)
-  try {
-    const response = await fetch('https://auth.modelxing.com/pi/v1/models', {
-      headers: { authorization: `Bearer ${grant}` }, signal: controller.signal,
-    })
-    if (!response.ok) return []
-    const payload = await response.json() as { data?: Array<{ id?: unknown; endpoint?: unknown; object?: unknown }> }
-    const seen = new Set<string>()
-    const models: Array<{ id: string; name: string }> = []
-    for (const item of payload.data ?? []) {
-      if (typeof item?.id !== 'string' || item.id.length === 0 || seen.has(item.id)) continue
-      if (item.endpoint !== undefined && item.endpoint !== '/v1/chat/completions') continue
-      if (item.endpoint === undefined && item.object !== 'model') continue
-      seen.add(item.id)
-      models.push({ id: item.id, name: item.id })
-    }
-    return models
-  } catch (_error) {
-    return []
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-function paiNuoProviderPatch(models: ReadonlyArray<{ id: string; name: string }>): string {
-  if (models.length === 0) return ''
-  const list = models.map(model => JSON.stringify({ id: model.id, name: model.name })).join(',')
-  return '# paiNuo-model-provider: PaiNuo ecosystem model catalog (auth.modelxing.com proxy).\n' +
-    '- id: llm-pi-ai\n' +
-    '  config:\n' +
-    '    providers:\n' +
-    '      painuo:\n' +
-    '        displayName: 派诺生态\n' +
-    '        apiKeyEnv: DSH_PAINUO_TOKEN\n' +
-    '        api: openai-completions\n' +
-    '        baseURL: https://auth.modelxing.com/pi/v1\n' +
-    '        defaultContextWindow: 131072\n' +
-    '        defaultMaxTokens: 8192\n' +
-    `        models: [${list}]\n`
-}
-
 async function bootstrapPaiNuoBrand(): Promise<void> {
   try {
     const home = resolveDshHome()
@@ -487,14 +445,7 @@ async function bootstrapPaiNuoBrand(): Promise<void> {
     // for auth.modelxing.com (and must never be overwritten by the brand app).
     const readGrant = (): string | undefined => {
       try {
-        const text = readFileSync(credentialsPath, 'utf8')
-        const start = text.indexOf('deepseek-account-platform/default:')
-        if (start === -1) return undefined
-        const block = text.slice(start, start + 512)
-        const token = /token:\s*(\S+)/.exec(block)?.[1]
-        const issuer = /issuer:\s*(\S+)/.exec(block)?.[1]
-        if (token === undefined || issuer !== 'https://auth.modelxing.com' || !token.startsWith('sdzdsh_')) return undefined
-        return token
+        return readPaiNuoGrant(readFileSync(credentialsPath, 'utf8'))
       } catch (_error) { return undefined }
     }
     const grant = readGrant()
@@ -573,6 +524,8 @@ function bootstrapBrandWorkspace(): void {
 }
 
 async function main(): Promise<void> {
+  // A stale upstream override in the launching shell must not redirect the brand app.
+  assertNoUpstreamEndpointOverrides(process.env)
   const desktopSettings = readDesktopSettings(app.getPath('userData'))
   void pruneCrashReports(app.getPath('logs'))
   const journalDirectory = process.env.DSH_DESKTOP_UPDATE_JOURNAL_DIR
@@ -929,7 +882,6 @@ async function main(): Promise<void> {
     // A confirmation on a hidden window would go unseen, so it waits for the next show; the mandatory
     // flow keeps its own taskbar and Dock attention instead.
     if (!isMandatory()) await windowShown()
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- A quit can begin while the show is awaited.
     if (quitting) return state
     return updates.install(version)
   }

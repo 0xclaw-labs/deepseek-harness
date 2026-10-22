@@ -32,10 +32,16 @@ describe('dsh-base bundle', () => {
     )
     expect(rows.length).toBeGreaterThan(50)
     expect(rows.some(row => row.id === 'agent-loop')).toBe(true)
-    expect(rows.find(row => row.id === 'session-telemetry-otel')?.disabled).toBeUndefined()
-    expect(rows.find(row => row.id === 'session-telemetry-otel')?.config?.['mode']).toEqual({
-      __jsExpr: "process.env.DSH_TELEMETRY_MODE || 'FEEDBACK_ONLY'",
+    expect(rows.find(row => row.id === 'session-telemetry-otel')?.disabled).toBe(true)
+    expect(rows.find(row => row.id === 'session-telemetry-otel')?.config?.['mode']).toBe('DISABLED')
+    expect(rows.find(row => row.id === 'agent-default-model')?.config).toEqual({
+      provider: 'painuo', model: 'deepseek-v4.1-flash-1017-local',
     })
+    for (const id of ['llm-deepseek', 'llm-deepseek-account', 'session-log-deepseek', 'web-search-deepseek', 'web-deepseek-api']) {
+      expect(rows.find(row => row.id === id)?.disabled, `${id} must stay disabled in the brand composition`).toBe(true)
+    }
+    expect(rows.find(row => row.id === 'web')?.config).not.toHaveProperty('searchProvider')
+    expect(rows.find(row => row.id === 'tool-web')?.config).toMatchObject({ search: false, fetch: true })
     expect(rows.find(row => row.id === 'hmr')).toMatchObject({
       config: { root: [] },
     })
@@ -43,7 +49,6 @@ describe('dsh-base bundle', () => {
     expect(rows.filter(row => row.id === 'subagent-claude-code')).toHaveLength(0)
     expect(rows.find(row => row.id === 'web')?.config).toMatchObject({ fetchProvider: 'http' })
     expect(rows.find(row => row.id === 'web-fetch-http')).toBeDefined()
-    expect(rows.find(row => row.id === 'tool-web')?.config).toMatchObject({ fetch: true })
     expect(manifest.dependencies).not.toHaveProperty('@deepseek-ai/dsh-subagent-codex')
     expect(manifest.dependencies).not.toHaveProperty('@deepseek-ai/dsh-subagent-claude-code')
     expect(manifest.dependencies).toHaveProperty('@deepseek-ai/dsh-web-fetch-http')

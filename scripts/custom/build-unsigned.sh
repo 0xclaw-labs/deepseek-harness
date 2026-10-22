@@ -75,6 +75,10 @@ node "$ROOT/custom/branding/patch-cli.mjs" \
   --brand "$BRAND_DIR/brand.json" \
   --write
 
+# A branded package must not inherit any upstream default endpoint. This reads
+# the composition and runtime defaults before the expensive build.
+node "$ROOT/scripts/custom/verify-brand-defaults.mjs"
+
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "build-unsigned: pnpm not found; enable corepack (upstream packageManager: pnpm@11.28.5)" >&2
   exit 2

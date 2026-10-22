@@ -25,8 +25,10 @@ const UPDATE_ENVIRONMENTS = {
     secretKeyEnvName: 'DOWNLOAD_TEST_COS_SECRET_KEY',
   },
   production: {
-    originEnvName: undefined,
-    fixedOrigin: 'https://download.deepseek.com',
+    // Brand production has no implicit feed: signed builds must name the
+    // PaiNuo update origin explicitly, and that origin may not be upstream.
+    originEnvName: 'DSH_DESKTOP_UPDATE_ORIGIN',
+    fixedOrigin: undefined,
     bucketEnvName: 'DOWNLOAD_PROD_COS_BUCKET',
     secretIdEnvName: 'DOWNLOAD_PROD_COS_SECRET_ID',
     secretKeyEnvName: 'DOWNLOAD_PROD_COS_SECRET_KEY',
@@ -129,7 +131,16 @@ function httpsOrigin(value, name) {
     || parsed.hash !== '') {
     throw new Error(`desktop auto-update: ${name} must be an absolute HTTPS origin without a path, credentials, query, or fragment`)
   }
+  if (isUpstreamDeepSeekHost(parsed.hostname)) {
+    throw new Error(`desktop auto-update: ${name} must not point at an upstream DeepSeek service`)
+  }
   return parsed.origin
+}
+
+/** Reject update hosts owned by DeepSeek; a brand build must not poll or upload there. */
+function isUpstreamDeepSeekHost(hostname) {
+  const normalized = hostname.trim().toLowerCase().replace(/\.$/u, '')
+  return normalized === 'deepseek.com' || normalized.endsWith('.deepseek.com')
 }
 
 /**
@@ -151,7 +162,10 @@ export function resolveDesktopAutoUpdateConfig(env, platform, arch) {
     if (originEnvName === undefined) throw new Error('desktop auto-update: selected deployment has no origin')
     origin = httpsOrigin(requiredEnvironmentValue(env, originEnvName), originEnvName)
   }
-  let releasePrefix = 'dsh-desk'
+  let releasePrefix = env.DSH_DESKTOP_UPDATE_RELEASE_PREFIX?.trim() || 'suishendazi-desk'
+  if (!/^[a-z0-9][a-z0-9/_-]*$/u.test(releasePrefix)) {
+    throw new Error('desktop auto-update: DSH_DESKTOP_UPDATE_RELEASE_PREFIX must be a lowercase path segment')
+  }
   if (environment === 'test') {
     const releaseId = requiredEnvironmentValue(env, 'DOWNLOAD_TEST_RELEASE_ID')
     if (!/^[a-f0-9]{32}$/u.test(releaseId)) {
