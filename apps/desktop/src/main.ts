@@ -158,6 +158,9 @@ if (desktopProfileDirectory !== undefined) {
   const profile = join(app.getPath('appData'), desktopProfileDirectory)
   mkdirSync(profile, { recursive: true })
   app.setPath('userData', profile)
+  // Cookies, caches, and other Session state follow sessionData; pin it before
+  // ready so a rebrand never writes Chromium state beside the upstream app.
+  app.setPath('sessionData', profile)
   mkdirSync(join(profile, 'logs'), { recursive: true })
   // Brand isolation: a rebranded package owns a private Harness home. Without it
   // the Host would read `~/.dsh` — the user's upstream/npm-installed DeepSeek

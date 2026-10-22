@@ -35,6 +35,10 @@ async function main(): Promise<void> {
         env: {
           ELECTRON_RUN_AS_NODE: '1',
           DSH_DESKTOP_NODE_EXECUTABLE: process.execPath,
+          // Profile package operations run from a scrubbed parent environment, so a
+          // branded Host must hand its private roots to lifecycle scripts explicitly.
+          ...(process.env.DSH_HOME === undefined ? {} : { DSH_HOME: process.env.DSH_HOME }),
+          ...(process.env.DSH_AGENTS_HOME === undefined ? {} : { DSH_AGENTS_HOME: process.env.DSH_AGENTS_HOME }),
           PATH: `${process.argv[6] ?? ''}${delimiter}${process.env.PATH ?? ''}`,
         },
       },
