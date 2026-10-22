@@ -3,7 +3,7 @@
 import { homedir } from 'node:os'
 import { posix, win32 } from 'node:path'
 import { runNativeCommand, type NativeCommandRunner } from '@deepseek-ai/dsh-native-command'
-import { DEFAULT_WORKSPACE_DIRECTORY } from './default-workspace.ts'
+import { DEFAULT_WORKSPACE_DIRECTORY, DEFAULT_WORKSPACE_PARENT } from './default-workspace.ts'
 
 /** Platform observations replaceable in directory-resolution tests. */
 interface DocumentsDirectoryInternals {
@@ -13,8 +13,8 @@ interface DocumentsDirectoryInternals {
   /**
    * Complete first-use Workspace path supplied by a deployment override.
    * When set it wins over the Documents lookup, because a rebranded package
-   * must be able to choose its own folder instead of upstream's
-   * `<Documents>/deepseek-harness/default-workspace`.
+   * must be able to choose its own folder instead of the deployment parent's
+   * `<Documents>/<parent>/default-workspace`.
    */
   readonly workspaceDirectory?: string
 }
@@ -91,5 +91,5 @@ export async function defaultWorkspaceDirectory(
   }
   directory = validateDocumentsDirectory(directory, platform)
   signal.throwIfAborted()
-  return paths.join(directory, 'deepseek-harness', DEFAULT_WORKSPACE_DIRECTORY)
+  return paths.join(directory, DEFAULT_WORKSPACE_PARENT, DEFAULT_WORKSPACE_DIRECTORY)
 }

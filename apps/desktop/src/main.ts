@@ -58,6 +58,7 @@ import { desktopClientMetadata, desktopClientVersion } from './client-metadata.t
 import { DesktopMandatoryUpdateWindow } from './mandatory-update-window.ts'
 import { DesktopPolicyTestAuth } from './policy-test-auth.ts'
 import { readDesktopSettings } from './settings.ts'
+import { applyBrandDefaults, brandWorkspaceBlock } from './brand-defaults.ts'
 import { DesktopUpdateDialog, type UpdateDialogOptions } from './update-dialog.ts'
 import { readDesktopRuntime } from './runtime-tree.ts'
 import { DesktopBrowserGuests } from './browser-guests.ts'
@@ -501,10 +502,7 @@ function bootstrapBrandWorkspace(): void {
     mkdirSync(profileDir, { recursive: true })
     const patchPath = join(profileDir, 'cordis.patch.yml')
     const marker = 'brand-default-workspace'
-    const block = `# ${marker}: the branded first-use Workspace, never upstream's Documents/deepseek-harness.\n`
-      + '- id: workspace-controller\n'
-      + '  config:\n'
-      + `    defaultWorkspacePath: ${JSON.stringify(resolveBrandWorkspaceDirectory())}\n`
+    const block = brandWorkspaceBlock(resolveBrandWorkspaceDirectory())
     const existing = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : ''
     const markerIndex = existing.indexOf(`# ${marker}`)
     let rest = existing
@@ -523,6 +521,26 @@ function bootstrapBrandWorkspace(): void {
   }
 }
 
+/**
+ * Write the branded deployment defaults into the Host profile patch.
+ *
+ * The bundle layers still name upstream's public model route, search route,
+ * and telemetry collector. These rows are prepended so a later user row (for
+ * example a saved model choice) always wins. A failed write is a warning: the
+ * Desktop still starts with the bundle defaults rather than refusing to boot
+ * over a cosmetic/deployment preference.
+ */
+function bootstrapBrandDefaults(): void {
+  if (desktopProfileDirectory === undefined) return
+  try {
+    const profileDir = join(resolveDshHome(), 'profiles', 'desktop')
+    mkdirSync(profileDir, { recursive: true })
+    applyBrandDefaults(join(profileDir, 'cordis.patch.yml'))
+  } catch (error) {
+    console.warn('brand defaults bootstrap failed', error)
+  }
+}
+
 async function main(): Promise<void> {
   // A stale upstream override in the launching shell must not redirect the brand app.
   assertNoUpstreamEndpointOverrides(process.env)
@@ -533,6 +551,7 @@ async function main(): Promise<void> {
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
   await bootstrapPaiNuoBrand()
+  bootstrapBrandDefaults()
   bootstrapBrandWorkspace()
   const development = !app.isPackaged
   const primaryRuntime = development
