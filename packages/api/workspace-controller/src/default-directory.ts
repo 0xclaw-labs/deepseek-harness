@@ -10,6 +10,13 @@ interface DocumentsDirectoryInternals {
   readonly platform?: NodeJS.Platform
   readonly home?: string
   readonly run?: NativeCommandRunner
+  /**
+   * Complete first-use Workspace path supplied by a deployment override.
+   * When set it wins over the Documents lookup, because a rebranded package
+   * must be able to choose its own folder instead of upstream's
+   * `<Documents>/deepseek-harness/default-workspace`.
+   */
+  readonly workspaceDirectory?: string
 }
 
 /**
@@ -31,7 +38,8 @@ export function validateDocumentsDirectory(directory: string, platform: NodeJS.P
  * Resolve the first-use directory on the Host without creating files.
  * @param documentsDirectory - explicit deployment override for the system Documents directory.
  * @param signal - caller lifetime and lookup deadline.
- * @param internals - platform facts and native command runner.
+ * @param internals - platform facts, native command runner, and an optional
+ *   complete Workspace path that wins over the Documents lookup.
  * @returns the absolute candidate path.
  */
 export async function defaultWorkspaceDirectory(
@@ -42,6 +50,15 @@ export async function defaultWorkspaceDirectory(
   const platform = internals.platform ?? process.platform
   const paths = platform === 'win32' ? win32 : posix
   signal.throwIfAborted()
+  const configuredWorkspace = internals.workspaceDirectory?.trim()
+  if (configuredWorkspace !== undefined && configuredWorkspace !== '') {
+    const normalized = validateDocumentsDirectory(configuredWorkspace, platform)
+    // `path.normalize` keeps a trailing separator; a Workspace path is a
+    // directory identity, so publish it without one (except a filesystem root).
+    return normalized.length > paths.parse(normalized).root.length && normalized.endsWith(paths.sep)
+      ? normalized.slice(0, -1)
+      : normalized
+  }
   let directory = documentsDirectory
   if (directory === undefined) {
     const run = internals.run ?? runNativeCommand

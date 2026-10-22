@@ -68,6 +68,13 @@ node "$ROOT/custom/branding/apply-brand.mjs" \
   --replacements "$BRAND_DIR/replacements.json" \
   --write
 
+# The upstream terminal launchers name the upstream executable and leave
+# DSH_HOME unset; brand them before the runtime is packaged.
+node "$ROOT/custom/branding/patch-cli.mjs" \
+  --root "$WORK" \
+  --brand "$BRAND_DIR/brand.json" \
+  --write
+
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "build-unsigned: pnpm not found; enable corepack (upstream packageManager: pnpm@11.28.5)" >&2
   exit 2

@@ -55,6 +55,20 @@ const schemes = (info.CFBundleURLTypes ?? []).flatMap(entry => entry.CFBundleURL
 if (!schemes.includes(brand.protocolScheme)) problems.push(`CFBundleURLSchemes missing ${brand.protocolScheme} (got ${JSON.stringify(schemes)})`)
 if (schemes.includes('dsh')) problems.push('bundle still declares upstream dsh:// scheme')
 
+// The terminal launchers are generated from upstream templates; a stale copy
+// either names the upstream executable (which the brand bundle does not have)
+// or leaves DSH_HOME unset, so `dsh` would read the user's ~/.dsh.
+for (const name of ['dsh', 'dsh.cmd']) {
+  const path = join(appPath, 'Contents', 'Resources', 'runtime', 'cli', 'bin', name)
+  if (!existsSync(path)) continue
+  const launcher = readFileSync(path, 'utf8')
+  if (launcher.includes('DeepSeek Harness')) problems.push(`${name} still names the upstream executable`)
+  if (!launcher.includes(brand.productName)) problems.push(`${name} does not name ${brand.productName}`)
+  if (!launcher.includes(`${brand.appId}/dsh-home`) && !launcher.includes(`${brand.appId}\\dsh-home`)) {
+    problems.push(`${name} does not pin the branded dsh-home`)
+  }
+}
+
 if (problems.length > 0) {
   console.error('verify-brand-manifest: FAILED')
   for (const problem of problems) console.error(`  - ${problem}`)

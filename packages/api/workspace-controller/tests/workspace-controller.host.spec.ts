@@ -51,7 +51,7 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve }
 }
 
-async function harness(options: { systemDocuments?: boolean } = {}) {
+async function harness(options: { systemDocuments?: boolean; workspacePath?: string } = {}) {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-controller-')))
   tempDirs.push(root)
   const ctx = new Context()
@@ -71,7 +71,10 @@ async function harness(options: { systemDocuments?: boolean } = {}) {
     resources: { register: vi.fn(() => dispose) },
   } as never)
   new RemoteAccessService(ctx)
-  const controller = new WorkspaceController(ctx, options.systemDocuments === true ? {} : { documentsDirectory: root })
+  const controller = new WorkspaceController(ctx, options.systemDocuments === true ? {} : {
+    documentsDirectory: root,
+    ...options.workspacePath === undefined ? {} : { defaultWorkspacePath: options.workspacePath },
+  })
   return { controller, ctx, root, storageDomain }
 }
 
@@ -599,6 +602,17 @@ describe('first-use Remote', () => {
     expect(existsSync(result!.workspace.path)).toBe(true)
     expect(ctx.sessions.list()).toEqual([])
     expect(await controller.initializeDefault(signal)).toEqual(result)
+  })
+
+  it('creates the branded first-use Workspace from the profile config', async () => {
+    const brandParent = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-brand-workspace-')))
+    const brandWorkspace = join(brandParent, 'default-workspace')
+    tempDirs.push(brandParent)
+    const { controller } = await harness({ workspacePath: brandWorkspace })
+    const result = await controller.initializeDefault(new AbortController().signal)
+    expect(result!.workspace.path).toBe(brandWorkspace)
+    expect(result!.workspace.title).toBe(DEFAULT_WORKSPACE_DIRECTORY)
+    expect(existsSync(brandWorkspace)).toBe(true)
   })
 
   it('skips ineligible first use and propagates preparation failures', async () => {

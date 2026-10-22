@@ -3,6 +3,7 @@ import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
 import { existsSync, mkdirSync, readFileSync, watchFile, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -126,6 +127,26 @@ function resolveDesktopProtocolScheme(): string {
   }
   // Development launches have no packaged manifest field; honor the build environment when present.
   return resolveDeepLinkScheme(process.env.DSH_DESKTOP_PROTOCOL_SCHEME)
+}
+
+/**
+ * First-use Workspace owned by this brand.
+ *
+ * Upstream creates `<Documents>/deepseek-harness/default-workspace`; a
+ * rebranded package must never adopt that folder, or both applications would
+ * edit the same files. The Host receives the complete path through the
+ * profile patch written by {@link bootstrapBrandWorkspace}; an explicit
+ * profile config still wins because the brand block is prepended and later
+ * entries in the patch sequence override it.
+ * @returns a fully qualified brand-specific workspace directory.
+ */
+function resolveBrandWorkspaceDirectory(): string {
+  try {
+    return join(app.getPath('documents'), '随身搭子', 'default-workspace')
+  } catch (error: unknown) {
+    console.warn('desktop workspace: Documents directory unavailable', error)
+    return join(homedir(), 'Documents', '随身搭子', 'default-workspace')
+  }
 }
 
 // Claim the branded profile before ready and before any profile access, including the
@@ -512,6 +533,45 @@ async function bootstrapPaiNuoBrand(): Promise<void> {
   }
 }
 
+/**
+ * Write the branded first-use Workspace override into the Host profile patch.
+ *
+ * Workspace creation belongs to the Host, so the Desktop expresses its
+ * deployment choice through the same profile patch it already owns for the
+ * PaiNuo provider. Regenerating the block keeps a moved Documents directory
+ * from leaving a stale path behind. The block is prepended so a user-authored
+ * `workspace-controller` entry later in the patch still wins.
+ */
+function bootstrapBrandWorkspace(): void {
+  if (desktopProfileDirectory === undefined) return
+  try {
+    const home = resolveDshHome()
+    const profileDir = join(home, 'profiles', 'desktop')
+    mkdirSync(profileDir, { recursive: true })
+    const patchPath = join(profileDir, 'cordis.patch.yml')
+    const marker = 'brand-default-workspace'
+    const block = `# ${marker}: the branded first-use Workspace, never upstream's Documents/deepseek-harness.\n`
+      + '- id: workspace-controller\n'
+      + '  config:\n'
+      + `    defaultWorkspacePath: ${JSON.stringify(resolveBrandWorkspaceDirectory())}\n`
+    const existing = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : ''
+    const markerIndex = existing.indexOf(`# ${marker}`)
+    let rest = existing
+    if (markerIndex !== -1) {
+      // Remove only the marked block: stop at the second `- id:` row so a
+      // user-authored entry after ours survives.
+      const firstRow = existing.indexOf('\n- id:', markerIndex)
+      const secondRow = firstRow === -1 ? -1 : existing.indexOf('\n- id:', firstRow + 1)
+      rest = existing.slice(0, markerIndex) + (secondRow === -1 ? '' : existing.slice(secondRow + 1))
+    }
+    rest = rest.split('\n').filter(line => line.trim() !== '[]').join('\n').trim()
+    const next = rest === '' ? block : `${block}${rest}\n`
+    if (next !== existing) writeFileSync(patchPath, next, { mode: 0o600 })
+  } catch (error) {
+    console.warn('brand workspace bootstrap failed', error)
+  }
+}
+
 async function main(): Promise<void> {
   const desktopSettings = readDesktopSettings(app.getPath('userData'))
   void pruneCrashReports(app.getPath('logs'))
@@ -520,6 +580,7 @@ async function main(): Promise<void> {
   const resources = runtimeResources()
   const paths = resolveDesktopPaths()
   await bootstrapPaiNuoBrand()
+  bootstrapBrandWorkspace()
   const development = !app.isPackaged
   const primaryRuntime = development
     ? developmentPrimaryRuntime()

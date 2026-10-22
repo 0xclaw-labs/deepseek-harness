@@ -21,6 +21,43 @@ describe('system Documents directory', () => {
     expect(run).not.toHaveBeenCalled()
   })
 
+  it('uses a branded workspace path without a system lookup or upstream suffix', async () => {
+    const run = vi.fn<NativeCommandRunner>()
+    await expect(defaultWorkspaceDirectory(undefined, new AbortController().signal, {
+      platform: 'darwin',
+      run,
+      workspaceDirectory: '/Users/a/Documents/随身搭子/default-workspace/',
+    })).resolves.toBe('/Users/a/Documents/随身搭子/default-workspace')
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('lets the branded workspace path win over the configured Documents directory', async () => {
+    const run = vi.fn<NativeCommandRunner>()
+    await expect(defaultWorkspaceDirectory('/documents', new AbortController().signal, {
+      platform: 'linux',
+      run,
+      workspaceDirectory: '/brand/workspace',
+    })).resolves.toBe('/brand/workspace')
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('treats a blank branded workspace path as unset', async () => {
+    const run = vi.fn<NativeCommandRunner>()
+    await expect(defaultWorkspaceDirectory('/documents', new AbortController().signal, {
+      platform: 'linux',
+      run,
+      workspaceDirectory: '   ',
+    })).resolves.toBe('/documents/deepseek-harness/default-workspace')
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('rejects a relative branded workspace path', async () => {
+    await expect(defaultWorkspaceDirectory(undefined, new AbortController().signal, {
+      platform: 'linux',
+      workspaceDirectory: 'relative/workspace',
+    })).rejects.toThrow('fully qualified')
+  })
+
   it.each(['', '\r\n', '/home/a\n'])('rejects an unavailable XDG directory %j', async (stdout) => {
     const run: NativeCommandRunner = async () => ({ stdout, stderr: '' })
     await expect(defaultWorkspaceDirectory(undefined, new AbortController().signal, { platform: 'linux', home: '/home/a', run }))

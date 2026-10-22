@@ -37,6 +37,13 @@ export { DirectoryPickerController } from './directory-picker.ts'
 export interface Config {
   /** Override the system Documents directory with a fully qualified path. */
   documentsDirectory?: string
+  /**
+   * Complete first-use Workspace path for a rebranded deployment. When set,
+   * the Host creates this directory instead of upstream's
+   * `<Documents>/deepseek-harness/default-workspace`, so two desktop
+   * applications never share one editable folder.
+   */
+  defaultWorkspacePath?: string
   /** Maximum duration of the operating system's Documents lookup. */
   documentsLookupTimeoutMs?: number
 }
@@ -57,6 +64,7 @@ export class WorkspaceController extends TypertRemoteService {
 
   static Config: z<Config, ResolvedConfig> = z.object({
     documentsDirectory: z.string(),
+    defaultWorkspacePath: z.string(),
     documentsLookupTimeoutMs: z.natural().min(1).default(10_000),
   })
 
@@ -73,6 +81,7 @@ export class WorkspaceController extends TypertRemoteService {
     ctx.typert.resources.register('workspace', { field: 'workspaceId' })
     this.config = WorkspaceController.Config(config)
     if (this.config.documentsDirectory !== undefined) validateDocumentsDirectory(this.config.documentsDirectory)
+    if (this.config.defaultWorkspacePath !== undefined) validateDocumentsDirectory(this.config.defaultWorkspacePath)
     this.commands = new WorkspaceCommands(ctx)
     this.feed = new WorkspaceFeed(ctx)
     // This package is the Loader entry for both Remote owners it hosts: the
@@ -106,6 +115,11 @@ export class WorkspaceController extends TypertRemoteService {
       const timeout = AbortSignal.timeout(this.config.documentsLookupTimeoutMs)
       return await defaultWorkspaceDirectory(
         this.config.documentsDirectory, AbortSignal.any([signal, timeout]),
+        {
+          ...this.config.defaultWorkspacePath === undefined
+            ? {}
+            : { workspaceDirectory: this.config.defaultWorkspacePath },
+        },
       )
     })
     return workspace === undefined ? undefined : { workspace: workspaceView(workspace) }

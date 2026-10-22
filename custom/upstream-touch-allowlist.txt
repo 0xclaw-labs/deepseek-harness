@@ -30,3 +30,14 @@ apps/desktop/tests/brand-packaging.spec.ts
 # default to the hosted PaiNuo login-redirect/account shim (auth.modelxing.com), with
 # DSH_PLATFORM_ORIGIN / DSH_INFERENCE_ORIGIN env overrides for other deployments.
 packages/credentials/deepseek-account-platform/src/index.ts
+
+# 2026-10-22: upstream's first-use Workspace is <Documents>/deepseek-harness/default-workspace,
+# which two installed apps would edit together. The controller gains an explicit
+# defaultWorkspacePath config (set by the branded Desktop through its profile patch);
+# upstream builds leave it unset and keep the existing path unchanged.
+packages/api/workspace-controller/README.md
+packages/api/workspace-controller/README.zh.md
+packages/api/workspace-controller/src/default-directory.ts
+packages/api/workspace-controller/src/index.ts
+packages/api/workspace-controller/tests/default-directory.host.spec.ts
+packages/api/workspace-controller/tests/workspace-controller.host.spec.ts
