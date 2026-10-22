@@ -57355,3 +57355,17 @@ index 627a4f2f9a..c76364e410 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/tsconfig.client.json b/tsconfig.client.json
+index b2f0423c7c..0e88106117 100644
+--- a/tsconfig.client.json
++++ b/tsconfig.client.json
+@@ -19,6 +19,9 @@
+     "apps/desktop/src/keyboard.ts",
+     "apps/desktop/src/keybindings.ts",
+     "apps/desktop/src/browser-guests.ts",
++    "apps/desktop/src/brand-endpoints.ts",
++    "apps/desktop/src/model-display.ts",
++    "apps/desktop/src/cloud-screen.ts",
+     "apps/desktop/src/ipc.ts",
+     "apps/desktop/src/update-overlay.ts",
+     "apps/desktop/tests/**/*.client.spec.tsx",
