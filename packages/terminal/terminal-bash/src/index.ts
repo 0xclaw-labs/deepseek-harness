@@ -76,7 +76,12 @@ function inheritedHarnessHome(): TerminalHarnessHome {
     const value = process.env[name]
     return value === undefined || value.trim().length === 0 ? undefined : value
   }
-  return { dshHome: read('DSH_HOME'), agentsHome: read('DSH_AGENTS_HOME') }
+  const home: { dshHome?: string; agentsHome?: string } = {}
+  const dshHome = read('DSH_HOME')
+  if (dshHome !== undefined) home.dshHome = dshHome
+  const agentsHome = read('DSH_AGENTS_HOME')
+  if (agentsHome !== undefined) home.agentsHome = agentsHome
+  return home
 }
 
 function childEnvironment(

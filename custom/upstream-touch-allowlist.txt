@@ -76,3 +76,49 @@ packages/api/workspace-controller/src/default-workspace.ts
 # profile patch. The generator is a focused new module so it can be unit-tested
 # without Electron; main.ts only calls it during brand bootstrap.
 apps/desktop/src/brand-defaults.ts
+
+# 2026-10-22: the dsh release packer requires every workspace member to share one
+# version. The branded 0.2.2 bump therefore touches every package manifest; the
+# only changed field is `version` and nothing in the dependency graph.
+package.json
+apps/*/package.json
+packages/*/package.json
+packages/*/*/package.json
+packages/*/*/*/package.json
+
+# 2026-10-22: visible brand marks (welcome wordmark, window title, web manifest,
+# favicons, sidebar wordmark/mark, boot wordmark). Users must never see the
+# upstream DeepSeek wordmark in the branded app.
+apps/desktop/renderer/assets/welcome-brand.svg
+apps/web/index.html
+apps/web/public/favicon-dark.svg
+apps/web/public/favicon.svg
+apps/web/public/manifest.webmanifest
+packages/client/ui-primitives/src/BrandWordmark.tsx
+packages/client/ui-primitives/src/FishLogo.tsx
+packages/client/web/src/boot-page.ts
+# 2026-10-22: account settings snapshots follow the branded copy (派诺生态).
+packages/client/ui-settings-account/tests/expected/account-en.txt
+packages/client/ui-settings-account/tests/expected/account-signed-out-en.txt
+packages/client/ui-settings-account/tests/expected/account-signed-out-zh.txt
+packages/client/ui-settings-account/tests/expected/account-zh.txt
+packages/client/ui-settings-account/tests/expected/bonus-en.txt
+packages/client/ui-settings-account/tests/expected/bonus-zh.txt
+packages/client/ui-settings-account/tests/expected/login-en.txt
+packages/client/ui-settings-account/tests/expected/login-zh.txt
+packages/client/ui-settings-account/tests/expected/platform-error-en.txt
+packages/client/ui-settings-account/tests/expected/platform-error-zh.txt
+packages/client/ui-settings-account/tests/expected/platform-header-en.txt
+packages/client/ui-settings-account/tests/expected/platform-header-zh.txt
+# 2026-10-22: the branded Host must pass its private DSH_HOME/DSH_AGENTS_HOME to
+# profile lifecycle scripts, and the shell/terminal backends must restore those
+# roots because the subprocess provider scrubs ambient DSH_* values.
+apps/desktop-host/src/index.ts
+packages/shell/shell-env/README.md
+packages/shell/shell-env/README.zh.md
+packages/shell/shell-env/src/index.ts
+packages/shell/shell-env/tests/shell-env.spec.ts
+packages/terminal/terminal-bash/README.md
+packages/terminal/terminal-bash/README.zh.md
+packages/terminal/terminal-bash/src/index.ts
+packages/terminal/terminal-bash/tests/local.spec.ts
