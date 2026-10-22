@@ -35,6 +35,7 @@ async function fixture(
   embeddedPageDist = '',
   desktopPlatform: 'darwin' | 'win32' | null = null,
   balanceTimeoutMs = 30_000,
+  surface: { accountSurface: 'billing-center'; billingCenterUrl: string } | undefined = undefined,
 ) {
   const home = await mkdtemp(join(tmpdir(), 'dsh-account-'))
   cleanups.push(() => rm(home, { recursive: true, force: true }))
@@ -161,6 +162,7 @@ async function fixture(
     platformOrigin: origin, inferenceOrigin, embeddedPageDist, desktopPlatform,
     allowLoopbackHttp: true, requestHeaders, accountRequestHeaders,
     rewriteBrowserOrigin, logoutRetryDelayMs: 1, balanceTimeoutMs,
+    ...(surface ?? {}),
   })
   await provider
   cleanups.push(async () => { await provider.dispose(); await authorization.dispose(); await credentials.dispose(); await web.dispose() })
@@ -1681,4 +1683,17 @@ it('reads credential-free device identity without minting a device', async () =>
   await storeAccount(f)
   await f.account.getProfile(clientMetadata())
   expect(await f.account.getDeviceIdentity()).toEqual({ deviceId, userId: 'test-user', osVersion: expect.any(String) as string })
+})
+
+it('routes the branded account surface to the configured billing center in the browser', async () => {
+  const page = 'https://agentbuddy.modelxing.com/billing.html'
+  const f = await fixture(undefined, {}, false, {}, 'https://api.deepseek.com', undefined, '',
+    null, 30_000, { accountSurface: 'billing-center', billingCenterUrl: page })
+  expect((await f.account.getState()).links).toEqual({ usageUrl: page, topUpUrl: page, embedded: false })
+})
+
+it('removes both account links when the branded billing center is unconfigured', async () => {
+  const f = await fixture(undefined, {}, false, {}, 'https://api.deepseek.com', undefined, '',
+    null, 30_000, { accountSurface: 'billing-center', billingCenterUrl: '' })
+  expect((await f.account.getState()).links).toEqual({ usageUrl: null, topUpUrl: null, embedded: false })
 })
