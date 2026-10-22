@@ -41,3 +41,15 @@ packages/api/workspace-controller/src/default-directory.ts
 packages/api/workspace-controller/src/index.ts
 packages/api/workspace-controller/tests/default-directory.host.spec.ts
 packages/api/workspace-controller/tests/workspace-controller.host.spec.ts
+
+# 2026-10-22: the brand fork's first-use Workspace parent must not be upstream's
+# Documents/deepseek-harness. The shared constant is read by the Host fallback
+# (web/headless profiles) as well as documented by the workspace controller;
+# the branded Desktop still supplies a complete path through its profile patch.
+packages/api/workspace-controller/src/default-workspace.ts
+#
+# 2026-10-22: a fresh branded Desktop writes deployment defaults (branded account
+# model route, no upstream search pin, no upstream telemetry collector) into its
+# profile patch. The generator is a focused new module so it can be unit-tested
+# without Electron; main.ts only calls it during brand bootstrap.
+apps/desktop/src/brand-defaults.ts
