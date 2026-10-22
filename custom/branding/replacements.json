@@ -4,6 +4,13 @@
   "extensions": [".ts", ".tsx", ".css", ".json", ".mjs", ".md"],
   "excludeSegments": ["node_modules", "dist", "build", ".next", "coverage", "tests", "__tests__", "fixtures", "fixture"],
   "replacements": [
-    { "from": "DeepSeek Harness", "to": "随身搭子" }
+    { "from": "DeepSeek Harness", "to": "随身搭子" },
+    { "from": "DeepSeek-V4.1-Flash", "to": "派诺·DeepSeek-V4.1-Flash", "skipWhenPrecededBy": "派诺·" },
+    { "from": "DeepSeek-V4-Pro", "to": "派诺·DeepSeek-V4-Pro", "skipWhenPrecededBy": "派诺·" },
+    { "from": "'provider.account': 'DeepSeek 账号'", "to": "'provider.account': '派诺生态账号'" },
+    { "from": "'provider.account': 'DeepSeek Account'", "to": "'provider.account': '派诺生态账号'" },
+    { "from": "deepSeekAccount: 'DeepSeek 账号'", "to": "deepSeekAccount: '派诺生态账号'" },
+    { "from": "deepSeekAccount: 'DeepSeek Account'", "to": "deepSeekAccount: '派诺生态账号'" },
+    { "from": "Configure the official DeepSeek provider to start building.", "to": "Configure the PaiNuo ecosystem models to start building." }
   ]
 }
