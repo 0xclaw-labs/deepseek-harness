@@ -3,6 +3,13 @@
   "includeDirs": ["apps/web/src", "apps/desktop/src", "packages"],
   "extensions": [".ts", ".tsx", ".css", ".json", ".mjs", ".md"],
   "excludeSegments": ["node_modules", "dist", "build", ".next", "coverage", "tests", "__tests__", "fixtures", "fixture"],
+  "includeFiles": [
+    "apps/desktop/tests/expected/about-panel.json",
+    "apps/desktop/tests/expected/application-menu-en-US.json",
+    "apps/desktop/tests/expected/application-menu-zh-CN.json",
+    "apps/desktop/tests/expected/command-management-win32-en-US.json",
+    "apps/desktop/tests/expected/command-management-win32-zh-CN.json"
+  ],
   "replacements": [
     { "from": "DeepSeek Harness", "to": "随身搭子" },
     { "from": "DeepSeek-V4.1-Flash", "to": "派诺·DeepSeek-V4.1-Flash", "skipWhenPrecededBy": "派诺·" },
@@ -11,6 +18,8 @@
     { "from": "'provider.account': 'DeepSeek Account'", "to": "'provider.account': '派诺生态账号'" },
     { "from": "deepSeekAccount: 'DeepSeek 账号'", "to": "deepSeekAccount: '派诺生态账号'" },
     { "from": "deepSeekAccount: 'DeepSeek Account'", "to": "deepSeekAccount: '派诺生态账号'" },
-    { "from": "Configure the official DeepSeek provider to start building.", "to": "Configure the PaiNuo ecosystem models to start building." }
-  ]
+    { "from": "Configure the official DeepSeek provider to start building.", "to": "Configure the PaiNuo ecosystem models to start building." },
+    { "from": "official DeepSeek models", "to": "your PaiNuo models" },
+    { "from": "DeepSeek 官方模型", "to": "派诺模型" },
+    { "from": "start using Harness", "to": "start using 随身搭子" }  ]
 }
