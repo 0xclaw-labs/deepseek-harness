@@ -59354,10 +59354,26 @@ index 54d1afd9ad..cec58495f0 100644
   * Validate platform-owned browser destinations without forwarding arbitrary URLs.
   * @param value - returned browser URL.
 diff --git a/packages/credentials/deepseek-account-platform/tests/account.spec.ts b/packages/credentials/deepseek-account-platform/tests/account.spec.ts
-index 359126b30d..b34a4d2c94 100644
+index 359126b30d..f1e18553cb 100644
 --- a/packages/credentials/deepseek-account-platform/tests/account.spec.ts
 +++ b/packages/credentials/deepseek-account-platform/tests/account.spec.ts
-@@ -265,7 +265,7 @@ it('stores a grant before redirecting, restores account presence, and signs out
+@@ -35,6 +35,7 @@ async function fixture(
+   embeddedPageDist = '',
+   desktopPlatform: 'darwin' | 'win32' | null = null,
+   balanceTimeoutMs = 30_000,
++  surface: { accountSurface: 'billing-center'; billingCenterUrl: string } | undefined = undefined,
+ ) {
+   const home = await mkdtemp(join(tmpdir(), 'dsh-account-'))
+   cleanups.push(() => rm(home, { recursive: true, force: true }))
+@@ -161,6 +162,7 @@ async function fixture(
+     platformOrigin: origin, inferenceOrigin, embeddedPageDist, desktopPlatform,
+     allowLoopbackHttp: true, requestHeaders, accountRequestHeaders,
+     rewriteBrowserOrigin, logoutRetryDelayMs: 1, balanceTimeoutMs,
++    ...(surface ?? {}),
+   })
+   await provider
+   cleanups.push(async () => { await provider.dispose(); await authorization.dispose(); await credentials.dispose(); await web.dispose() })
+@@ -265,7 +267,7 @@ it('stores a grant before redirecting, restores account presence, and signs out
    expect(await readFile(join(f.home, 'credentials.yaml'), 'utf8')).toContain('dsh_mock_test')
    // The Host publishes identity from a separate profile read; the snapshot only reuses it.
    await f.account.getProfile(clientMetadata())
@@ -59366,7 +59382,7 @@ index 359126b30d..b34a4d2c94 100644
      requestHeaders: {} })
    expect(await f.account.resolveToken('https://api.deepseek.com')).toBeUndefined()
    await f.account.signOut(clientMetadata())
-@@ -384,7 +384,7 @@ it('removes its callback route without closing the shared server on disposal', a
+@@ -384,7 +386,7 @@ it('removes its callback route without closing the shared server on disposal', a
 
  it('derives every portal link from the private platform origin', async () => {
    const f = await fixture()
@@ -59375,7 +59391,7 @@ index 359126b30d..b34a4d2c94 100644
    await f.account.startSignIn(clientMetadata(), f.callbackOrigin, 'desktop')
    expect((await f.wait('waiting-browser')).attempt?.authorizeUrl).toBe(`${f.origin}/dsh/authorize?authorize_id=test`)
  })
-@@ -875,7 +875,7 @@ it('carries the configured embedded frontend selector in the private Platform se
+@@ -875,7 +877,7 @@ it('carries the configured embedded frontend selector in the private Platform se
    await f.wait('waiting-browser')
    await fetch(f.callback(), { redirect: 'manual' })
    await f.account.getProfile(clientMetadata())
@@ -59384,7 +59400,7 @@ index 359126b30d..b34a4d2c94 100644
      requestHeaders: {} })
  })
 
-@@ -898,7 +898,7 @@ it.each([
+@@ -898,7 +900,7 @@ it.each([
    await f.wait('waiting-browser')
    await fetch(f.callback(), { redirect: 'manual' })
    await readDetails(f.account)
@@ -59393,6 +59409,23 @@ index 359126b30d..b34a4d2c94 100644
      requestHeaders: { cookie: 'test_gate=synthetic', ...overrides } })
    await f.account.signOut(clientMetadata())
    await expect.poll(f.logoutCount).toBe(1)
+@@ -1682,3 +1684,16 @@ it('reads credential-free device identity without minting a device', async () =>
+   await f.account.getProfile(clientMetadata())
+   expect(await f.account.getDeviceIdentity()).toEqual({ deviceId, userId: 'test-user', osVersion: expect.any(String) as string })
+ })
++
++it('routes the branded account surface to the configured billing center in the browser', async () => {
++  const page = 'https://agentbuddy.modelxing.com/billing.html'
++  const f = await fixture(undefined, {}, false, {}, 'https://api.deepseek.com', undefined, '',
++    null, 30_000, { accountSurface: 'billing-center', billingCenterUrl: page })
++  expect((await f.account.getState()).links).toEqual({ usageUrl: page, topUpUrl: page, embedded: false })
++})
++
++it('removes both account links when the branded billing center is unconfigured', async () => {
++  const f = await fixture(undefined, {}, false, {}, 'https://api.deepseek.com', undefined, '',
++    null, 30_000, { accountSurface: 'billing-center', billingCenterUrl: '' })
++  expect((await f.account.getState()).links).toEqual({ usageUrl: null, topUpUrl: null, embedded: false })
++})
 diff --git a/packages/credentials/deepseek-account-platform/tests/brand-defaults.spec.ts b/packages/credentials/deepseek-account-platform/tests/brand-defaults.spec.ts
 new file mode 100644
 index 0000000000..c7a2996be4
