@@ -5,7 +5,7 @@
 //
 // This checks defaults and enabled composition rows, not every explicitly
 // user-configured BYO provider or upstream test fixture.
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as yaml from 'js-yaml'
@@ -92,6 +92,53 @@ if (!read('packages/host/product-telemetry-otel/src/index.ts').includes("endpoin
 }
 if (!read('packages/boot/plugin-market/src/index.ts').includes('default([])')) {
   fail('plugin market defaults must stay empty')
+}
+
+// Client product copy: DSH_CLIENT_TITLE is fixed into every Vite and tsdown
+// artifact, so the branded build must pin it. Inheriting it ships the upstream
+// name as the packaged product title.
+const buildScript = read('scripts/custom/build-unsigned.sh')
+if (!/^\s*DSH_CLIENT_TITLE="\$PRODUCT_NAME"\s+pnpm run build$/mu.test(buildScript)) {
+  fail('scripts/custom/build-unsigned.sh must pin DSH_CLIENT_TITLE="$PRODUCT_NAME" on the client build')
+}
+// Native desktop copy the product-name rule alone cannot reach: the welcome
+// key screen still asked for the upstream provider.
+const replacements = JSON.parse(read('custom/branding/replacements.json'))
+const rules = new Map((replacements.replacements ?? []).map(rule => [rule.from, rule.to]))
+for (const [from, to] of [['DeepSeek Harness', '随身搭子'], ['official DeepSeek models', 'your PaiNuo models'],
+  ['DeepSeek 官方模型', '派诺模型'], ['start using Harness', 'start using 随身搭子']]) {
+  if (rules.get(from) !== to) fail(`brand replacements must map ${JSON.stringify(from)} to ${JSON.stringify(to)}`)
+}
+// Expected-output fixtures describe what the branded product prints, so they
+// must follow the branded sources. Every fixture that pins upstream product
+// copy has to be named; the directory walk cannot reach it under `tests/`.
+const expectedDir = 'apps/desktop/tests/expected'
+const listed = new Set(replacements.includeFiles ?? [])
+/** Collect every JSON fixture under the expected-output tree, nested directories included. */
+function expectedFixtures(dir) {
+  const found = []
+  for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+    const relative = `${dir}/${entry.name}`
+    if (entry.isDirectory()) found.push(...expectedFixtures(relative))
+    else if (entry.isFile() && entry.name.endsWith('.json')) found.push(relative)
+  }
+  return found
+}
+for (const relative of expectedFixtures(expectedDir)) {
+  if (read(relative).includes('DeepSeek Harness') && !listed.has(relative)) {
+    fail(`${relative} pins the upstream product name; add it to brand replacements includeFiles`)
+  }
+}
+const aboutPanel = JSON.parse(read('apps/desktop/tests/expected/about-panel.json'))
+if (aboutPanel['darwin:en-US']?.menu?.[0]?.label !== 'About DeepSeek Harness') {
+  fail('apps/desktop/tests/expected/about-panel.json no longer matches the upstream menu copy the brand rule rewrites')
+}
+const desktopLocale = read('apps/desktop/src/locale.ts')
+for (const expected of ["welcomeKeyDescription: 'Configure official DeepSeek models to start using Harness'",
+  "welcomeKeyDescription: '配置 DeepSeek 官方模型，即可开始使用'"]) {
+  if (!desktopLocale.includes(expected)) {
+    fail(`apps/desktop/src/locale.ts no longer carries ${JSON.stringify(expected)}; update replacements.json`)
+  }
 }
 
 // Build-time update destination: no official feed, and production must name one.

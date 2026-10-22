@@ -88,7 +88,13 @@ cd "$WORK"
 if [[ "${SKIP_INSTALL:-0}" != "1" ]]; then
   pnpm install --frozen-lockfile
 fi
-pnpm run build
+# The client build fixes every DSH_CLIENT_* value into both the Vite web shell
+# and each tsdown client bundle, so DSH_CLIENT_TITLE becomes the packaged
+# product title. Pin it instead of inheriting it: a packaging host that ever ran
+# an official-profile build exports "DeepSeek Harness", and that value otherwise
+# ships inside the branded bundles (ui-layout's productTitle) while the shell
+# title stays branded — the split observed in 0.2.2-rc.2.
+DSH_CLIENT_TITLE="$PRODUCT_NAME" pnpm run build
 
 DSH_DESKTOP_UNSIGNED=1 \
 DSH_DESKTOP_APP_ID="$APP_ID" \

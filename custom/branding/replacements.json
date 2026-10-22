@@ -3,7 +3,17 @@
   "includeDirs": ["apps/web/src", "apps/desktop/src", "packages"],
   "extensions": [".ts", ".tsx", ".css", ".json", ".mjs", ".md"],
   "excludeSegments": ["node_modules", "dist", "build", ".next", "coverage", "tests", "__tests__", "fixtures", "fixture"],
+  "includeFiles": [
+    "apps/desktop/tests/expected/about-panel.json",
+    "apps/desktop/tests/expected/application-menu-en-US.json",
+    "apps/desktop/tests/expected/application-menu-zh-CN.json",
+    "apps/desktop/tests/expected/command-management-win32-en-US.json",
+    "apps/desktop/tests/expected/command-management-win32-zh-CN.json"
+  ],
   "replacements": [
-    { "from": "DeepSeek Harness", "to": "随身搭子" }
+    { "from": "DeepSeek Harness", "to": "随身搭子" },
+    { "from": "official DeepSeek models", "to": "your PaiNuo models" },
+    { "from": "DeepSeek 官方模型", "to": "派诺模型" },
+    { "from": "start using Harness", "to": "start using 随身搭子" }
   ]
 }

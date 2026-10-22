@@ -81,6 +81,29 @@ for (const dir of spec.includeDirs ?? []) {
   walk(root, join(root, dir), exts, excludeSegments, files, seen)
 }
 
+// Files the transform rewrites even though a directory rule above skips them:
+// expected-output fixtures under `tests/` describe what the branded product
+// prints, so they must follow the branded sources instead of pinning upstream
+// copy. An entry is a repository-relative path or glob and is rewritten at any
+// extension, because the fixture that pins product copy is often plain text.
+// Every other file under an excluded segment stays untouched.
+for (const entry of spec.includeFiles ?? []) {
+  const matches = globSync(entry, { cwd: root }).sort().map((match) => match.replaceAll('\\', '/'))
+  if (matches.length === 0) {
+    console.warn(`apply-brand: includeFiles entry matched nothing, skipping: ${entry}`)
+    continue
+  }
+  for (const match of matches) {
+    const targetRel = withinRoot(root, join(root, match))
+    if (!targetRel) fail(`includeFiles entry escapes root: ${entry}`)
+    const target = join(root, targetRel)
+    if (!statSync(target).isFile()) fail(`includeFiles entry is not a file: ${targetRel}`)
+    if (seen.has(target)) continue
+    seen.add(target)
+    files.push(target)
+  }
+}
+
 const replacements = (spec.replacements ?? []).filter((r) => typeof r?.from === 'string' && r.from !== '')
 const totals = { filesScanned: files.length, filesChanged: 0, replacements: 0, perString: {} }
 for (const r of replacements) totals.perString[r.from] = 0
@@ -134,7 +157,8 @@ if (args.json) console.log(JSON.stringify(summary, null, 2))
 else {
   console.log(`apply-brand[${args.mode}] root=${root}`)
   console.log(`  scanned=${totals.filesScanned} changed=${totals.filesChanged} replacements=${totals.replacements}`)
-  for (const [from, count] of Object.entries(totals.perString)) console.log(`  "${from}" -> ${JSON.stringify(brand.productName)} × ${count}`)
+  // Each rule prints its own target: several rules now map to different copy.
+  for (const r of replacements) console.log(`  ${JSON.stringify(r.from)} -> ${JSON.stringify(String(r.to ?? ''))} × ${totals.perString[r.from]}`)
   for (const a of assetResults) console.log(`  asset ${a.to} source=${a.sourceExists ? 'ok' : 'missing'}${args.mode === 'write' ? ` copied=${a.copied === true}` : ''}`)
 }
 if (args.strict) {
