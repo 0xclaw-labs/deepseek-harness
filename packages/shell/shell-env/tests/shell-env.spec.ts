@@ -6,7 +6,7 @@
 
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -17,6 +17,7 @@ import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
 
 const testToolSignal = new AbortController().signal
 
+beforeEach(() => vi.stubEnv('DSH_AGENTS_HOME', undefined))
 afterEach(() => vi.unstubAllEnvs())
 
 function execution(sessionId?: string): ToolExecution {
@@ -78,6 +79,22 @@ describe('ShellEnvRegistry', () => {
     vi.stubEnv('DSH_HOME', undefined)
     const fromDefault = new ShellEnvRegistry(new Context())
     expect(fromDefault.collect(execution()).DSH_HOME).toBe(join(homedir(), '.dsh'))
+  })
+
+  it('forwards an ambient DSH_AGENTS_HOME so nested harness processes share the agent root', () => {
+    vi.stubEnv('DSH_AGENTS_HOME', './ambient-agents-home')
+    const registry = new ShellEnvRegistry(new Context(), { dshHome: './test-dsh-home' })
+    expect(registry.collect(execution()).DSH_AGENTS_HOME).toBe(resolve('./ambient-agents-home'))
+    expect(() => registry.register({
+      name: 'agents-claimer',
+      variables: { DSH_AGENTS_HOME: { description: 'Reserved key.' } },
+      resolve: () => ({}),
+    })).toThrow(/reserved key "DSH_AGENTS_HOME"/)
+  })
+
+  it('omits DSH_AGENTS_HOME when the launcher does not export one', () => {
+    const registry = new ShellEnvRegistry(new Context(), { dshHome: './test-dsh-home' })
+    expect(registry.collect(execution())).not.toHaveProperty('DSH_AGENTS_HOME')
   })
 
   it('collects declared contributor variables and omits unavailable values', () => {

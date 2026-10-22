@@ -62,9 +62,30 @@ function ensureSandboxModeFence(ctx: Context, owner: Agent): void {
   }, { global: true })
 }
 
-function childEnvironment(spec: TerminalBackendSpawnSpec, dialect: ShellDialect): Record<string, string> {
+/** Harness roots inherited from the launching process and re-exposed to the shell. */
+export interface TerminalHarnessHome {
+  /** Absolute Harness home exported as `DSH_HOME`; omitted when the launcher did not set one. */
+  readonly dshHome?: string
+  /** Absolute shared agent root exported as `DSH_AGENTS_HOME`; omitted when the launcher did not set one. */
+  readonly agentsHome?: string
+}
+
+/** Read non-empty Harness roots from the launching environment; blank values count as unset. */
+function inheritedHarnessHome(): TerminalHarnessHome {
+  const read = (name: string): string | undefined => {
+    const value = process.env[name]
+    return value === undefined || value.trim().length === 0 ? undefined : value
+  }
+  return { dshHome: read('DSH_HOME'), agentsHome: read('DSH_AGENTS_HOME') }
+}
+
+function childEnvironment(
+  spec: TerminalBackendSpawnSpec, dialect: ShellDialect, home: TerminalHarnessHome,
+): Record<string, string> {
   // The subprocess provider supplies its own scrubbed ambient base; these are
-  // deliberate terminal-specific overrides layered after it.
+  // deliberate terminal-specific overrides layered after it. The scrub removes
+  // every ambient DSH_* value, so a branded launcher's private home must be
+  // restored here or a `dsh` typed into the terminal falls back to ~/.dsh.
   const common = {
     TERM: 'dumb',
     PAGER: 'cat',
@@ -72,6 +93,8 @@ function childEnvironment(spec: TerminalBackendSpawnSpec, dialect: ShellDialect)
     DSH_SHELL: '1',
     DSH_SESSION_ID: spec.owner.id,
     DSH_PTY_SESSION_ID: spec.sessionId,
+    ...(home.dshHome === undefined ? {} : { DSH_HOME: home.dshHome }),
+    ...(home.agentsHome === undefined ? {} : { DSH_AGENTS_HOME: home.agentsHome }),
   }
   if (dialect === 'pwsh') {
     // pwsh ignores PS1/PROMPT_COMMAND; its prompt is installed by the startup
@@ -195,6 +218,7 @@ export class BashTerminalBackend implements TerminalBackend {
       terminal: SubprocessTerminalHandle,
       config: ResolvedConfig,
     ) => LocalPtySession = (terminal, config) => new LocalPtySession(terminal, config),
+    private readonly home: TerminalHarnessHome = inheritedHarnessHome(),
   ) {
     this.type = config.backendType
   }
@@ -209,7 +233,7 @@ export class BashTerminalBackend implements TerminalBackend {
     const terminal = await this.spawnTerminal({
       argv,
       cwd: spec.cwd ?? await this.ctx.workingDirectory.ensure(spec.owner, spec.signal),
-      env: childEnvironment(spec, this.config.shellDialect),
+      env: childEnvironment(spec, this.config.shellDialect, this.home),
       rows: this.config.rows,
       cols: this.config.cols,
       terminalType: 'dumb',

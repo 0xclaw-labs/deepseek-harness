@@ -3,7 +3,7 @@ import { provideWorkingDirectoryFixture, unsupportedInbox } from '@deepseek-ai/d
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
@@ -22,6 +22,7 @@ const roots: string[] = []
 const contexts: Context[] = []
 
 afterEach(async () => {
+  vi.unstubAllEnvs()
   for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
@@ -157,6 +158,21 @@ describe.skipIf(process.platform === 'win32')('terminal-bash real shell', () => 
       if (previous === undefined) delete process.env.DSH_TEST_SECRET
       else process.env.DSH_TEST_SECRET = previous
     }
+  }, 10_000)
+
+  it('forwards the launcher Harness and agent roots into the terminal environment', async () => {
+    vi.stubEnv('DSH_HOME', '/brand/dsh-home')
+    vi.stubEnv('DSH_AGENTS_HOME', '/brand/agents-home')
+    const { ctx, agent } = await harness('danger-full-access')
+    const created = await ctx.terminals.spawn(agent, { type: 'shell' })
+
+    const operation = ctx.terminals.startSend(agent, created.sessionId, {
+      text: 'printf "dsh=%s agents=%s\\n" "$DSH_HOME" "$DSH_AGENTS_HOME"',
+      submit: true,
+    })
+    expect((await operation.done).viewport)
+      .toContain('dsh=/brand/dsh-home agents=/brand/agents-home')
+    expect(await ctx.terminals.kill(agent, created.sessionId)).toBe(true)
   }, 10_000)
 
   it('restores the controlled prompt after an in-shell PS1 override', async () => {

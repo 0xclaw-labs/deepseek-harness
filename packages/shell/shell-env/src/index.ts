@@ -12,7 +12,7 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { DSH_ENV_PREFIX } from '@deepseek-ai/dsh-shell'
 import type { DshEnvironment, DshEnvironmentKey } from '@deepseek-ai/dsh-shell'
-import { DSH_HOME_ENV, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { AGENTS_HOME_ENV, DSH_HOME_ENV, resolveAgentsHome, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 // Declares `Context.profileContext`, the launcher-provided profile the built-ins read.
 import type {} from '@deepseek-ai/dsh-app-boot'
@@ -75,6 +75,7 @@ const DSH_PROFILE_KEY = `${DSH_ENV_PREFIX}PROFILE` as const
 const DSH_PROFILE_DIR_KEY = `${DSH_ENV_PREFIX}PROFILE_DIR` as const
 const RESERVED_BASH_ENV_KEYS = new Set<DshEnvironmentKey>([
   DSH_HOME_ENV,
+  AGENTS_HOME_ENV,
   DSH_SHELL_KEY,
   DSH_SESSION_ID_KEY,
   DSH_PROFILE_KEY,
@@ -94,6 +95,13 @@ export class ShellEnvRegistry extends Service {
   private readonly contributors = new Map<string, BashEnvContributor>()
   private readonly keyOwners = new Map<DshEnvironmentKey, string>()
   private readonly dshHome: string
+  /**
+   * Ambient shared agent root forwarded as `DSH_AGENTS_HOME`, when the launcher
+   * exports one. A branded Desktop sets it to a private directory so a nested
+   * `dsh` process started from a model shell keeps its skills and instructions
+   * out of the upstream `~/.agents`; unset keeps the upstream shell unchanged.
+   */
+  private readonly agentsHome: string | undefined
 
   /**
    * Create and install the `ctx.shellEnv` service.
@@ -103,6 +111,10 @@ export class ShellEnvRegistry extends Service {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'shellEnv')
     this.dshHome = resolveDshHome(config.dshHome)
+    const ambientAgentsHome = process.env[AGENTS_HOME_ENV]
+    this.agentsHome = ambientAgentsHome !== undefined && ambientAgentsHome.trim().length > 0
+      ? resolveAgentsHome()
+      : undefined
   }
 
   /**
@@ -158,6 +170,7 @@ export class ShellEnvRegistry extends Service {
       [DSH_HOME_ENV]: this.dshHome,
       [DSH_SHELL_KEY]: '1',
     }
+    if (this.agentsHome !== undefined) values[AGENTS_HOME_ENV] = this.agentsHome
     if (execution.agent !== undefined) {
       values[DSH_SESSION_ID_KEY] = execution.agent.session.header.id
     }
