@@ -197,3 +197,7 @@ apps/desktop-host/tests/platform-session.spec.ts
 # credential or an arbitrary-URL opener.
 apps/desktop/src/ipc.ts
 apps/desktop/src/preload-app.ts
+apps/desktop/src/cloud-screen.ts
+apps/desktop/tests/cloud-screen.spec.ts
+apps/desktop/tests/cloud-screen-preload.spec.ts
+apps/desktop/tests/brand-endpoints.spec.ts
