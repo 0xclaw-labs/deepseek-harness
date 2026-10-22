@@ -17,6 +17,7 @@ import {
   paiNuoProviderPatch,
   readPaiNuoGrant,
 } from '../src/brand-endpoints.ts'
+import { BRAND_PROVIDER_DISPLAY_NAME } from '../src/model-display.ts'
 
 const brand = JSON.parse(readFileSync(fileURLToPath(new URL('../../../custom/branding/brand.json', import.meta.url)), 'utf8')) as {
   endpoints: {
@@ -95,9 +96,25 @@ describe('brand endpoints', () => {
     expect(patch).toContain(`provider: ${BRAND_PROVIDER_ID}`)
     expect(patch).toContain(`model: "${BRAND_DEFAULT_MODEL_ID}"`)
     expect(patch).not.toMatch(/deepseek\.com|deepseeksvc\.com/u)
+    // The Models page and the model selector render this catalog name; every
+    // wire id stays the provider's own, so a request still names the same model.
+    expect(patch).toContain(`displayName: ${BRAND_PROVIDER_DISPLAY_NAME}`)
     const parsed = yaml.load(patch, { schema: entryListSchema })
     expect(parsed).toEqual([
-      expect.objectContaining({ id: 'llm-pi-ai' }),
+      expect.objectContaining({
+        id: 'llm-pi-ai',
+        config: {
+          providers: {
+            [BRAND_PROVIDER_ID]: expect.objectContaining({
+              displayName: BRAND_PROVIDER_DISPLAY_NAME,
+              models: [
+                { id: BRAND_DEFAULT_MODEL_ID, name: '派诺·DeepSeek-V4.1-Flash-1017-Local' },
+                { id: 'deepseek-v4-pro', name: '派诺·DeepSeek-V4-Pro' },
+              ],
+            }),
+          },
+        },
+      }),
       expect.objectContaining({ id: 'agent-default-model', config: { provider: BRAND_PROVIDER_ID, model: BRAND_DEFAULT_MODEL_ID } }),
     ])
   })
