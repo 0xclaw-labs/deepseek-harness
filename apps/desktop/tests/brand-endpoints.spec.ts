@@ -7,6 +7,7 @@ import {
   assertBrandEndpoint,
   assertNoUpstreamEndpointOverrides,
   BRAND_AUTH_ORIGIN,
+  BRAND_CLOUD_DESKTOP_API_ORIGIN,
   BRAND_DEFAULT_MODEL_ID,
   BRAND_INFERENCE_BASE_URL,
   BRAND_MODEL_CATALOG_URL,
@@ -28,6 +29,8 @@ const brand = JSON.parse(readFileSync(fileURLToPath(new URL('../../../custom/bra
     pluginMarketIndexes: []
     webSearch: null
     telemetry: null
+    billingCenterUrl: string
+    cloudDesktopApiOrigin: string
   }
 }
 
@@ -41,7 +44,11 @@ describe('brand endpoints', () => {
       pluginMarketIndexes: [],
       webSearch: null,
       telemetry: null,
+      cloudDesktopApiOrigin: BRAND_CLOUD_DESKTOP_API_ORIGIN,
     })
+    // The delegate and noVNC surfaces are gateway paths on the billing origin;
+    // a second host would need its own nginx/TLS surface and its own review.
+    expect(new URL(BRAND_CLOUD_DESKTOP_API_ORIGIN).origin).toBe(new URL(brand.endpoints.billingCenterUrl).origin)
   })
 
   it.each([

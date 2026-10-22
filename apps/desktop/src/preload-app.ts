@@ -15,6 +15,10 @@ function createProductApi(): DshDesktopProductApi {
     protocolVersion: 1,
     browser: createDesktopBrowserBridge(),
     deviceInfo: () => ipcRenderer.invoke(DESKTOP_IPC.deviceInfo) as Promise<string>,
+    cloudScreen: {
+      request: screenId => ipcRenderer.invoke(DESKTOP_IPC.cloudScreenRequest, screenId) as ReturnType<DshDesktopProductApi['cloudScreen']['request']>,
+      openExternal: url => ipcRenderer.invoke(DESKTOP_IPC.cloudScreenOpenExternal, url) as Promise<boolean>,
+    },
     keyboard: {
       closeWindow: revision => ipcRenderer.invoke(DESKTOP_IPC.shortcutsCloseWindow, revision) as Promise<void>,
       subscribe: (listener) => {

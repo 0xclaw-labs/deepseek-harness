@@ -60,6 +60,12 @@ import { DesktopPolicyTestAuth } from './policy-test-auth.ts'
 import { readDesktopSettings } from './settings.ts'
 import { applyBrandDefaults, brandWorkspaceBlock } from './brand-defaults.ts'
 import { BRAND_BILLING_CENTER_URL } from './brand-endpoints.ts'
+import {
+  cloudScreenExternalUrlAllowed,
+  planCloudScreen,
+  requestCloudScreenDelegate,
+  resolveCloudScreenCredential,
+} from './cloud-screen.ts'
 import { DesktopUpdateDialog, type UpdateDialogOptions } from './update-dialog.ts'
 import { readDesktopRuntime } from './runtime-tree.ts'
 import { DesktopBrowserGuests } from './browser-guests.ts'
@@ -966,6 +972,28 @@ async function main(): Promise<void> {
   ipcMain.handle(DESKTOP_IPC.browserRelease, (event, lease: unknown) => {
     assertProductSender(event)
     return browserGuests.release(event.sender, lease)
+  })
+
+  // 跨端实时画面（HUI-4001）：主进程持有取票逻辑与「往哪开」的裁决，渲染层只
+  // 执行结果。凭据来自 DSH_CLOUD_SCREEN_TOKEN（平台受众 token 的部署缝）；只有
+  // 品牌 shim 的 sdzdsh_ 授权时如实判 unsupported，绝不把它发给网关换 401——
+  // 那条路径退回系统浏览器（平台 SSO 会话在那里，与账单中心同理）。
+  ipcMain.handle(DESKTOP_IPC.cloudScreenRequest, async (event, screenId: unknown) => {
+    assertProductSender(event)
+    if (typeof screenId !== 'string') throw new Error('dsh desktop: cloud screen id must be text')
+    const { credential } = resolveCloudScreenCredential(process.env, () => {
+      try {
+        return readPaiNuoGrant(readFileSync(join(resolveDshHome(), '.credentials.yaml'), 'utf8'))
+      } catch (_error) { return undefined }
+    })
+    const result = await requestCloudScreenDelegate({ screenId, credential })
+    return planCloudScreen(result)
+  })
+  ipcMain.handle(DESKTOP_IPC.cloudScreenOpenExternal, async (event, url: unknown) => {
+    assertProductSender(event)
+    if (typeof url !== 'string' || !cloudScreenExternalUrlAllowed(url)) return false
+    await shell.openExternal(url)
+    return true
   })
 
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['ws://127.0.0.1/*', 'wss://127.0.0.1/*'] }, (details, callback) => {
