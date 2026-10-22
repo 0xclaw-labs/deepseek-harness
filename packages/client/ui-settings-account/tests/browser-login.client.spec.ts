@@ -6,7 +6,7 @@ import { BrowserLogin } from '../src/client/browser-login.ts'
 
 afterEach(() => { vi.restoreAllMocks() })
 function view(phase: NonNullable<AccountView['attempt']>['phase'], authorizeUrl?: string): AccountView {
-  return { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
+  return { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
     attempt: { id: 'attempt' as SignInAttemptId, phase, ...(authorizeUrl ? { authorizeUrl } : {}) } }
 }
 function setup() {

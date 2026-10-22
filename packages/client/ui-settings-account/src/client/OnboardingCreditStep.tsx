@@ -25,6 +25,7 @@ export function OnboardingCreditStep({ t, locale, heading, busy, funded, canRech
     <div className={css.copy}>
       <h1 id="desktop-onboarding-title" ref={heading} tabIndex={-1}>{t('onboardingCredit')}</h1>
       <p className={css.heroDescription}>{t('onboardingCreditDescription')}</p>
+      {!canRecharge && <p className={css.creditHint} role="status">{t('accountPageUnavailableHint')}</p>}
       <div className={css.creditActions}>
         <Button className={css.action} variant="primary" disabled={busy || (!funded && !canRecharge)} onClick={funded ? onContinue : onRecharge}>{t(funded ? 'onboardingContinue' : 'onboardingTopUp')}</Button>
         <Button variant="outline" className={`${css.action} ${css.laterAction}`} disabled={busy || (funded && !canRecharge)} onClick={funded ? onRecharge : onLater}>{t(funded ? 'onboardingFundedTopUp' : 'onboardingLater')}</Button>

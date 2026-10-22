@@ -25,7 +25,7 @@ afterEach(() => {
 const noticeMessage = 'Request quota exhausted.'
 
 function snapshot(status?: 'signed-out' | 'credential-stored'): AccountSnapshot {
-  const view: AccountView = { status: status ?? 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' } }
+  const view: AccountView = { status: status ?? 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '', embedded: true } }
   return { view: status === undefined ? undefined : view, details: undefined, avatar: undefined, failed: false }
 }
 

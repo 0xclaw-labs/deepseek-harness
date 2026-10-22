@@ -113,6 +113,7 @@
 
 .creditIllustration { width: 100%; height: auto; aspect-ratio: 594 / 509; object-fit: contain; }
 .credit .copy { max-width: 400px; }
+.creditHint { margin: 16px 0 0; font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-tertiary); }
 .creditActions { display: flex; gap: 24px; margin-top: 60px; }
 .creditActions > button { flex: 1; max-width: 160px; }
 .creditActions .laterAction { background: var(--dsw-alias-onboarding-secondary-fill); }

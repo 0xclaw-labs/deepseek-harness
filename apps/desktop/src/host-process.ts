@@ -66,6 +66,7 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
       if (!('userId' in session) || (session.userId !== null
         && (typeof session.userId !== 'string' || session.userId.length === 0))) return false
       if ('embeddedPageDist' in session && typeof session.embeddedPageDist !== 'string') return false
+      if (!('embeddedPages' in session) || typeof session.embeddedPages !== 'boolean') return false
       if ('requestHeaders' in session && (typeof session.requestHeaders !== 'object' || session.requestHeaders === null
         || Array.isArray(session.requestHeaders)
         || Object.entries(session.requestHeaders).some(([name, value]) => typeof value !== 'string'

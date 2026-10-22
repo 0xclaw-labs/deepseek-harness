@@ -85,12 +85,20 @@ export function DesktopOnboarding({
     track?.('onboarding_page_click', { page_name: pageName, button_name, ...selected_content === undefined ? {} : { selected_content } })
   }
   const go = (next: 'welcome' | 'credit' | 'purpose' | 'process') => { void update({ step: next }) }
-  const canRecharge = openPlatformPage !== undefined
+  const links = account.view?.links
+  // Recharge needs a destination. The Platform's own page loads in the native host; every
+  // other destination opens in the browser, where the user's own session already lives.
+  // A deployment without one states that instead of offering a button that cannot work.
+  const canRecharge = links?.topUpUrl != null
   const recharge = () => {
     setDialog(null)
     releaseRecharge.current?.()
-    // Every control that reaches this is disabled without the callback.
-    releaseRecharge.current = openPlatformPage?.('top-up', () => { releaseRecharge.current = undefined })
+    if (links?.topUpUrl == null) return
+    if (links.embedded && openPlatformPage !== undefined) {
+      releaseRecharge.current = openPlatformPage('top-up', () => { releaseRecharge.current = undefined })
+      return
+    }
+    window.open(links.topUpUrl, '_blank', 'noopener,noreferrer')
   }
   const later = () => {
     const balance = account.details?.balance

@@ -20,7 +20,7 @@ it.each(['accepted', 'refused', 'disconnected', 'pending'] as const)('initialize
     if (outcome === 'disconnected') throw new Error('connection lost')
     return { ok: outcome === 'accepted' || outcome === 'pending', value: undefined }
   })
-  const links = { usageUrl: 'https://example.test/usage', topUpUrl: 'https://example.test/top_up' }
+  const links = { usageUrl: 'https://example.test/usage', topUpUrl: 'https://example.test/top_up', embedded: true }
   const signedIn: AccountView = {
     status: 'credential-stored', links, attempt: { id: 'login' as SignInAttemptId, phase: 'succeeded' },
   }

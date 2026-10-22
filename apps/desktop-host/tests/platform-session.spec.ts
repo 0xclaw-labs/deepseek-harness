@@ -5,7 +5,7 @@ import { installPlatformSessionPublisher } from '../src/platform-session.ts'
 
 const state: AccountView = {
   status: 'credential-stored', attempt: null,
-  links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up' },
+  links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up', embedded: true },
 }
 
 class Account extends DeepSeekAccount {

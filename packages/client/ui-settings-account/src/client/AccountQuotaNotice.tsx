@@ -30,7 +30,11 @@ export function AccountQuotaNotice({ matched, openPlatformPage, useAccount, useP
   const { dismiss, keepOpen, message } = matched
   const accountStatus = useAccount(snapshot => snapshot.view?.status)
   const accountFailed = useAccount(snapshot => snapshot.failed)
+  const links = useAccount(snapshot => snapshot.view?.links)
   const signedIn = accountStatus === 'credential-stored'
+  // Only the Platform's own page can load in the native host; every other destination
+  // opens in the browser, and an absent one leaves the generic warning in place.
+  const embedded = openPlatformPage !== undefined && links?.embedded === true
   const platformPage = usePlatformPage(current => current)
   const [opened, setOpened] = useState(false)
   const previousSignedIn = useRef(signedIn)
@@ -56,26 +60,33 @@ export function AccountQuotaNotice({ matched, openPlatformPage, useAccount, useP
     previousSignedIn.current = signedIn
   }, [dismiss, signedIn])
   // Await the first account snapshot without letting a Toast timer discard the
-  // notice before the native account action becomes available. A terminal stream
+  // notice before the account action becomes available. A terminal stream
   // failure ends that wait and leaves the generic warning available.
   if (accountStatus === undefined && !accountFailed && openPlatformPage !== undefined) return null
-  // Signed out, unavailable, or without the native host, use generic notice copy.
-  if (!signedIn || openPlatformPage === undefined) {
+  // Signed out, or without a recharge destination, use generic notice copy.
+  if (!signedIn || links?.topUpUrl == null) {
     return <Toast text={message} icon={<IconWarningOutlineRegular size={18} />} onDone={dismiss} />
   }
-  // Defer the Modal until the native page closes; do not mount hidden focus or
-  // Escape handlers under the opaque view.
+  const topUpUrl = links.topUpUrl
+  // Defer the Modal while the native page owns the window; do not mount hidden focus
+  // or Escape handlers under the opaque view.
   if (opened || platformPage !== null) return null
   return <Modal open title={t('quotaTitle')} closeLabel={t('close')} onClose={dismiss}
     description={t('quotaDescription')}
     footer={<>
       <Button variant="outline" onClick={dismiss}>{t('cancel')}</Button>
       <Button variant="primary" onClick={() => {
-        // Retain the notice before its page mounts; a later failure would
-        // otherwise republish it and remount this entry.
-        releaseHold.current = keepOpen()
-        releasePage.current = openPlatformPage('top-up', () => { releasePage.current = undefined; dismiss() })
         setOpened(true)
+        if (embedded && openPlatformPage !== undefined) {
+          // Retain the notice before its page mounts; a later failure would
+          // otherwise republish it and remount this entry.
+          releaseHold.current = keepOpen()
+          releasePage.current = openPlatformPage('top-up', () => { releasePage.current = undefined; dismiss() })
+          return
+        }
+        // A browser destination owns its own session; the notice has nothing left to show.
+        window.open(topUpUrl, '_blank', 'noopener,noreferrer')
+        dismiss()
       }}>{t('quotaTopUp')}</Button>
     </>} />
 }

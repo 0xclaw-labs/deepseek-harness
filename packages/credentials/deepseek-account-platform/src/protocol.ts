@@ -1,6 +1,6 @@
 /** Validated platform HTTP messages and restricted browser destinations. */
 import { z } from 'zod'
-import type { AccountBonusOrderId, SignInErrorCode } from '@deepseek-ai/dsh-deepseek-account/types'
+import type { AccountLinks, AccountBonusOrderId, SignInErrorCode } from '@deepseek-ai/dsh-deepseek-account/types'
 
 /** Protocol errors expose a stable code, never a response body or authorization URL. */
 export class PlatformAuthError extends Error {
@@ -27,6 +27,48 @@ export function platformOrigin(value: string, allowLoopbackHttp: boolean): strin
     throw new Error('account: platformOrigin must be an HTTPS origin or explicitly enabled loopback HTTP origin')
   }
   return url.origin
+}
+
+/** Account pages and wallet ownership of one deployment. */
+export type AccountSurface = 'billing-center' | 'platform-pages'
+
+/**
+ * Validate one configured account page destination.
+ * @param value - configured absolute URL; the empty string means this deployment serves no such page.
+ * @param label - configuration field named in the failure.
+ * @param allowLoopbackHttp - development-only opt-in for loopback HTTP.
+ * @returns normalized absolute URL, or null when unconfigured.
+ */
+export function accountPageUrl(value: string, label: string, allowLoopbackHttp: boolean): string | null {
+  if (value === '') return null
+  let url: URL
+  try { url = new URL(value) } catch {
+    throw new Error(`account: ${label} must be an absolute URL or empty`)
+  }
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+  if (url.username || url.password || url.hash
+    || !(url.protocol === 'https:' || (allowLoopbackHttp && loopback && url.protocol === 'http:'))) {
+    throw new Error(`account: ${label} must be an HTTPS URL without credentials or fragment, or explicitly enabled loopback HTTP`)
+  }
+  return url.href
+}
+
+/**
+ * Resolve the account destinations and how the Desktop opens them.
+ * `platform-pages` serves the pages from the account origin, where the embedded
+ * viewer can receive the stored grant; `billing-center` points both entries at the
+ * configured center, or removes them when this deployment has none, because the
+ * account origin serves no such page.
+ * @param surface - which service serves this deployment's account pages.
+ * @param billingCenterUrl - validated billing center, or null when unconfigured.
+ * @param origin - validated account origin serving `usage` and `top_up`.
+ * @returns destinations the account surfaces offer.
+ */
+export function accountLinks(surface: AccountSurface, billingCenterUrl: string | null, origin: string): AccountLinks {
+  if (surface === 'platform-pages') {
+    return { usageUrl: new URL('/usage', origin).href, topUpUrl: new URL('/top_up', origin).href, embedded: true }
+  }
+  return { usageUrl: billingCenterUrl, topUpUrl: billingCenterUrl, embedded: false }
 }
 
 /**

@@ -14,12 +14,13 @@ export function accountView(value: unknown): AccountView {
     throw new Error('desktop account: invalid state')
   }
   if (!('links' in value) || typeof value.links !== 'object' || value.links === null
-    || !('usageUrl' in value.links) || typeof value.links.usageUrl !== 'string'
-    || !('topUpUrl' in value.links) || typeof value.links.topUpUrl !== 'string') {
+    || !('usageUrl' in value.links) || (value.links.usageUrl !== null && typeof value.links.usageUrl !== 'string')
+    || !('topUpUrl' in value.links) || (value.links.topUpUrl !== null && typeof value.links.topUpUrl !== 'string')
+    || !('embedded' in value.links) || typeof value.links.embedded !== 'boolean') {
     throw new Error('desktop account: invalid platform links')
   }
-  validateBrowserDestination(value.links.usageUrl)
-  validateBrowserDestination(value.links.topUpUrl)
+  if (value.links.usageUrl !== null) validateBrowserDestination(value.links.usageUrl)
+  if (value.links.topUpUrl !== null) validateBrowserDestination(value.links.topUpUrl)
   const attempt = value.attempt
   if (attempt !== null && (typeof attempt !== 'object' || !('id' in attempt) || typeof attempt.id !== 'string'
     || !('phase' in attempt) || !['initializing', 'waiting-browser', 'exchanging', 'committing', 'succeeded', 'cancelled', 'expired', 'failed'].includes(String(attempt.phase))
@@ -34,7 +35,7 @@ export function accountView(value: unknown): AccountView {
   const parsed = value as AccountView
   return {
     status: parsed.status,
-    links: { usageUrl: parsed.links.usageUrl, topUpUrl: parsed.links.topUpUrl },
+    links: { usageUrl: parsed.links.usageUrl, topUpUrl: parsed.links.topUpUrl, embedded: parsed.links.embedded },
     attempt: parsed.attempt === null ? null : {
       id: parsed.attempt.id, phase: parsed.attempt.phase,
       ...parsed.attempt.authorizeUrl === undefined ? {} : { authorizeUrl: parsed.attempt.authorizeUrl },

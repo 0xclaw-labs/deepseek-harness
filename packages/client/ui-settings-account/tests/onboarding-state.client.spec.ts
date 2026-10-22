@@ -16,7 +16,7 @@ afterEach(async () => { for (const dispose of cleanup.splice(0).reverse()) await
 
 function accountState(status?: 'credential-stored' | 'signed-out'): AccountSnapshot {
   return {
-    view: status === undefined ? undefined : { status, attempt: null, links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up' } },
+    view: status === undefined ? undefined : { status, attempt: null, links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up', embedded: true } },
     details: undefined, avatar: undefined, failed: false,
   }
 }
