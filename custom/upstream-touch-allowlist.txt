@@ -201,3 +201,18 @@ apps/desktop/src/cloud-screen.ts
 apps/desktop/tests/cloud-screen.spec.ts
 apps/desktop/tests/cloud-screen-preload.spec.ts
 apps/desktop/tests/brand-endpoints.spec.ts
+
+# 2026-10-22: signed-release prerequisites. Node 24 is pinned for local tests
+# (direct .ts imports need >=22.18; engines floor is 22.19); the artifact prefix
+# is resolved from one brand manifest helper across packaging/upload/retention/
+# version discovery; production publication forwards the explicit brand update
+# origin; and the signed build script stays fail-closed without credentials.
+.nvmrc
+.node-version
+docs/testing.md
+apps/desktop/scripts/artifact-prefix.ts
+apps/desktop/scripts/desktop-build-version-discovery.ts
+apps/desktop/scripts/desktop-upload-plan.ts
+apps/desktop/scripts/publish-desktop-ci.ts
+apps/desktop/scripts/retain-desktop-ci.ts
+apps/desktop/tests/fixtures/installed-update-packaging.mjs
