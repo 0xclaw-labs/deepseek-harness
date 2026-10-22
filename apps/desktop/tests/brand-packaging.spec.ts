@@ -107,7 +107,7 @@ describe('branded profile defaults', () => {
     const patch = join(profile, 'cordis.patch.yml')
     expect(applyBrandDefaults(patch)).toBe(true)
     const content = readFileSync(patch, 'utf8')
-    expect(content).toContain('provider: deepseek-account')
+    expect(content).toContain('provider: painuo')
     expect(content).not.toContain('deepseek-official')
     expect(applyBrandDefaults(patch)).toBe(false)
     expect(readFileSync(patch, 'utf8')).toBe(content)
