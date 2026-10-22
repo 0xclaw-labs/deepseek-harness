@@ -1063,7 +1063,7 @@ index 2afdfd7194..051e3b40b2 100644
    app.on('activate', (_event, hasVisibleWindows) => {
 diff --git a/apps/desktop/src/model-display.ts b/apps/desktop/src/model-display.ts
 new file mode 100644
-index 0000000000..18a7e3a5ee
+index 0000000000..581df6592e
 --- /dev/null
 +++ b/apps/desktop/src/model-display.ts
 @@ -0,0 +1,84 @@
@@ -1151,7 +1151,6 @@ index 0000000000..18a7e3a5ee
 +  if (base === '' || base.startsWith(BRAND_MODEL_DISPLAY_PREFIX)) return base
 +  return `${BRAND_MODEL_DISPLAY_PREFIX}${base.split('-').map(displayToken).join('-')}`
 +}
-\ No newline at end of file
 diff --git a/apps/desktop/tests/brand-endpoints.spec.ts b/apps/desktop/tests/brand-endpoints.spec.ts
 new file mode 100644
 index 0000000000..ef4f48b5df
@@ -1570,7 +1569,7 @@ index 9577581d82..9b4eb49d1f 100644
        { ...config.githubApp, clientId: 'app-id\nother=value' },
 diff --git a/apps/desktop/tests/model-display.spec.ts b/apps/desktop/tests/model-display.spec.ts
 new file mode 100644
-index 0000000000..8378068237
+index 0000000000..50cdea0c5a
 --- /dev/null
 +++ b/apps/desktop/tests/model-display.spec.ts
 @@ -0,0 +1,64 @@
@@ -1638,7 +1637,6 @@ index 0000000000..8378068237
 +    expect(displayModelName('vendor-x/future-model-v2')).toBe('派诺·Vendor-X/future-Model-V2')
 +  })
 +})
-\ No newline at end of file
 diff --git a/apps/plugin-market-generator/package.json b/apps/plugin-market-generator/package.json
 index b013bc93ff..c2b3aa4e62 100644
 --- a/apps/plugin-market-generator/package.json
