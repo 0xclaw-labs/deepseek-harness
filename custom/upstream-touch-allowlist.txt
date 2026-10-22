@@ -216,3 +216,7 @@ apps/desktop/scripts/desktop-upload-plan.ts
 apps/desktop/scripts/publish-desktop-ci.ts
 apps/desktop/scripts/retain-desktop-ci.ts
 apps/desktop/tests/fixtures/installed-update-packaging.mjs
+
+# 2026-10-22: the branded desktop client aggregate now includes its endpoint,
+# model-display and cloud-screen modules so tsc -p tsconfig.client.json sees ipc imports.
+tsconfig.client.json
