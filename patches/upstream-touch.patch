@@ -6627,10 +6627,10 @@ index a11f47e686..5fb9a23c93 100644
      "access": "public"
    },
 diff --git a/packages/terminal/terminal-bash/src/index.ts b/packages/terminal/terminal-bash/src/index.ts
-index 131e75b553..86521af092 100644
+index 131e75b553..fdc41ddc8a 100644
 --- a/packages/terminal/terminal-bash/src/index.ts
 +++ b/packages/terminal/terminal-bash/src/index.ts
-@@ -62,9 +62,30 @@ function ensureSandboxModeFence(ctx: Context, owner: Agent): void {
+@@ -62,9 +62,35 @@ function ensureSandboxModeFence(ctx: Context, owner: Agent): void {
    }, { global: true })
  }
 
@@ -6649,7 +6649,12 @@ index 131e75b553..86521af092 100644
 +    const value = process.env[name]
 +    return value === undefined || value.trim().length === 0 ? undefined : value
 +  }
-+  return { dshHome: read('DSH_HOME'), agentsHome: read('DSH_AGENTS_HOME') }
++  const home: { dshHome?: string; agentsHome?: string } = {}
++  const dshHome = read('DSH_HOME')
++  if (dshHome !== undefined) home.dshHome = dshHome
++  const agentsHome = read('DSH_AGENTS_HOME')
++  if (agentsHome !== undefined) home.agentsHome = agentsHome
++  return home
 +}
 +
 +function childEnvironment(
@@ -6663,7 +6668,7 @@ index 131e75b553..86521af092 100644
    const common = {
      TERM: 'dumb',
      PAGER: 'cat',
-@@ -72,6 +93,8 @@ function childEnvironment(spec: TerminalBackendSpawnSpec, dialect: ShellDialect)
+@@ -72,6 +98,8 @@ function childEnvironment(spec: TerminalBackendSpawnSpec, dialect: ShellDialect)
      DSH_SHELL: '1',
      DSH_SESSION_ID: spec.owner.id,
      DSH_PTY_SESSION_ID: spec.sessionId,
@@ -6672,7 +6677,7 @@ index 131e75b553..86521af092 100644
    }
    if (dialect === 'pwsh') {
      // pwsh ignores PS1/PROMPT_COMMAND; its prompt is installed by the startup
-@@ -195,6 +218,7 @@ export class BashTerminalBackend implements TerminalBackend {
+@@ -195,6 +223,7 @@ export class BashTerminalBackend implements TerminalBackend {
        terminal: SubprocessTerminalHandle,
        config: ResolvedConfig,
      ) => LocalPtySession = (terminal, config) => new LocalPtySession(terminal, config),
@@ -6680,7 +6685,7 @@ index 131e75b553..86521af092 100644
    ) {
      this.type = config.backendType
    }
-@@ -209,7 +233,7 @@ export class BashTerminalBackend implements TerminalBackend {
+@@ -209,7 +238,7 @@ export class BashTerminalBackend implements TerminalBackend {
      const terminal = await this.spawnTerminal({
        argv,
        cwd: spec.cwd ?? await this.ctx.workingDirectory.ensure(spec.owner, spec.signal),
