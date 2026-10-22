@@ -426,10 +426,10 @@ index 0000000000..b34572134e
 +}
 diff --git a/apps/desktop/src/brand-endpoints.ts b/apps/desktop/src/brand-endpoints.ts
 new file mode 100644
-index 0000000000..e6ebb2c20c
+index 0000000000..8b73e5d87e
 --- /dev/null
 +++ b/apps/desktop/src/brand-endpoints.ts
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,206 @@
 +/**
 + * Brand deployment endpoints for the 随身搭子 desktop.
 + *
@@ -438,10 +438,14 @@ index 0000000000..e6ebb2c20c
 + * of those defaults; `custom/branding/brand.json` records the same values for
 + * packaging and review, and `apps/desktop/tests/brand-endpoints.spec.ts` pins
 + * the two together. Upstream adapters may still describe their own public
-+ * endpoints in source, but the branded composition disables those rows.
++ * endpoints in source, but the branded composition disables those rows. Catalog
++ * display names come from `./model-display.ts`, so the patch this module
++ * generates shows the brand while every wire id stays the provider's own.
 + *
 + * @module
 + */
++
++import { displayModelName, displayProviderName } from './model-display.ts'
 +
 +/** PaiNuo ecosystem account shim origin (login redirect, grant exchange, account). */
 +export const BRAND_AUTH_ORIGIN = 'https://auth.modelxing.com'
@@ -565,19 +569,25 @@ index 0000000000..e6ebb2c20c
 + * Generate the profile patch that mounts the PaiNuo provider and selects its
 + * default model. An empty catalog produces no patch, so a signed-out app keeps
 + * the brand provider disabled rather than falling back to an upstream route.
++ *
++ * Each entry keeps the catalog's wire id and gains a branded display name
++ * (`displayModelName`); the adapter resolves requests, the session log, and the
++ * agent default by id, so a rename here never reaches the wire.
 + * @param models - live PaiNuo catalog entries.
 + * @returns YAML patch block, or an empty string without a catalog.
 + */
 +export function paiNuoProviderPatch(models: readonly BrandCatalogModel[]): string {
 +  const defaultModel = chooseDefaultModel(models)
 +  if (defaultModel === undefined) return ''
-+  const list = models.map(model => JSON.stringify({ id: model.id, name: model.name })).join(',')
++  const list = models
++    .map(model => JSON.stringify({ id: model.id, name: displayModelName(model.id, model.name) }))
++    .join(',')
 +  return '# paiNuo-model-provider: PaiNuo ecosystem model catalog (auth.modelxing.com proxy).\n'
 +    + '- id: llm-pi-ai\n'
 +    + '  config:\n'
 +    + '    providers:\n'
 +    + `      ${BRAND_PROVIDER_ID}:\n`
-+    + '        displayName: 派诺生态\n'
++    + `        displayName: ${displayProviderName(BRAND_PROVIDER_ID)}\n`
 +    + '        apiKeyEnv: DSH_PAINUO_TOKEN\n'
 +    + '        api: openai-completions\n'
 +    + `        baseURL: ${BRAND_INFERENCE_BASE_URL}\n`
@@ -1051,12 +1061,103 @@ index 2afdfd7194..051e3b40b2 100644
    })
 
    app.on('activate', (_event, hasVisibleWindows) => {
+diff --git a/apps/desktop/src/model-display.ts b/apps/desktop/src/model-display.ts
+new file mode 100644
+index 0000000000..18a7e3a5ee
+--- /dev/null
++++ b/apps/desktop/src/model-display.ts
+@@ -0,0 +1,84 @@
++/**
++ * Brand display names for the model catalogs this deployment mints.
++ *
++ * The PaiNuo proxy advertises models by wire id, so the generated provider
++ * patch would otherwise show raw ids such as `deepseek-v4.1-flash-1017-local`
++ * in the model selector and on the Models settings page. This module owns the
++ * display rules for that catalog: the wire id keeps carrying the provider's
++ * protocol id into every request, and a route or model this deployment does not
++ * serve is returned untouched rather than guessed.
++ *
++ * @module @deepseek-ai/dsh-desktop/model-display
++ */
++
++/** Catalog display name of the branded proxy route. */
++export const BRAND_PROVIDER_DISPLAY_NAME = '派诺生态'
++
++/** Prefix every branded catalog entry's display name carries. */
++export const BRAND_MODEL_DISPLAY_PREFIX = '派诺·'
++
++/**
++ * Provider routes this deployment serves itself, and the name each one shows.
++ * `painuo` is the branded `llm-pi-ai` route the Desktop writes into the profile
++ * patch; every other route keeps the name its own catalog advertises.
++ */
++const BRAND_PROVIDER_NAMES: Readonly<Record<string, string>> = {
++  painuo: BRAND_PROVIDER_DISPLAY_NAME,
++}
++
++/**
++ * Name one provider route in a model catalog.
++ * @param providerId - route id from the deployment's provider directory.
++ * @param fallback - the route's own catalog name, or its id when it has none.
++ * @returns the branded name for this deployment's proxy route, else `fallback`.
++ */
++export function displayProviderName(providerId: string, fallback: string = providerId): string {
++  return BRAND_PROVIDER_NAMES[providerId.trim()] ?? fallback
++}
++
++/**
++ * Canonical spellings for vendor words the proxy lowercases in its wire ids,
++ * taken from the spellings the same catalog already uses elsewhere. Only letter
++ * case is corrected; a vendor that is not listed keeps its own letters and
++ * capitalizes its first one instead, so no product identity is invented.
++ */
++const VENDOR_WORD_SPELLINGS: Readonly<Record<string, string>> = {
++  deepseek: 'DeepSeek',
++  glm: 'GLM',
++}
++
++/**
++ * Readability pass over one hyphen-separated display token: a version prefix
++ * (`v4.1`) uppercases its `v`, a listed vendor word takes its canonical
++ * spelling, and any other token that starts with a lowercase letter capitalizes
++ * that letter. Numeric, mixed-case, and vendor-styled tokens stay
++ * byte-identical, so no character of the provider's own name is invented.
++ * @param token - one `-`-separated token of a model name.
++ * @returns the token as it is displayed.
++ */
++function displayToken(token: string): string {
++  if (/^v\d/u.test(token)) return `V${token.slice(1)}`
++  const canonical = VENDOR_WORD_SPELLINGS[token]
++  if (canonical !== undefined) return canonical
++  if (/^[a-z]/u.test(token)) return `${token.charAt(0).toUpperCase()}${token.slice(1)}`
++  return token
++}
++
++/**
++ * Display name for one catalog model.
++ *
++ * The wire id is never altered: this name only reaches catalog labels, while
++ * `id` keeps carrying the provider's protocol id into selection, requests, and
++ * the session log. A name that already carries the brand prefix stays as it is,
++ * so the rule is idempotent over an already-branded catalog.
++ *
++ * @param modelId - the provider's wire model id.
++ * @param catalogName - the name the catalog advertises, when it advertises one.
++ * @returns the branded display name, else the untouched catalog name or id.
++ */
++export function displayModelName(modelId: string, catalogName?: string): string {
++  const advertised = catalogName?.trim() ?? ''
++  const base = advertised === '' ? modelId.trim() : advertised
++  if (base === '' || base.startsWith(BRAND_MODEL_DISPLAY_PREFIX)) return base
++  return `${BRAND_MODEL_DISPLAY_PREFIX}${base.split('-').map(displayToken).join('-')}`
++}
+\ No newline at end of file
 diff --git a/apps/desktop/tests/brand-endpoints.spec.ts b/apps/desktop/tests/brand-endpoints.spec.ts
 new file mode 100644
-index 0000000000..93021d3b27
+index 0000000000..ef4f48b5df
 --- /dev/null
 +++ b/apps/desktop/tests/brand-endpoints.spec.ts
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,129 @@
 +import { readFileSync } from 'node:fs'
 +import { fileURLToPath } from 'node:url'
 +import { describe, expect, it } from 'vitest'
@@ -1076,6 +1177,7 @@ index 0000000000..93021d3b27
 +  paiNuoProviderPatch,
 +  readPaiNuoGrant,
 +} from '../src/brand-endpoints.ts'
++import { BRAND_PROVIDER_DISPLAY_NAME } from '../src/model-display.ts'
 +
 +const brand = JSON.parse(readFileSync(fileURLToPath(new URL('../../../custom/branding/brand.json', import.meta.url)), 'utf8')) as {
 +  endpoints: {
@@ -1154,9 +1256,25 @@ index 0000000000..93021d3b27
 +    expect(patch).toContain(`provider: ${BRAND_PROVIDER_ID}`)
 +    expect(patch).toContain(`model: "${BRAND_DEFAULT_MODEL_ID}"`)
 +    expect(patch).not.toMatch(/deepseek\.com|deepseeksvc\.com/u)
++    // The Models page and the model selector render this catalog name; every
++    // wire id stays the provider's own, so a request still names the same model.
++    expect(patch).toContain(`displayName: ${BRAND_PROVIDER_DISPLAY_NAME}`)
 +    const parsed = yaml.load(patch, { schema: entryListSchema })
 +    expect(parsed).toEqual([
-+      expect.objectContaining({ id: 'llm-pi-ai' }),
++      expect.objectContaining({
++        id: 'llm-pi-ai',
++        config: {
++          providers: {
++            [BRAND_PROVIDER_ID]: expect.objectContaining({
++              displayName: BRAND_PROVIDER_DISPLAY_NAME,
++              models: [
++                { id: BRAND_DEFAULT_MODEL_ID, name: '派诺·DeepSeek-V4.1-Flash-1017-Local' },
++                { id: 'deepseek-v4-pro', name: '派诺·DeepSeek-V4-Pro' },
++              ],
++            }),
++          },
++        },
++      }),
 +      expect.objectContaining({ id: 'agent-default-model', config: { provider: BRAND_PROVIDER_ID, model: BRAND_DEFAULT_MODEL_ID } }),
 +    ])
 +  })
@@ -1450,6 +1568,77 @@ index 9577581d82..9b4eb49d1f 100644
        githubApp: { clientId: 'app-id', privateKeyFile: join(root, 'key.pem') } }
      for (const githubApp of [
        { ...config.githubApp, clientId: 'app-id\nother=value' },
+diff --git a/apps/desktop/tests/model-display.spec.ts b/apps/desktop/tests/model-display.spec.ts
+new file mode 100644
+index 0000000000..8378068237
+--- /dev/null
++++ b/apps/desktop/tests/model-display.spec.ts
+@@ -0,0 +1,64 @@
++import { describe, expect, it } from 'vitest'
++import {
++  BRAND_MODEL_DISPLAY_PREFIX,
++  BRAND_PROVIDER_DISPLAY_NAME,
++  displayModelName,
++  displayProviderName,
++} from '../src/model-display.ts'
++import { BRAND_PROVIDER_ID } from '../src/brand-endpoints.ts'
++
++describe('model display names', () => {
++  it('names the branded proxy route and keeps every other route verbatim', () => {
++    expect(displayProviderName(BRAND_PROVIDER_ID)).toBe(BRAND_PROVIDER_DISPLAY_NAME)
++    expect(displayProviderName(BRAND_PROVIDER_ID, 'ignored catalog name')).toBe(BRAND_PROVIDER_DISPLAY_NAME)
++    // An upstream route the branded composition disables keeps its own name: the
++    // branded app must not claim to serve a model it does not route.
++    expect(displayProviderName('deepseek-official', 'DeepSeek')).toBe('DeepSeek')
++    expect(displayProviderName('acme-gateway')).toBe('acme-gateway')
++    expect(displayProviderName('painuo-other', 'PaiNuo reseller')).toBe('PaiNuo reseller')
++  })
++
++  it('brands a wire model id without altering the id itself', () => {
++    const id = 'deepseek-v4.1-flash-1017-local'
++    expect(displayModelName(id)).toBe(`${BRAND_MODEL_DISPLAY_PREFIX}DeepSeek-V4.1-Flash-1017-Local`)
++    // The id is only ever read: display rules return a label, never a route.
++    expect(id).toBe('deepseek-v4.1-flash-1017-local')
++  })
++
++  it.each([
++    ['deepseek-v4-pro', undefined, '派诺·DeepSeek-V4-Pro'],
++    ['deepseek-v4-flash-ga-260731', undefined, '派诺·DeepSeek-V4-Flash-Ga-260731'],
++    ['kimi-k2.5', undefined, '派诺·Kimi-K2.5'],
++    ['qwen3.5-397b-a17b', undefined, '派诺·Qwen3.5-397b-A17b'],
++    ['MiniMax-M2.5', undefined, '派诺·MiniMax-M2.5'],
++    ['ZHIPU/GLM-5.3-Flash', undefined, '派诺·ZHIPU/GLM-5.3-Flash'],
++    // Vendor-styled and numeric tokens are never re-cased into another product.
++    ['GLM-5.3', undefined, '派诺·GLM-5.3'],
++    ['glm-5.3', undefined, '派诺·GLM-5.3'],
++    ['fun-asr-flash-8k-realtime', undefined, '派诺·Fun-Asr-Flash-8k-Realtime'],
++  ])('renders %s as %s', (id, catalogName, expected) => {
++    expect(displayModelName(id, catalogName)).toBe(expected)
++  })
++
++  it('keeps the catalog name when the catalog advertises one, and brands it', () => {
++    expect(displayModelName('deepseek-flash', 'DeepSeek-V4.1-Flash'))
++      .toBe(`${BRAND_MODEL_DISPLAY_PREFIX}DeepSeek-V4.1-Flash`)
++    // A catalog name that is already branded, and a name that is not a wire id
++    // at all, both survive a second pass unchanged.
++    expect(displayModelName('deepseek-flash', '派诺·DeepSeek-V4.1-Flash')).toBe('派诺·DeepSeek-V4.1-Flash')
++    expect(displayModelName('brand-new-model', '  Acme Turbo  ')).toBe('派诺·Acme Turbo')
++  })
++
++  it('returns an unknown or empty name untouched instead of inventing one', () => {
++    expect(displayModelName('')).toBe('')
++    expect(displayModelName('   ')).toBe('')
++    expect(displayModelName('gpt-5.4-mini', '')).toBe('派诺·Gpt-5.4-Mini')
++    expect(displayModelName('', 'Only A Catalog Name')).toBe('派诺·Only A Catalog Name')
++  })
++
++  it('is rule-driven, not a fixed model list', () => {
++    // A model that does not exist today still gets a branded, readable label.
++    expect(displayModelName('deepseek-v9-ultra-2099')).toBe('派诺·DeepSeek-V9-Ultra-2099')
++    expect(displayModelName('vendor-x/future-model-v2')).toBe('派诺·Vendor-X/future-Model-V2')
++  })
++})
+\ No newline at end of file
 diff --git a/apps/plugin-market-generator/package.json b/apps/plugin-market-generator/package.json
 index b013bc93ff..c2b3aa4e62 100644
 --- a/apps/plugin-market-generator/package.json
