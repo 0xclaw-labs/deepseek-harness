@@ -26,6 +26,12 @@ export interface PlatformSession {
   readonly embeddedPageDist?: string
   /** Host-only deployment request headers; the consuming client adds its own dynamic identity, and neither reaches renderer bootstrap. */
   readonly requestHeaders?: Readonly<Record<string, string>>
+  /**
+   * Whether the embedded viewer may load this account's usage and top-up pages from
+   * `origin`. False sends those destinations to the browser; the viewer never
+   * resolves a path on an origin that does not serve one.
+   */
+  readonly embeddedPages: boolean
 }
 
 /** Account operations; only Host consumers can obtain a request credential. */
@@ -48,7 +54,8 @@ export abstract class DeepSeekAccount extends Service {
   /**
    * Query Platform recharge and bonus wallet balances independently of profile data.
    * @param client - identity of the requesting UI for this call.
-   * @returns balance outcome, or null if signed out or the grant changed during the query.
+   * @returns balance outcome, `{ status: 'external' }` when this deployment serves the
+   * wallet on its own account page, or null if signed out or the grant changed during the query.
    */
   abstract getBalance(client: AccountClientMetadata): Promise<AccountDetails['balance'] | null>
   /**

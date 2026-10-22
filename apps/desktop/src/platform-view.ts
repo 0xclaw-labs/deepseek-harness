@@ -59,6 +59,7 @@ export class DesktopPlatformView {
   setSession(next: PlatformSession | null): void {
     if (next?.token === this.account?.token && next?.origin === this.account?.origin
       && next?.embeddedPageDist === this.account?.embeddedPageDist
+      && next?.embeddedPages === this.account?.embeddedPages
       && JSON.stringify(next?.requestHeaders) === JSON.stringify(this.account?.requestHeaders)) {
       if (next?.userId === this.account?.userId || this.account?.userId === null) {
         this.account = next
@@ -81,6 +82,10 @@ export class DesktopPlatformView {
     this.close()
     const account = this.account
     if (account === null) throw new Error('Platform account unavailable')
+    // The viewer hands its grant to the document it loads, which only the account
+    // origin may receive; a deployment whose account pages live elsewhere names them
+    // through the account links, and those open in the browser instead.
+    if (!account.embeddedPages) throw new Error('Platform page unavailable for this account')
     if (owner.isDestroyed()) return
     const generation = this.generation
     this.owner = owner

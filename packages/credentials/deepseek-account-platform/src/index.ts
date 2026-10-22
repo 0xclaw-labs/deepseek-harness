@@ -7,12 +7,12 @@ import { promises as streamPromises } from 'node:stream'
 import { Context, Service } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { z } from 'zod'
-import { DeepSeekAccount, installAccountTaskCancellation, mergePlatformCookies, platformClientHeaders, platformWireLocale, type AccountBonusBatch, type AccountBonusOrderId, type AccountClientMetadata, type AccountDetails, type AccountUserId, type AccountView, type PlatformSession, type SignInAttemptId, type SignInAttemptView } from '@deepseek-ai/dsh-deepseek-account'
+import { DeepSeekAccount, installAccountTaskCancellation, mergePlatformCookies, platformClientHeaders, platformWireLocale, type AccountBonusBatch, type AccountBonusOrderId, type AccountClientMetadata, type AccountDetails, type AccountLinks, type AccountUserId, type AccountView, type PlatformSession, type SignInAttemptId, type SignInAttemptView } from '@deepseek-ai/dsh-deepseek-account'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
 import type { AuthorizationSession } from '@deepseek-ai/dsh-authorization'
 import { profile, readAccountDetail, readUnnotifiedBonuses, sendBonusNotified } from './details.ts'
 import { revokeAccount, type LogoutRetryPolicy } from './logout.ts'
-import { AccountUnauthorizedError, PlatformAuthError, platformHeaders, platformOrigin, browserUrl, requestPlatform, initialization, exchange, loginOrigin } from './protocol.ts'
+import { AccountUnauthorizedError, PlatformAuthError, accountLinks, accountPageUrl, platformHeaders, platformOrigin, browserUrl, requestPlatform, initialization, exchange, loginOrigin, type AccountSurface } from './protocol.ts'
 
 const KEY = credentialKey('deepseek-account-platform', 'default')
 const DEVICE = credentialKey('deepseek-account-platform', 'device')
@@ -29,6 +29,19 @@ export interface Config {
   embeddedPageDist?: string
   /** Exact HTTP(S) origin allowed to receive account tokens for inference and files. */
   inferenceOrigin?: string
+  /**
+   * Which service serves this deployment's account pages and wallet.
+   * `billing-center` (the branded deployment) sends Top up and ledger entries to
+   * `billingCenterUrl` and reads no wallet from the account summary; `platform-pages`
+   * keeps the platform's own `/usage` and `/top_up` pages and its summary wallets.
+   */
+  accountSurface?: AccountSurface
+  /**
+   * Brand billing center serving the recharge, balance and ledger pages. Empty
+   * removes both account entries instead of pointing them at a page this
+   * deployment does not serve.
+   */
+  billingCenterUrl?: string
   /** Allow HTTP only on loopback for the development Mock. */
   allowLoopbackHttp?: boolean
   /** Map authorization and completion pages to platformOrigin for private development proxies. */
@@ -54,6 +67,8 @@ export const Config = Schema.object({
   desktopPlatform: Schema.union([Schema.const('darwin'), Schema.const('win32'), Schema.const(null)]).default(null),
   embeddedPageDist: Schema.string().default(''),
   inferenceOrigin: Schema.string().default(process.env.DSH_INFERENCE_ORIGIN ?? 'https://auth.modelxing.com'),
+  accountSurface: Schema.union([Schema.const('billing-center'), Schema.const('platform-pages')]).default('billing-center'),
+  billingCenterUrl: Schema.string().default(process.env.DSH_BILLING_CENTER_URL ?? ''),
   allowLoopbackHttp: Schema.boolean().default(false),
   rewriteBrowserOrigin: Schema.boolean().default(false),
   requestHeaders: Schema.dict(Schema.string().role('secret')).default({}),
@@ -89,6 +104,8 @@ export class PlatformAccount extends DeepSeekAccount {
   private readonly inferenceOrigin: string
   private readonly rewriteBrowserOrigin: boolean
   private readonly platform: 'darwin' | 'win32' | null
+  private readonly links: AccountLinks
+  private readonly summaryBalance: boolean
   private readonly requestHeaders: Record<string, string>
   private readonly accountRequestHeaders: Record<string, string>
   private readonly requestTimeout: number
@@ -123,6 +140,12 @@ export class PlatformAccount extends DeepSeekAccount {
     this.inferenceOrigin = inference.origin
     this.rewriteBrowserOrigin = resolved.rewriteBrowserOrigin
     this.platform = resolved.desktopPlatform
+    const billingCenter = accountPageUrl(resolved.billingCenterUrl, 'billingCenterUrl', resolved.allowLoopbackHttp)
+    if (resolved.accountSurface === 'platform-pages' && billingCenter !== null) {
+      throw new Error('account: billingCenterUrl must be empty while accountSurface is platform-pages')
+    }
+    this.links = accountLinks(resolved.accountSurface, billingCenter, this.origin)
+    this.summaryBalance = resolved.accountSurface === 'platform-pages'
     this.requestHeaders = platformHeaders(resolved.requestHeaders)
     const accountHeaders = platformHeaders(resolved.accountRequestHeaders)
     this.accountRequestHeaders = { ...this.requestHeaders, ...accountHeaders }
@@ -184,7 +207,7 @@ export class PlatformAccount extends DeepSeekAccount {
       status: record === undefined ? 'signed-out' : 'credential-stored',
       // Credential removal can notify watchers before sign-out finishes clearing the attempt.
       attempt: record === undefined && attempt?.phase === 'succeeded' ? null : attempt,
-      links: { usageUrl: new URL('/usage', this.origin).href, topUpUrl: new URL('/top_up', this.origin).href },
+      links: this.links,
     }
   }
 
@@ -201,8 +224,14 @@ export class PlatformAccount extends DeepSeekAccount {
     return cached ?? result
   }
 
-  override getBalance(client: AccountClientMetadata): Promise<AccountDetails['balance'] | null> {
-    return this.getDetail('balance', this.detailHeaders(client))
+  override async getBalance(client: AccountClientMetadata): Promise<AccountDetails['balance'] | null> {
+    if (this.summaryBalance) return this.getDetail('balance', this.detailHeaders(client))
+    // The billing center owns this deployment's wallet, and the account summary carries
+    // a placeholder that is not the user's spendable balance; publishing it would
+    // present a number this deployment cannot honour.
+    const lifetime = this.detailsLifetime
+    const stored = await this.readCurrentGrant(lifetime)
+    return stored === null || lifetime.signal.aborted || this.detailsLifetime !== lifetime ? null : { status: 'external' }
   }
 
   override async getUnnotifiedBonuses(client: AccountClientMetadata): Promise<AccountBonusBatch | null> {
@@ -366,7 +395,7 @@ export class PlatformAccount extends DeepSeekAccount {
     return { origin: this.origin, token: stored.token,
       userId: this.lastProfile?.token === stored.token ? this.lastProfile.profile.value.id || null : null,
       ...(this.embeddedPageDist ? { embeddedPageDist: this.embeddedPageDist } : {}),
-      requestHeaders }
+      embeddedPages: this.links.embedded, requestHeaders }
   }
 
   private async readCurrentGrant(lifetime: AbortController): Promise<z.infer<typeof grant> | null> {

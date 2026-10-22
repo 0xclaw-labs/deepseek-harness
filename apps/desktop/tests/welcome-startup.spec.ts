@@ -17,7 +17,7 @@ const state = vi.hoisted(() => ({
   expiryListener: undefined as (() => void) | undefined,
   accountListener: undefined as ((value: AccountView) => void) | undefined,
   accountState: vi.fn<() => Promise<AccountView>>().mockResolvedValue({
-    status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' },
+    status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '', embedded: true },
   }),
   quit: vi.fn(),
   startHost: vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:3080/?token=test', injections: [] }),
@@ -178,7 +178,7 @@ it.each([false, true])('starts welcome onboarding without carrying update focus 
   state.preference = 'zh'
   state.hasApiKey = false
   state.operations = undefined
-  state.accountState.mockResolvedValue({ status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' } })
+  state.accountState.mockResolvedValue({ status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '', embedded: true } })
   if (updated) vi.stubGlobal('process', { ...process, platform: 'win32', argv: ['desktop', '--updated'] })
   vi.useFakeTimers()
   vi.stubEnv('DSH_CLIENT_VERSION', '1.2.3')
@@ -221,7 +221,7 @@ it.each([false, true])('starts welcome onboarding without carrying update focus 
   expect(await state.operations!.takeNotice()).toBeUndefined()
   expect(state.dialogLocale!().id).toBe('zh-CN')
   const attemptId = 'login' as NonNullable<AccountView['attempt']>['id']
-  const account: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
+  const account: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
     attempt: { id: attemptId, phase: 'waiting-browser', authorizeUrl: 'https://example.test/login' } }
   state.accountState.mockResolvedValue(account)
   await state.operations!.copySignInLink(attemptId)

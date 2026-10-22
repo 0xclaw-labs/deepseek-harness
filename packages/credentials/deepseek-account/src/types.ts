@@ -31,8 +31,16 @@ export interface SignInAttemptView {
 }
 /** Browser destinations derived from the Host's platform configuration; never carry tokens. */
 export interface AccountLinks {
-  readonly usageUrl: string
-  readonly topUpUrl: string
+  /** Ledger and balance page, or null when this deployment serves none. */
+  readonly usageUrl: string | null
+  /** Top-up page, or null when this deployment serves no recharge page. */
+  readonly topUpUrl: string | null
+  /**
+   * Whether the Desktop shows these destinations in its embedded Platform view.
+   * True only while the account provider serves them on its own origin, where the
+   * viewer can receive the stored grant; every other destination opens in the browser.
+   */
+  readonly embedded: boolean
 }
 /** Stored-account presence is not a claim that the server has validated its token. */
 export interface AccountView {
@@ -59,7 +67,15 @@ export interface AccountWallet {
 /** Independent query outcomes allow profile and balance failures to render separately. */
 export interface AccountDetails {
   readonly profile: { readonly status: 'ready'; readonly value: AccountProfile } | { readonly status: 'failed' }
-  readonly balance: { readonly status: 'ready'; readonly value: readonly AccountWallet[]; readonly bonusWallets: readonly AccountWallet[] } | { readonly status: 'failed' }
+  /**
+   * `ready` values come from the account API; `failed` means the query itself failed;
+   * `external` means this deployment's wallet is served by its own account page
+   * (the account links), so no balance query exists to run here.
+   */
+  readonly balance:
+    | { readonly status: 'ready'; readonly value: readonly AccountWallet[]; readonly bonusWallets: readonly AccountWallet[] }
+    | { readonly status: 'failed' }
+    | { readonly status: 'external' }
 }
 
 /** Identity of one granted bonus order; stable across devices and sign-ins. */

@@ -2339,7 +2339,7 @@ it.each(['failed', 'expired'] as const)('focuses DSH once when browser authoriza
   const window = harness.windows[0]!
   window.focus.mockClear()
   const state: AccountView = {
-    status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
+    status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true },
     attempt: { id: 'test-failed-attempt' as NonNullable<AccountView['attempt']>['id'], phase },
   }
   harness.publishAccount(state)
@@ -2356,7 +2356,7 @@ it.each([['light', false], ['dark', true]] as const)('opens Platform authorizati
   await Promise.resolve(invoke(DESKTOP_IPC.boot))
   harness.nativeTheme.shouldUseDarkColors = shouldUseDarkColors
   const state: AccountView = {
-    status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
+    status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true },
     attempt: { id: 'test-theme-attempt' as NonNullable<AccountView['attempt']>['id'], phase: 'waiting-browser',
       authorizeUrl: 'https://platform.deepseek.com/dsh/authorize?state=state-1' },
   }

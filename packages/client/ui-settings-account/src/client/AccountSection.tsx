@@ -102,11 +102,20 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
   const wallets = details?.balance?.status === 'ready' ? details.balance.value : undefined
   const bonusWallets = details?.balance?.status === 'ready'
     ? details.balance.bonusWallets.filter(wallet => new Big(wallet.balance).gt(0)) : []
-  const showBonusRow = details?.balance?.status !== 'ready' || bonusWallets.length > 0
+  const balance = details?.balance
+  // One wallet row while the account page owns the balance: that page reports the same
+  // recharge and granted money as a single balance, not two Harness-side totals.
+  const showBonusRow = balance?.status !== 'external'
+    && (balance?.status !== 'ready' || bonusWallets.length > 0)
   const attempt = state?.attempt
   const active = attempt !== null && attempt !== undefined
     && ['initializing', 'waiting-browser', 'exchanging', 'committing'].includes(attempt.phase)
   const signedIn = state?.status === 'credential-stored'
+  const links = state?.links
+  // Only the Platform's own account pages can load in the native view, because it hands
+  // the viewer a grant scoped to the account origin. Every other destination, and an
+  // absent one, stays in this document.
+  const embedded = openPlatformPage !== undefined && signedIn && links?.embedded === true
   useEffect(() => () => { releasePage.current?.(); releasePage.current = undefined }, [])
   useEffect(() => {
     if (signedIn) return
@@ -123,25 +132,27 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
     try { await action() } catch { setFailed(true) } finally { setBusy(false) }
   }
   /**
-   * @param event - click on a Platform destination link.
-   * @returns nothing; on Desktop the embedded page replaces the pending navigation.
+   * @param page - destination this entry opens.
+   * @returns the click handler; an embeddable page replaces the pending navigation and
+   * every other destination keeps its own browser navigation.
    */
-  const openUsage = (event: MouseEvent<HTMLAnchorElement>): void => {
-    if (openPlatformPage !== undefined && signedIn) { event.preventDefault(); showPage(openPlatformPage, 'usage') }
+  const openPage = (page: PlatformPage) => (event: MouseEvent<HTMLAnchorElement>): void => {
+    if (embedded && openPlatformPage !== undefined) { event.preventDefault(); showPage(openPlatformPage, page) }
   }
   /**
    * The Platform entry the balance rows share with the Usage action: an embedded page on
    * Desktop, a new tab elsewhere. A wallet read that failed still reaches the same
    * destination, so the user can inspect the balance the Harness could not load; the
-   * destination comes from the account links, not from the wallet response.
+   * destination comes from the account links, not from the wallet response. A deployment
+   * that serves no such page states that instead of offering a link to nowhere.
    * @param label - localized link copy.
    * @param className - link treatment for the row that renders it, absent when the sheet has no such rule.
-   * @returns the Platform anchor.
+   * @param url - destination from the account links, null when this deployment serves none.
+   * @returns the Platform anchor, or the unavailable statement.
    */
-  const platformLink = (label: string, className: string | undefined) => (
-    <a className={className} href={state?.links.usageUrl} aria-disabled={state === undefined}
-      target="_blank" rel="noreferrer" onClick={openUsage}>{label}</a>
-  )
+  const platformLink = (label: string, className: string | undefined, url: string | null | undefined) => url == null
+    ? <span className={css.unavailable}>{t('accountPageUnavailable')}</span>
+    : <a className={className} href={url} target="_blank" rel="noreferrer" onClick={openPage('usage')}>{label}</a>
   const status = failed || streamFailed || attempt?.phase === 'failed' ? t('failed')
     : attempt?.phase === 'expired' ? t('expired')
       : active ? t(attempt.phase === 'initializing' ? 'initializing' : attempt.phase === 'waiting-browser' ? 'waiting' : 'completing')
@@ -172,9 +183,11 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
             <span className={css.status} role="status">{status}</span>
           </div>
         </div>
-        {signedIn && <a className={css.accountInfo} href={new URL('/', state.links.usageUrl).href} target="_blank" rel="noopener noreferrer">
-          {t('accountInfo')}<IconRightUpOutlineRegular size={12} />
-        </a>}
+        {signedIn && links !== undefined && links.usageUrl !== null
+          && <a className={css.accountInfo} href={links.embedded ? new URL('/', links.usageUrl).href : links.usageUrl}
+            target="_blank" rel="noopener noreferrer">
+            {t('accountInfo')}<IconRightUpOutlineRegular size={12} />
+          </a>}
       </div>
       {active && <div className={css.actions}>
         {attempt.authorizeUrl && <a className={css.linkButton} href={authorizeUrlWithTheme(attempt.authorizeUrl, colorScheme)}
@@ -193,7 +206,7 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
             </span>)}</span>
             : !signedIn || details?.balance === undefined
               ? <span className={css.unavailable}>{t(!signedIn ? 'balanceSignedOut' : 'loading')}</span>
-              : platformLink(t('balanceUnavailable'), css.unavailableLink)}
+              : platformLink(t('balanceUnavailable'), css.unavailableLink, links?.usageUrl)}
         </div>
         {signedIn && showBonusRow && <>
           <div className={css.divider} />
@@ -206,7 +219,7 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
                 </span>)}</span>
                 : details?.balance === undefined
                   ? <span className={css.unavailable}>{t('loading')}</span>
-                  : platformLink(t('balanceUnavailable'), css.unavailableLink)}
+                  : platformLink(t('balanceUnavailable'), css.unavailableLink, links?.usageUrl)}
             </span>
           </div>
         </>}
@@ -214,10 +227,11 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
         <div className={css.row}>
           <span className={css.secondary}>{t('more')}</span>
           <div className={css.links}>
-            {platformLink(t('usage'), css.linkButton)}
-            <a className={`${css.linkButton} ${css.primary}`} href={state?.links.topUpUrl} aria-disabled={state === undefined}
-              target="_blank" rel="noreferrer"
-              onClick={(event) => { if (openPlatformPage !== undefined && signedIn) { event.preventDefault(); showPage(openPlatformPage, 'top-up') } }}>{t('topUp')}</a>
+            {platformLink(t('usage'), css.linkButton, links?.usageUrl)}
+            {links?.topUpUrl == null
+              ? <span className={`${css.linkButton} ${css.unavailable}`} aria-disabled="true" title={t('accountPageUnavailable')}>{t('topUp')}</span>
+              : <a className={`${css.linkButton} ${css.primary}`} href={links.topUpUrl}
+                target="_blank" rel="noreferrer" onClick={openPage('top-up')}>{t('topUp')}</a>}
           </div>
         </div>
       </div>

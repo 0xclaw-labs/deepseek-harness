@@ -19,8 +19,8 @@ function mount(language = 'zh-CN', takeNotice = vi.fn<() => Promise<WelcomeNotic
     analytics: vi.fn(async (_event: string, _attributes: object) => {}),
     analyticsEnabled: async () => true,
     onAccountState: vi.fn((_listener: (state: AccountView) => void) => stopAccount),
-    startSignIn: vi.fn(async (): Promise<AccountView> => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null })),
-    cancelSignIn: vi.fn(async (): Promise<AccountView> => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null })),
+    startSignIn: vi.fn(async (): Promise<AccountView> => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: null })),
+    cancelSignIn: vi.fn(async (): Promise<AccountView> => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: null })),
     copySignInLink: vi.fn(async () => undefined),
     ...resolveDesktopLocale(language),
     saveApiKey: vi.fn<(value: string) => Promise<WelcomeSaveResult>>().mockResolvedValue({ ok: true }),
@@ -159,7 +159,7 @@ describe('desktop welcome presentation', () => {
 it.each(['zh-CN', 'en'])('renders %s timeout with manual retry and API-key alternative', async (language) => {
   const view = mount(language)
   const receive = (state: AccountView) => { act(() => { view.api.onAccountState.mock.calls[0]![0](state) }) }
-  receive({ status: 'signed-out', links: { usageUrl: '', topUpUrl: '' }, attempt: { id: 'expired' as NonNullable<AccountView['attempt']>['id'], phase: 'expired' } })
+  receive({ status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true }, attempt: { id: 'expired' as NonNullable<AccountView['attempt']>['id'], phase: 'expired' } })
   expect(view.button('#auth-retry').hidden).toBe(false)
   expect(view.button('#auth-api-key').hidden).toBe(false)
   expect(view.api.startSignIn).not.toHaveBeenCalled()
@@ -172,7 +172,7 @@ it.each(['zh-CN', 'en'])('renders %s timeout with manual retry and API-key alter
 it.each(['zh-CN', 'en'])('renders %s browser fallback and copies only the active login link', async (language) => {
   const view = mount(language)
   const receive = (state: AccountView) => { act(() => { view.api.onAccountState.mock.calls[0]![0](state) }) }
-  const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
+  const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
     attempt: { id: 'waiting' as NonNullable<AccountView['attempt']>['id'], phase: 'waiting-browser', authorizeUrl: 'https://example.test/login' } }
   receive(waiting)
   await expect(view.copy() + view.document.querySelector('#auth-description')!.textContent + '\n')
@@ -198,7 +198,7 @@ it('keeps a newer account notification when the start response arrives late', as
   view.api.startSignIn.mockReturnValueOnce(started.promise)
   fireEvent.click(view.button('#sign-in'))
   expect(view.button('#auth-cancel').disabled).toBe(true)
-  const state: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
+  const state: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
     attempt: { id: 'attempt' as NonNullable<AccountView['attempt']>['id'], phase: 'expired' } }
   act(() => { view.api.onAccountState.mock.calls[0]![0](state) })
   await act(async () => { started.resolve({ ...state, attempt: { ...state.attempt!, phase: 'waiting-browser' } }); await started.promise })
@@ -210,7 +210,7 @@ it('does not restore a copied-link status after leaving the waiting phase', asyn
   const view = mount()
   const copied = Promise.withResolvers<undefined>()
   view.api.copySignInLink.mockReturnValueOnce(copied.promise)
-  const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
+  const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
     attempt: { id: 'attempt' as NonNullable<AccountView['attempt']>['id'], phase: 'waiting-browser' } }
   act(() => { view.api.onAccountState.mock.calls[0]![0](waiting) })
   fireEvent.click(view.button('#auth-copy'))
@@ -225,7 +225,7 @@ it('keeps the key draft while account notifications arrive and releases the subs
   const view = mount()
   fireEvent.click(view.button('#api-key'))
   view.enterKey('sk-draft')
-  act(() => { view.api.onAccountState.mock.calls[0]![0]({ status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
+  act(() => { view.api.onAccountState.mock.calls[0]![0]({ status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
     attempt: { id: 'expired' as NonNullable<AccountView['attempt']>['id'], phase: 'expired' } }) })
   expect(view.document.querySelector<HTMLElement>('#key-form')!.hidden).toBe(false)
   expect(view.input.value).toBe('sk-draft')
@@ -238,7 +238,7 @@ it.each(['copied', 'failed'] as const)('restores the copy action after %s feedba
   try {
     const view = mount('en')
     if (result === 'failed') view.api.copySignInLink.mockRejectedValue(new Error('clipboard unavailable'))
-    const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
+    const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
       attempt: { id: 'waiting' as NonNullable<AccountView['attempt']>['id'], phase: 'waiting-browser' } }
     act(() => { view.api.onAccountState.mock.calls[0]![0](waiting) })
     const feedback = result === 'copied' ? view.api.messages.welcomeAuthCopied : view.api.messages.welcomeAuthCopyFailed
@@ -272,7 +272,7 @@ it.each(['zh-CN', 'en'])('keeps the expiry notice visible after returning to Wel
     await act(async () => {})
     const publish = view.api.onAccountState.mock.calls[0]![0]
     const expired: AccountView = { status: 'signed-out', attempt: null,
-      links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' } }
+      links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true } }
     await act(async () => { publish(expired) })
     const notice = screen.getByRole('alert')
     expect(notice.textContent).toBe(view.api.messages.welcomeSessionExpired)
@@ -293,7 +293,7 @@ it('does not infer a notification from a retained expired account snapshot', asy
   const view = mount()
   await act(async () => {
     view.api.onAccountState.mock.calls[0]![0]({ status: 'signed-out', attempt: null,
-      links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' } })
+      links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true } })
   })
   expect(screen.queryByRole('alert')).toBeNull()
 })
@@ -319,7 +319,7 @@ it('ignores a notification received after its renderer unmounts', async () => {
 it.each(['zh-CN', 'en'])('returns from completed sign-in to the initial page after sign-out: %s', async (language) => {
   const view = mount(language)
   const publish = view.api.onAccountState.mock.calls[0]![0]
-  const links = { usageUrl: 'https://example.test/usage', topUpUrl: 'https://example.test/top_up' }
+  const links = { usageUrl: 'https://example.test/usage', topUpUrl: 'https://example.test/top_up', embedded: true }
   act(() => { publish({ status: 'credential-stored', links,
     attempt: { id: 'completed' as NonNullable<AccountView['attempt']>['id'], phase: 'succeeded' } }) })
   expect(view.document.querySelector<HTMLElement>('#auth-page')!.hidden).toBe(false)
@@ -338,6 +338,6 @@ it('reports each return to the welcome entry once, including account cancellatio
   const pending = Promise.withResolvers<AccountView>()
   view.api.startSignIn.mockReturnValueOnce(pending.promise)
   fireEvent.click(view.button('#sign-in'))
-  await act(async () => { pending.resolve({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null }) })
+  await act(async () => { pending.resolve({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: null }) })
   expect(view.api.analytics.mock.calls.map(([action]) => action)).toEqual(['auth_page_click', 'auth_page_view', 'auth_page_click', 'auth_page_view'])
 })

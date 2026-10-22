@@ -33,7 +33,7 @@ it('shares settings card materials and control sizes in both palettes', async ()
   const account = scaffold.ctx.deepseekAccount
   const state: AccountView = {
     status: 'credential-stored', attempt: null,
-    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
+    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true },
   }
   // The Platform provider supplies synthetic identity and wallets; renderer, RPC, and settings remain real.
   const mocks = [

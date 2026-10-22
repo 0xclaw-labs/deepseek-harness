@@ -38,7 +38,7 @@ it('claims onboarding while loading, offers API key fallback, and completes afte
   const view = render(<AccountOnboarding {...props} />)
   expect(props.setOnboarding).toHaveBeenCalledExactlyOnceWith(true)
   expect(screen.queryByRole('dialog')).toBeNull()
-  account = { ...account, view: { status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' } } }
+  account = { ...account, view: { status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '', embedded: true } } }
   view.rerender(<AccountOnboarding {...props} />)
   fireEvent.click(screen.getByRole('button', { name: en.addApiKey }))
   expect(props.showLogin).toHaveBeenLastCalledWith(false)

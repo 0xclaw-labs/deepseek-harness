@@ -30,7 +30,7 @@ function operationsOf(state: Omit<AccountView, 'links'>, details?: Partial<Accou
     ...pages === undefined ? {} : { openPlatformPage: pages.open },
     hooks: {
       account: {
-        getSnapshot: () => ({ view: { ...state, links: { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up' } }, details, avatar, failed: false }),
+        getSnapshot: () => ({ view: { ...state, links: { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up', embedded: true } }, details, avatar, failed: false }),
         subscribe: () => () => {},
       },
       theme: { getSnapshot: () => themeOf('light'), subscribe: () => () => {} },
@@ -205,7 +205,7 @@ it('reports a failed start in the login dialog, not as a sidebar alert', async (
   const operations = mount({ status: 'signed-out', attempt: null })
   cleanup()
   const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
-  const links = { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up' }
+  const links = { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up', embedded: true }
   let snapshot: AccountSnapshot = { view: { status: 'signed-out', attempt: null, links }, details: undefined, avatar: undefined, failed: false }
   // The plugin's start publishes the failure through the account snapshot, then rejects.
   const start = vi.fn((): Promise<void> => {

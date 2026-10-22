@@ -49,7 +49,7 @@ const quotaEntry = (seq: number, code: string): SessionLiveEventEntry => ({
 
 const storedView: AccountView = {
   status: 'credential-stored', attempt: null,
-  links: { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up' },
+  links: { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up', embedded: true },
 }
 const theme: ThemeSnapshot = {
   preference: 'light', fontSizes: { text: 14, code: 11, terminal: 13 }, fontFamilies: { text: '', code: '', terminal: '' }, active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], revision: 0,

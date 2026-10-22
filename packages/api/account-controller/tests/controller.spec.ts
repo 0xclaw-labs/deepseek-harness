@@ -8,7 +8,7 @@ import AccountController from '../src/index.ts'
 
 const roots: Context[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(ctx => ctx.fiber.dispose())) })
-const state: AccountView = { status: 'signed-out', links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up' }, attempt: null }
+const state: AccountView = { status: 'signed-out', links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up', embedded: true }, attempt: null }
 const client: AccountClientMetadata = { version: '0.0.0-test', locale: 'zh-CN', timezoneOffsetSeconds: 28_800 }
 
 function fixture() {
