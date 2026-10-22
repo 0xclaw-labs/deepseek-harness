@@ -25,7 +25,7 @@ function readAsarFile(archive, name) {
   const jsonLength = fd.readUInt32LE(12)
   const header = JSON.parse(fd.subarray(16, 16 + jsonLength).toString('utf8'))
   const dataStart = 8 + headerSize
-  let node = header.files
+  let node = header
   for (const part of name.split('/')) {
     if (node === undefined || node.files === undefined || node.files[part] === undefined) return undefined
     node = node.files[part]
