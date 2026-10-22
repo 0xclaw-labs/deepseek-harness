@@ -188,18 +188,19 @@ index 0000000000..7a6cc20d7c
 +  return target === 'open' || target === '' ? 'focus-primary-window' : undefined
 +}
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 2afdfd7194..2595786069 100644
+index 2afdfd7194..bd7fad0c82 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
-@@ -2,6 +2,7 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
+@@ -2,6 +2,8 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
  import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
  /** Electron shell: desktop project ownership, custom protocol, windows, and lifecycle. */
 
 +import { existsSync, mkdirSync, readFileSync, watchFile, writeFileSync } from 'node:fs'
++import { homedir } from 'node:os'
  import { readFile, writeFile } from 'node:fs/promises'
  import { join } from 'node:path'
  import { fileURLToPath } from 'node:url'
-@@ -22,6 +23,7 @@ import {
+@@ -22,6 +24,7 @@ import {
    type IpcMainInvokeEvent,
    type MenuItemConstructorOptions,
  } from 'electron'
@@ -207,7 +208,7 @@ index 2afdfd7194..2595786069 100644
  import { resolveDesktopPaths } from './paths.ts'
  import { DesktopProjectManager } from './project-manager.ts'
  import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
-@@ -42,6 +44,7 @@ import { pruneCrashReports, RendererConsoleTail, writeCrashReport, type CrashRep
+@@ -42,6 +45,7 @@ import { pruneCrashReports, RendererConsoleTail, writeCrashReport, type CrashRep
  import { openWelcomeWindow } from './welcome-window.ts'
  import { WELCOME_IPC, needsWelcome, type WelcomeNotice } from './welcome-api.ts'
  import { connectDesktopWelcome, type DesktopWelcomeBackend } from './welcome-backend.ts'
@@ -215,7 +216,7 @@ index 2afdfd7194..2595786069 100644
  import { DesktopUpdateJournal } from './update-journal.ts'
  import { DesktopUpdatePreparationError } from './update-error.ts'
  import { DesktopUpdateSchedule, resolveDesktopUpdateScheduleConfig } from './update-schedule.ts'
-@@ -80,9 +83,87 @@ let backendReady = false
+@@ -80,9 +84,107 @@ let backendReady = false
  /** Error-level console output of the primary window, attached to crash reports. */
  const rendererConsole = new RendererConsoleTail()
 
@@ -264,6 +265,26 @@ index 2afdfd7194..2595786069 100644
 +  return resolveDeepLinkScheme(process.env.DSH_DESKTOP_PROTOCOL_SCHEME)
 +}
 +
++/**
++ * First-use Workspace owned by this brand.
++ *
++ * Upstream creates `<Documents>/deepseek-harness/default-workspace`; a
++ * rebranded package must never adopt that folder, or both applications would
++ * edit the same files. The Host receives the complete path through the
++ * profile patch written by {@link bootstrapBrandWorkspace}; an explicit
++ * profile config still wins because the brand block is prepended and later
++ * entries in the patch sequence override it.
++ * @returns a fully qualified brand-specific workspace directory.
++ */
++function resolveBrandWorkspaceDirectory(): string {
++  try {
++    return join(app.getPath('documents'), '随身搭子', 'default-workspace')
++  } catch (error: unknown) {
++    console.warn('desktop workspace: Documents directory unavailable', error)
++    return join(homedir(), 'Documents', '随身搭子', 'default-workspace')
++  }
++}
++
 +// Claim the branded profile before ready and before any profile access, including the
 +// single-instance lock at the end of this module.
 +const desktopProfileDirectory = resolveDesktopProfileDirectory()
@@ -305,7 +326,7 @@ index 2afdfd7194..2595786069 100644
 
  function currentDesktopLocale(): ReturnType<typeof resolveDesktopLocale> {
    return resolveDesktopLocale(windowsLanguage ?? app.getLocale())
-@@ -212,6 +293,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -212,6 +314,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
      minWidth: 520,
      minHeight: 600,
      show,
@@ -313,7 +334,7 @@ index 2afdfd7194..2595786069 100644
      ...(process.platform === 'win32' && primary ? {
        titleBarStyle: 'hidden' as const,
        titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
-@@ -238,6 +320,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -238,6 +341,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
        devTools: true,
      },
    })
@@ -325,7 +346,7 @@ index 2afdfd7194..2595786069 100644
    window.webContents.setWindowOpenHandler(({ url }) => {
      if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
      return { action: 'deny' }
-@@ -314,6 +401,117 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -314,6 +422,156 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
    return window
  }
 
@@ -440,18 +461,58 @@ index 2afdfd7194..2595786069 100644
 +  }
 +}
 +
++/**
++ * Write the branded first-use Workspace override into the Host profile patch.
++ *
++ * Workspace creation belongs to the Host, so the Desktop expresses its
++ * deployment choice through the same profile patch it already owns for the
++ * PaiNuo provider. Regenerating the block keeps a moved Documents directory
++ * from leaving a stale path behind. The block is prepended so a user-authored
++ * `workspace-controller` entry later in the patch still wins.
++ */
++function bootstrapBrandWorkspace(): void {
++  if (desktopProfileDirectory === undefined) return
++  try {
++    const home = resolveDshHome()
++    const profileDir = join(home, 'profiles', 'desktop')
++    mkdirSync(profileDir, { recursive: true })
++    const patchPath = join(profileDir, 'cordis.patch.yml')
++    const marker = 'brand-default-workspace'
++    const block = `# ${marker}: the branded first-use Workspace, never upstream's Documents/deepseek-harness.\n`
++      + '- id: workspace-controller\n'
++      + '  config:\n'
++      + `    defaultWorkspacePath: ${JSON.stringify(resolveBrandWorkspaceDirectory())}\n`
++    const existing = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : ''
++    const markerIndex = existing.indexOf(`# ${marker}`)
++    let rest = existing
++    if (markerIndex !== -1) {
++      // Remove only the marked block: stop at the second `- id:` row so a
++      // user-authored entry after ours survives.
++      const firstRow = existing.indexOf('\n- id:', markerIndex)
++      const secondRow = firstRow === -1 ? -1 : existing.indexOf('\n- id:', firstRow + 1)
++      rest = existing.slice(0, markerIndex) + (secondRow === -1 ? '' : existing.slice(secondRow + 1))
++    }
++    rest = rest.split('\n').filter(line => line.trim() !== '[]').join('\n').trim()
++    const next = rest === '' ? block : `${block}${rest}\n`
++    if (next !== existing) writeFileSync(patchPath, next, { mode: 0o600 })
++  } catch (error) {
++    console.warn('brand workspace bootstrap failed', error)
++  }
++}
++
  async function main(): Promise<void> {
    const desktopSettings = readDesktopSettings(app.getPath('userData'))
    void pruneCrashReports(app.getPath('logs'))
-@@ -321,6 +519,7 @@ async function main(): Promise<void> {
+@@ -321,6 +579,8 @@ async function main(): Promise<void> {
    const updateJournal = journalDirectory === undefined ? undefined : new DesktopUpdateJournal(journalDirectory, app.getVersion())
    const resources = runtimeResources()
    const paths = resolveDesktopPaths()
 +  await bootstrapPaiNuoBrand()
++  bootstrapBrandWorkspace()
    const development = !app.isPackaged
    const primaryRuntime = development
      ? developmentPrimaryRuntime()
-@@ -338,7 +537,23 @@ async function main(): Promise<void> {
+@@ -338,7 +598,23 @@ async function main(): Promise<void> {
      return result.environment
    })
    let hostEnvironment: NodeJS.ProcessEnv = process.env
@@ -476,7 +537,7 @@ index 2afdfd7194..2595786069 100644
    let quitting = false
    let startup: Promise<void> | undefined
    let workspaceRecovery: Promise<void> | undefined
-@@ -932,7 +1147,8 @@ async function main(): Promise<void> {
+@@ -932,7 +1208,8 @@ async function main(): Promise<void> {
    const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
      : join(process.resourcesPath, 'icon.png')
    app.setAboutPanelOptions({
@@ -486,7 +547,7 @@ index 2afdfd7194..2595786069 100644
      applicationVersion: app.getVersion(),
      // The release has no separate build number; omit Electron's bundle version.
      version: '',
-@@ -1232,10 +1448,14 @@ async function main(): Promise<void> {
+@@ -1232,10 +1509,14 @@ async function main(): Promise<void> {
      window.focus()
    }
 
@@ -592,6 +653,227 @@ index 0000000000..472612ee4b
 +    expect(parseDeepLink('', 'suishendazi')).toBeUndefined()
 +  })
 +})
+diff --git a/packages/api/workspace-controller/README.md b/packages/api/workspace-controller/README.md
+index 27c26c7d9b..7e41864e80 100644
+--- a/packages/api/workspace-controller/README.md
++++ b/packages/api/workspace-controller/README.md
+@@ -33,13 +33,14 @@ The Client entry provides `ClientWorkspaceModel` and `createWorkspaceStateStream
+
+ `workspace.initializeDefault()` returns the durable default Workspace; the Client service exposes it as `workspaces.initializeDefault(signal?)`. It takes no request: the Host owns the fixed `default-workspace` directory name, and the registry derives the initial title from that same segment, so one installation keeps one on-disk path and one stored title in every language. The Host places the directory under its account's `<Documents>/deepseek-harness`, including on remote Web hosts. OS filename restrictions apply. Linux system lookup requires `xdg-user-dir` with an enabled Documents directory; hosts without it must configure `documentsDirectory` or use the folder picker.
+
+-The [Workspace registry](../../workspace/workspace/README.md#first-use-workspace) owns eligibility, directory creation, and durable initialization. An existing default Workspace is returned without another Documents lookup and is never renamed or relocated. Ineligible first use returns `undefined`, so startup can leave directory selection to the user. Lookup and creation failures use standard Remote error handling. Initialization creates no Session and sends no message.
++An explicit `defaultWorkspacePath` bypasses both the Documents lookup and the `deepseek-harness` suffix: a rebranded Desktop uses it to own `<Documents>/<brand>/default-workspace` without sharing upstream's editable folder. The value is a complete absolute path, validated when the controller is constructed. The [Workspace registry](../../workspace/workspace/README.md#first-use-workspace) owns eligibility, directory creation, and durable initialization. An existing default Workspace is returned without another Documents lookup and is never renamed or relocated. Ineligible first use returns `undefined`, so startup can leave directory selection to the user. Lookup and creation failures use standard Remote error handling. Initialization creates no Session and sends no message.
+
+ `DEFAULT_WORKSPACE_DIRECTORY` and `workspaceDisplayTitle(title, localizedDefault)` are published from `./default-workspace` for browser consumers: a Workspace still carrying the automatic title reads as the reader's localized default name, and every other title reads verbatim. A Workspace the user renamed to exactly `default-workspace` — or a folder of that name adopted from the picker — is labeled as the default; nothing else depends on the distinction.
+
+ | Configuration | Default | Purpose |
+ | --- | --- | --- |
+ | `documentsDirectory` | System Documents directory | Fully qualified Host directory override |
++| `defaultWorkspacePath` | Unset (upstream `<Documents>/deepseek-harness/default-workspace`) | Complete first-use Workspace path; wins over `documentsDirectory` |
+ | `documentsLookupTimeoutMs` | `10000` | Positive maximum duration of OS directory lookup, in milliseconds |
+
+ Documents lookup holds the registry mutation queue, so other Workspace mutations, including registration of a picked directory, can wait up to `documentsLookupTimeoutMs`. Cancellation can stop the lookup; after resolution succeeds, it does not roll back creation or registration.
+diff --git a/packages/api/workspace-controller/README.zh.md b/packages/api/workspace-controller/README.zh.md
+index 4772d0c9b1..df258dabd5 100644
+--- a/packages/api/workspace-controller/README.zh.md
++++ b/packages/api/workspace-controller/README.zh.md
+@@ -33,13 +33,14 @@ Client 入口提供 `ClientWorkspaceModel` 和 `createWorkspaceStateStream()`。
+
+ `workspace.initializeDefault()` 返回持久化的默认工作区；Client service 通过 `workspaces.initializeDefault(signal?)` 提供该操作。它不接受请求参数：固定目录名 `default-workspace` 由 Host 拥有，注册表也以同一路径片段作为初始标题，因此任何语言下同一安装环境都只有一个磁盘路径和一个存储标题。Host 将目录放在其账户的 `<Documents>/deepseek-harness` 下，远程 Web Host 也遵循此规则。操作系统的文件名限制同样适用。Linux 系统查询要求存在 `xdg-user-dir` 且启用了 Documents 目录；不具备该条件的 Host 必须配置 `documentsDirectory` 或使用文件夹选择器。
+
+-[Workspace 注册表](../../workspace/workspace/README.zh.md#first-use-workspace)负责资格判断、目录创建和持久化初始化。已有默认工作区直接返回，不再查询 Documents，也不会被重命名或迁移。不满足首次使用条件时返回 `undefined`，启动流程可将目录选择留给用户。查询和创建失败遵循标准 Remote 错误处理。初始化不创建 Session，也不发送消息。
++显式 `defaultWorkspacePath` 会同时绕过 Documents 查询和 `deepseek-harness` 后缀：品牌桌面端因此可以独占 `<Documents>/<品牌>/default-workspace`，不与上游共享可编辑目录。该值是构造控制器时校验的完整绝对路径。[Workspace 注册表](../../workspace/workspace/README.zh.md#first-use-workspace)负责资格判断、目录创建和持久化初始化。已有默认工作区直接返回，不再查询 Documents，也不会被重命名或迁移。不满足首次使用条件时返回 `undefined`，启动流程可将目录选择留给用户。查询和创建失败遵循标准 Remote 错误处理。初始化不创建 Session，也不发送消息。
+
+ `./default-workspace` 为浏览器消费方导出 `DEFAULT_WORKSPACE_DIRECTORY` 与 `workspaceDisplayTitle(title, localizedDefault)`：仍保留自动标题的工作区按读者语言显示默认名称，其他标题一律原样显示。被用户重命名为 `default-workspace` 的工作区，或从选择器采用的同名文件夹，也会按默认工作区显示；除显示之外没有其他行为依赖该判断。
+
+ | 配置 | 默认值 | 用途 |
+ | --- | --- | --- |
+ | `documentsDirectory` | 系统 Documents 目录 | 完全限定的 Host 目录覆盖值 |
++| `defaultWorkspacePath` | 未设置（上游 `<Documents>/deepseek-harness/default-workspace`） | 完整首次工作区路径；优先于 `documentsDirectory` |
+ | `documentsLookupTimeoutMs` | `10000` | 操作系统目录查询的正数最大时长，单位为毫秒 |
+
+ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（包括登记已选目录）最多可能等待 `documentsLookupTimeoutMs`。取消可以停止查询；解析成功后，取消不会回滚创建或登记。
+diff --git a/packages/api/workspace-controller/src/default-directory.ts b/packages/api/workspace-controller/src/default-directory.ts
+index b15fea8b94..1f798f62ad 100644
+--- a/packages/api/workspace-controller/src/default-directory.ts
++++ b/packages/api/workspace-controller/src/default-directory.ts
+@@ -10,6 +10,13 @@ interface DocumentsDirectoryInternals {
+   readonly platform?: NodeJS.Platform
+   readonly home?: string
+   readonly run?: NativeCommandRunner
++  /**
++   * Complete first-use Workspace path supplied by a deployment override.
++   * When set it wins over the Documents lookup, because a rebranded package
++   * must be able to choose its own folder instead of upstream's
++   * `<Documents>/deepseek-harness/default-workspace`.
++   */
++  readonly workspaceDirectory?: string
+ }
+
+ /**
+@@ -31,7 +38,8 @@ export function validateDocumentsDirectory(directory: string, platform: NodeJS.P
+  * Resolve the first-use directory on the Host without creating files.
+  * @param documentsDirectory - explicit deployment override for the system Documents directory.
+  * @param signal - caller lifetime and lookup deadline.
+- * @param internals - platform facts and native command runner.
++ * @param internals - platform facts, native command runner, and an optional
++ *   complete Workspace path that wins over the Documents lookup.
+  * @returns the absolute candidate path.
+  */
+ export async function defaultWorkspaceDirectory(
+@@ -42,6 +50,15 @@ export async function defaultWorkspaceDirectory(
+   const platform = internals.platform ?? process.platform
+   const paths = platform === 'win32' ? win32 : posix
+   signal.throwIfAborted()
++  const configuredWorkspace = internals.workspaceDirectory?.trim()
++  if (configuredWorkspace !== undefined && configuredWorkspace !== '') {
++    const normalized = validateDocumentsDirectory(configuredWorkspace, platform)
++    // `path.normalize` keeps a trailing separator; a Workspace path is a
++    // directory identity, so publish it without one (except a filesystem root).
++    return normalized.length > paths.parse(normalized).root.length && normalized.endsWith(paths.sep)
++      ? normalized.slice(0, -1)
++      : normalized
++  }
+   let directory = documentsDirectory
+   if (directory === undefined) {
+     const run = internals.run ?? runNativeCommand
+diff --git a/packages/api/workspace-controller/src/index.ts b/packages/api/workspace-controller/src/index.ts
+index f275eb3d12..5fecd38232 100644
+--- a/packages/api/workspace-controller/src/index.ts
++++ b/packages/api/workspace-controller/src/index.ts
+@@ -37,6 +37,13 @@ export { DirectoryPickerController } from './directory-picker.ts'
+ export interface Config {
+   /** Override the system Documents directory with a fully qualified path. */
+   documentsDirectory?: string
++  /**
++   * Complete first-use Workspace path for a rebranded deployment. When set,
++   * the Host creates this directory instead of upstream's
++   * `<Documents>/deepseek-harness/default-workspace`, so two desktop
++   * applications never share one editable folder.
++   */
++  defaultWorkspacePath?: string
+   /** Maximum duration of the operating system's Documents lookup. */
+   documentsLookupTimeoutMs?: number
+ }
+@@ -57,6 +64,7 @@ export class WorkspaceController extends TypertRemoteService {
+
+   static Config: z<Config, ResolvedConfig> = z.object({
+     documentsDirectory: z.string(),
++    defaultWorkspacePath: z.string(),
+     documentsLookupTimeoutMs: z.natural().min(1).default(10_000),
+   })
+
+@@ -73,6 +81,7 @@ export class WorkspaceController extends TypertRemoteService {
+     ctx.typert.resources.register('workspace', { field: 'workspaceId' })
+     this.config = WorkspaceController.Config(config)
+     if (this.config.documentsDirectory !== undefined) validateDocumentsDirectory(this.config.documentsDirectory)
++    if (this.config.defaultWorkspacePath !== undefined) validateDocumentsDirectory(this.config.defaultWorkspacePath)
+     this.commands = new WorkspaceCommands(ctx)
+     this.feed = new WorkspaceFeed(ctx)
+     // This package is the Loader entry for both Remote owners it hosts: the
+@@ -106,6 +115,11 @@ export class WorkspaceController extends TypertRemoteService {
+       const timeout = AbortSignal.timeout(this.config.documentsLookupTimeoutMs)
+       return await defaultWorkspaceDirectory(
+         this.config.documentsDirectory, AbortSignal.any([signal, timeout]),
++        {
++          ...this.config.defaultWorkspacePath === undefined
++            ? {}
++            : { workspaceDirectory: this.config.defaultWorkspacePath },
++        },
+       )
+     })
+     return workspace === undefined ? undefined : { workspace: workspaceView(workspace) }
+diff --git a/packages/api/workspace-controller/tests/default-directory.host.spec.ts b/packages/api/workspace-controller/tests/default-directory.host.spec.ts
+index c382f410ac..dfc2874f75 100644
+--- a/packages/api/workspace-controller/tests/default-directory.host.spec.ts
++++ b/packages/api/workspace-controller/tests/default-directory.host.spec.ts
+@@ -21,6 +21,43 @@ describe('system Documents directory', () => {
+     expect(run).not.toHaveBeenCalled()
+   })
+
++  it('uses a branded workspace path without a system lookup or upstream suffix', async () => {
++    const run = vi.fn<NativeCommandRunner>()
++    await expect(defaultWorkspaceDirectory(undefined, new AbortController().signal, {
++      platform: 'darwin',
++      run,
++      workspaceDirectory: '/Users/a/Documents/随身搭子/default-workspace/',
++    })).resolves.toBe('/Users/a/Documents/随身搭子/default-workspace')
++    expect(run).not.toHaveBeenCalled()
++  })
++
++  it('lets the branded workspace path win over the configured Documents directory', async () => {
++    const run = vi.fn<NativeCommandRunner>()
++    await expect(defaultWorkspaceDirectory('/documents', new AbortController().signal, {
++      platform: 'linux',
++      run,
++      workspaceDirectory: '/brand/workspace',
++    })).resolves.toBe('/brand/workspace')
++    expect(run).not.toHaveBeenCalled()
++  })
++
++  it('treats a blank branded workspace path as unset', async () => {
++    const run = vi.fn<NativeCommandRunner>()
++    await expect(defaultWorkspaceDirectory('/documents', new AbortController().signal, {
++      platform: 'linux',
++      run,
++      workspaceDirectory: '   ',
++    })).resolves.toBe('/documents/deepseek-harness/default-workspace')
++    expect(run).not.toHaveBeenCalled()
++  })
++
++  it('rejects a relative branded workspace path', async () => {
++    await expect(defaultWorkspaceDirectory(undefined, new AbortController().signal, {
++      platform: 'linux',
++      workspaceDirectory: 'relative/workspace',
++    })).rejects.toThrow('fully qualified')
++  })
++
+   it.each(['', '\r\n', '/home/a\n'])('rejects an unavailable XDG directory %j', async (stdout) => {
+     const run: NativeCommandRunner = async () => ({ stdout, stderr: '' })
+     await expect(defaultWorkspaceDirectory(undefined, new AbortController().signal, { platform: 'linux', home: '/home/a', run }))
+diff --git a/packages/api/workspace-controller/tests/workspace-controller.host.spec.ts b/packages/api/workspace-controller/tests/workspace-controller.host.spec.ts
+index c00531e06d..22ba28c4db 100644
+--- a/packages/api/workspace-controller/tests/workspace-controller.host.spec.ts
++++ b/packages/api/workspace-controller/tests/workspace-controller.host.spec.ts
+@@ -51,7 +51,7 @@ function deferred<T>(): Deferred<T> {
+   return { promise, resolve }
+ }
+
+-async function harness(options: { systemDocuments?: boolean } = {}) {
++async function harness(options: { systemDocuments?: boolean; workspacePath?: string } = {}) {
+   const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-controller-')))
+   tempDirs.push(root)
+   const ctx = new Context()
+@@ -71,7 +71,10 @@ async function harness(options: { systemDocuments?: boolean } = {}) {
+     resources: { register: vi.fn(() => dispose) },
+   } as never)
+   new RemoteAccessService(ctx)
+-  const controller = new WorkspaceController(ctx, options.systemDocuments === true ? {} : { documentsDirectory: root })
++  const controller = new WorkspaceController(ctx, options.systemDocuments === true ? {} : {
++    documentsDirectory: root,
++    ...options.workspacePath === undefined ? {} : { defaultWorkspacePath: options.workspacePath },
++  })
+   return { controller, ctx, root, storageDomain }
+ }
+
+@@ -601,6 +604,17 @@ describe('first-use Remote', () => {
+     expect(await controller.initializeDefault(signal)).toEqual(result)
+   })
+
++  it('creates the branded first-use Workspace from the profile config', async () => {
++    const brandParent = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-brand-workspace-')))
++    const brandWorkspace = join(brandParent, 'default-workspace')
++    tempDirs.push(brandParent)
++    const { controller } = await harness({ workspacePath: brandWorkspace })
++    const result = await controller.initializeDefault(new AbortController().signal)
++    expect(result!.workspace.path).toBe(brandWorkspace)
++    expect(result!.workspace.title).toBe(DEFAULT_WORKSPACE_DIRECTORY)
++    expect(existsSync(brandWorkspace)).toBe(true)
++  })
++
+   it('skips ineligible first use and propagates preparation failures', async () => {
+     const { controller, ctx, root } = await harness()
+     await ctx.workspaceRegistry.create(root)
 diff --git a/packages/credentials/deepseek-account-platform/src/index.ts b/packages/credentials/deepseek-account-platform/src/index.ts
 index 0319a553c3..e14004e061 100644
 --- a/packages/credentials/deepseek-account-platform/src/index.ts
