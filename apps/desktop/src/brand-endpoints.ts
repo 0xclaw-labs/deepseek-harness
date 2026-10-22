@@ -31,6 +31,12 @@ export const BRAND_MODEL_CATALOG_URL = `${BRAND_INFERENCE_BASE_URL}/models`
  */
 export const BRAND_BILLING_CENTER_URL = 'https://agentbuddy.modelxing.com/billing.html'
 
+/**
+ * Gateway origin for the cloud-desktop (noVNC) surface. The desktop never dials
+ * the box: delegate tickets and the noVNC proxy are gateway paths on this origin.
+ */
+export const BRAND_CLOUD_DESKTOP_API_ORIGIN = 'https://agentbuddy.modelxing.com'
+
 /** Provider id written into the generated profile patch. */
 export const BRAND_PROVIDER_ID = 'painuo'
 
@@ -46,6 +52,10 @@ const ENDPOINT_OVERRIDE_ENV = [
   'DSH_INFERENCE_ORIGIN',
   'DEEPSEEK_BASE_URL',
   'DSH_BILLING_CENTER_URL',
+  // Cross-client live cloud desktop: the credential seam. A deployment that can
+  // issue an agentbuddy-audience platform token wires it here; an upstream value
+  // would send the branded app's desktop credential to a DeepSeek service.
+  'DSH_CLOUD_SCREEN_TOKEN',
   'DSH_TELEMETRY_OTLP_URL',
   'DSH_PRODUCT_ANALYTICS_OTLP_URL',
   'DSH_DESKTOP_UPDATE_ORIGIN',

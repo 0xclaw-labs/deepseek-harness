@@ -540,10 +540,10 @@ index 0000000000..b34572134e
 +}
 diff --git a/apps/desktop/src/brand-endpoints.ts b/apps/desktop/src/brand-endpoints.ts
 new file mode 100644
-index 0000000000..d2ff1f0afc
+index 0000000000..b137534768
 --- /dev/null
 +++ b/apps/desktop/src/brand-endpoints.ts
-@@ -0,0 +1,214 @@
+@@ -0,0 +1,224 @@
 +/**
 + * Brand deployment endpoints for the 随身搭子 desktop.
 + *
@@ -577,6 +577,12 @@ index 0000000000..d2ff1f0afc
 + */
 +export const BRAND_BILLING_CENTER_URL = 'https://agentbuddy.modelxing.com/billing.html'
 +
++/**
++ * Gateway origin for the cloud-desktop (noVNC) surface. The desktop never dials
++ * the box: delegate tickets and the noVNC proxy are gateway paths on this origin.
++ */
++export const BRAND_CLOUD_DESKTOP_API_ORIGIN = 'https://agentbuddy.modelxing.com'
++
 +/** Provider id written into the generated profile patch. */
 +export const BRAND_PROVIDER_ID = 'painuo'
 +
@@ -592,6 +598,10 @@ index 0000000000..d2ff1f0afc
 +  'DSH_INFERENCE_ORIGIN',
 +  'DEEPSEEK_BASE_URL',
 +  'DSH_BILLING_CENTER_URL',
++  // Cross-client live cloud desktop: the credential seam. A deployment that can
++  // issue an agentbuddy-audience platform token wires it here; an upstream value
++  // would send the branded app's desktop credential to a DeepSeek service.
++  'DSH_CLOUD_SCREEN_TOKEN',
 +  'DSH_TELEMETRY_OTLP_URL',
 +  'DSH_PRODUCT_ANALYTICS_OTLP_URL',
 +  'DSH_DESKTOP_UPDATE_ORIGIN',
@@ -758,6 +768,249 @@ index 0000000000..d2ff1f0afc
 +    clearTimeout(timer)
 +  }
 +}
+diff --git a/apps/desktop/src/cloud-screen.ts b/apps/desktop/src/cloud-screen.ts
+new file mode 100644
+index 0000000000..e14148dffa
+--- /dev/null
++++ b/apps/desktop/src/cloud-screen.ts
+@@ -0,0 +1,237 @@
++/**
++ * Cross-client live cloud desktop: the desktop half of the delegate-ticket seam.
++ *
++ * The Sidebar Browser guest runs in its own Electron partition
++ * (`browser-guests.ts`), so it carries no platform session and cannot open the
++ * gateway's noVNC surface by itself. The gateway therefore issues a one-time,
++ * short-lived delegate URL to an already-authenticated client; whoever opens it
++ * lands in the same screen lease without a second sign-in.
++ *
++ * This module owns the main-process half: classify the stored credential, ask
++ * the gateway for a delegate URL, and decide between the Sidebar guest and the
++ * system browser. It performs no UI work and never opens anything itself.
++ *
++ * Honest failure: the branded shim grant (`sdzdsh_`, the model-proxy
++ * credential) is *not* accepted by the gateway, which takes a platform JWT or a
++ * `sdzs_` account session. That credential is refused locally with
++ * `credential_unsupported_for_gateway` instead of being sent to a gateway that
++ * would answer 401; the caller then falls back to the system browser, where the
++ * platform SSO session already lives.
++ *
++ * @module
++ */
++
++import { BRAND_CLOUD_DESKTOP_API_ORIGIN } from './brand-endpoints.ts'
++
++/** Credential wire forms the gateway's `RequirePrincipal` accepts. */
++export type GatewayCredentialKind = 'platform_jwt' | 'account_session' | 'unsupported'
++
++/**
++ * Classify a stored credential by its wire form.
++ * @param token - credential text from the environment or credential document.
++ * @returns the form the gateway routes on, or `unsupported` for anything else.
++ */
++export function classifyGatewayCredential(token: string | undefined): GatewayCredentialKind {
++  const value = token?.trim() ?? ''
++  if (value === '') return 'unsupported'
++  if (value.startsWith('sdzs_')) return 'account_session'
++  // A JWS compact serialization: three base64url segments. Only the form is
++  // classified here; the gateway verifies signature, issuer, and audience.
++  if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(value)) return 'platform_jwt'
++  return 'unsupported'
++}
++
++/** Why a delegate URL could not be produced. */
++export type CloudScreenUnavailableReason =
++  | 'credential_unsupported_for_gateway'
++  | 'credential_missing'
++  | 'screen_id_required'
++  | 'origin_refused'
++  | 'capability_absent'
++  | 'bad_payload'
++  | 'network'
++  | 'timeout'
++
++/** Outcome of one delegate request. */
++export type CloudScreenDelegateResult =
++  | { readonly kind: 'granted'; readonly url: string; readonly expiresAt: number; readonly mode: string }
++  | { readonly kind: 'refused'; readonly status: number; readonly code: string }
++  | { readonly kind: 'unavailable'; readonly reason: CloudScreenUnavailableReason }
++
++/**
++ * Restrict an opened URL to the gateway's own delegate-redeem endpoint for the
++ * requested screen. The gateway's answer is a credential: a compromised or
++ * proxied gateway must not be able to turn it into an arbitrary navigation.
++ * @param raw - URL from the gateway response.
++ * @param origin - configured gateway origin.
++ * @param screenId - screen the caller asked for.
++ * @returns whether the URL may be opened (or handed to a guest).
++ */
++export function cloudScreenDelegateUrlAllowed(raw: string, origin: string, screenId: string): boolean {
++  if (raw === '' || origin === '' || screenId === '') return false
++  let url: URL
++  try {
++    url = new URL(raw)
++  } catch (_error) {
++    return false
++  }
++  if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
++  if (url.username !== '' || url.password !== '') return false
++  if (url.origin !== origin) return false
++  if (url.pathname !== `/api/npw/screen/${screenId}/delegate/open`) return false
++  return (url.searchParams.get('d') ?? '') !== ''
++}
++
++const responseCode = (body: unknown, status: number): string => {
++  if (typeof body === 'object' && body !== null) {
++    const record = body as Record<string, unknown>
++    if (typeof record.code === 'string' && record.code !== '') return record.code
++    if (typeof record.error === 'string' && record.error !== '') return record.error
++  }
++  return `http_${status}`
++}
++
++/** One delegate request. */
++export interface CloudScreenDelegateRequest {
++  /** Screen channel id (`scrn_…`) the caller wants to open. */
++  readonly screenId: string
++  /** Gateway credential (platform JWT or `sdzs_` account session). */
++  readonly credential: string
++  /** Gateway origin override; defaults to the branded gateway. */
++  readonly origin?: string
++  /** Injected fetch (tests). */
++  readonly fetchImpl?: typeof fetch
++  /** Request deadline; defaults to 5s. */
++  readonly timeoutMs?: number
++}
++
++/**
++ * Ask the gateway for a one-time delegate URL
++ * (`POST /api/npw/screen/{scrnId}/delegate?channel=desktop`).
++ * @param request - screen id, credential, and injectable transport.
++ * @returns the delegate URL, a gateway refusal with its error code, or an honest
++ *   local unavailability reason (never a fabricated URL).
++ */
++export async function requestCloudScreenDelegate(
++  request: CloudScreenDelegateRequest,
++): Promise<CloudScreenDelegateResult> {
++  const origin = request.origin ?? BRAND_CLOUD_DESKTOP_API_ORIGIN
++  const screenId = request.screenId.trim()
++  if (screenId === '') return { kind: 'unavailable', reason: 'screen_id_required' }
++  const credential = request.credential.trim()
++  if (credential === '') return { kind: 'unavailable', reason: 'credential_missing' }
++  const kind = classifyGatewayCredential(credential)
++  if (kind === 'unsupported') return { kind: 'unavailable', reason: 'credential_unsupported_for_gateway' }
++  if (!URL.canParse(origin)) return { kind: 'unavailable', reason: 'origin_refused' }
++
++  const fetchImpl = request.fetchImpl ?? fetch
++  const controller = new AbortController()
++  const timeout = setTimeout(() => { controller.abort() }, request.timeoutMs ?? 5_000)
++  let response: Response
++  try {
++    response = await fetchImpl(`${origin}/api/npw/screen/${encodeURIComponent(screenId)}/delegate?channel=desktop`, {
++      method: 'POST',
++      headers: { authorization: `Bearer ${credential}` },
++      signal: controller.signal,
++    })
++  } catch (_error) {
++    // The deadline owns the distinction: an abort is our timeout, anything else
++    // is the transport failing before a response arrived.
++    return { kind: 'unavailable', reason: controller.signal.aborted ? 'timeout' : 'network' }
++  } finally {
++    clearTimeout(timeout)
++  }
++
++  let body: unknown = null
++  try {
++    body = await response.json()
++  } catch (_error) {
++    body = null
++  }
++  if (response.status === 503) return { kind: 'unavailable', reason: 'capability_absent' }
++  if (!response.ok) return { kind: 'refused', status: response.status, code: responseCode(body, response.status) }
++  if (typeof body !== 'object' || body === null) return { kind: 'unavailable', reason: 'bad_payload' }
++  const record = body as Record<string, unknown>
++  const url = typeof record.url === 'string' ? record.url : ''
++  const returnedScreen = typeof record.screenId === 'string' ? record.screenId : ''
++  const expiresAt = typeof record.expiresAt === 'number' ? record.expiresAt : 0
++  const mode = typeof record.mode === 'string' ? record.mode : ''
++  if (expiresAt <= 0 || returnedScreen !== screenId) return { kind: 'unavailable', reason: 'bad_payload' }
++  if (!cloudScreenDelegateUrlAllowed(url, origin, screenId)) return { kind: 'unavailable', reason: 'bad_payload' }
++  return { kind: 'granted', url, expiresAt, mode }
++}
++
++/** Where a cloud-desktop request should open. */
++export type CloudScreenPlan =
++  /** Open a Sidebar Browser tab with the one-time gateway URL. */
++  | { readonly kind: 'sidebar-guest'; readonly url: string }
++  /**
++   * Open the gateway console in the system browser. The platform SSO session
++   * lives there (same reasoning as the billing center), so this needs no grant
++   * from the app; it is the honest fallback, not an equivalent of the Sidebar.
++   */
++  | { readonly kind: 'system-browser'; readonly url: string; readonly reason: CloudScreenUnavailableReason | 'refused' }
++  /** Nothing can be opened; report why. */
++  | { readonly kind: 'unavailable'; readonly reason: CloudScreenUnavailableReason }
++
++/**
++ * Turn a delegate result into an open decision.
++ * @param result - delegate request outcome.
++ * @returns the plan the renderer executes.
++ */
++export function planCloudScreen(result: CloudScreenDelegateResult): CloudScreenPlan {
++  if (result.kind === 'granted') return { kind: 'sidebar-guest', url: result.url }
++  if (result.kind === 'refused') return { kind: 'system-browser', url: cloudScreenConsoleUrl(), reason: 'refused' }
++  if (result.reason === 'screen_id_required' || result.reason === 'credential_missing') return { kind: 'unavailable', reason: result.reason }
++  return { kind: 'system-browser', url: cloudScreenConsoleUrl(), reason: result.reason }
++}
++
++/**
++ * Restrict a shell-open to the branded gateway origin.
++ *
++ * The renderer may hand back a console URL or a delegate URL; neither needs an
++ * arbitrary-URL opener, so anything off the gateway origin is refused here
++ * rather than relying on the renderer's own check.
++ * @param raw - URL received over IPC.
++ * @returns whether the shell may open it.
++ */
++export function cloudScreenExternalUrlAllowed(raw: string): boolean {
++  let url: URL
++  try {
++    url = new URL(raw)
++  } catch (_error) {
++    return false
++  }
++  return (url.protocol === 'https:' || url.protocol === 'http:')
++    && url.username === '' && url.password === '' && url.origin === BRAND_CLOUD_DESKTOP_API_ORIGIN
++}
++
++/**
++ * Gateway console URL for the system-browser path.
++ * @returns the branded console entry, which lists the caller's computers.
++ */
++export function cloudScreenConsoleUrl(): string {
++  return `${BRAND_CLOUD_DESKTOP_API_ORIGIN}/console.html`
++}
++
++/**
++ * Resolve the credential used for the delegate request.
++ *
++ * `DSH_CLOUD_SCREEN_TOKEN` is the deployment seam: when the platform issues an
++ * agentbuddy-audience token (platform JWT or `sdzs_` session) the environment
++ * carries it and the Sidebar path works with no code change. The branded shim
++ * grant is deliberately not reused here — it is a model-proxy credential and
++ * the gateway rejects it.
++ * @param env - process environment.
++ * @param readShimGrant - reads the account shim's stored grant, when present.
++ * @returns the credential text (possibly empty) and its classified form.
++ */
++export function resolveCloudScreenCredential(
++  env: NodeJS.ProcessEnv,
++  readShimGrant: () => string | undefined,
++): { credential: string; kind: GatewayCredentialKind } {
++  const explicit = env.DSH_CLOUD_SCREEN_TOKEN?.trim() ?? ''
++  if (explicit !== '') return { credential: explicit, kind: classifyGatewayCredential(explicit) }
++  const shim = readShimGrant()?.trim() ?? ''
++  return { credential: shim, kind: classifyGatewayCredential(shim) }
++}
 diff --git a/apps/desktop/src/deep-link.ts b/apps/desktop/src/deep-link.ts
 new file mode 100644
 index 0000000000..7a6cc20d7c
@@ -827,6 +1080,52 @@ index 948a88e6b0..25af83b0f7 100644
        if ('requestHeaders' in session && (typeof session.requestHeaders !== 'object' || session.requestHeaders === null
          || Array.isArray(session.requestHeaders)
          || Object.entries(session.requestHeaders).some(([name, value]) => typeof value !== 'string'
+diff --git a/apps/desktop/src/ipc.ts b/apps/desktop/src/ipc.ts
+index fc19021fa6..fb0b40ab18 100644
+--- a/apps/desktop/src/ipc.ts
++++ b/apps/desktop/src/ipc.ts
+@@ -3,6 +3,7 @@
+ import type { DesktopKeyboardApi, DesktopShortcutsApi } from '@deepseek-ai/dsh-client-shortcuts/protocol'
+ import type { IpcMainInvokeEvent } from 'electron'
+ import type { DesktopBrowserBridge } from '@deepseek-ai/dsh-client-ui-sidebar-browser/types'
++import type { CloudScreenPlan } from './cloud-screen.ts'
+
+ /** IPC channel names kept private to the desktop application bundle. */
+ export const DESKTOP_IPC = {
+@@ -20,6 +21,8 @@ export const DESKTOP_IPC = {
+   browserAcquire: 'dsh-desktop:browser-acquire',
+   browserRelease: 'dsh-desktop:browser-release',
+   browserOpenRequested: 'dsh-desktop:browser-open-requested',
++  cloudScreenRequest: 'dsh-desktop:cloud-screen-request',
++  cloudScreenOpenExternal: 'dsh-desktop:cloud-screen-open-external',
+   directoryPick: 'dsh-desktop:directory-pick',
+   deviceInfo: 'dsh-desktop:device-info',
+   localeBootstrap: 'dsh-desktop:locale-bootstrap',
+@@ -72,6 +75,24 @@ export interface DesktopUpdatePresentation {
+ export interface DshDesktopProductApi {
+   readonly protocolVersion: 1
+   readonly browser: DesktopBrowserBridge
++  /**
++   * Cloud-desktop (noVNC) entry: the main process owns the delegate request and
++   * the open decision; the renderer only executes the returned plan.
++   */
++  readonly cloudScreen: {
++    /**
++     * Ask the gateway for a one-time delegate URL for one screen.
++     * @param screenId - screen channel id (`scrn_…`) to open.
++     * @returns where to open it (Sidebar guest, system browser) or why nothing can be opened.
++     */
++    request(screenId: string): Promise<CloudScreenPlan>
++    /**
++     * Open a gateway-origin URL in the system browser.
++     * @param url - gateway URL returned by this API.
++     * @returns whether the shell accepted the URL.
++     */
++    openExternal(url: string): Promise<boolean>
++  }
+   readonly keyboard: DesktopKeyboardApi
+   readonly shortcuts: DesktopShortcutsApi
+   /**
 diff --git a/apps/desktop/src/locale.ts b/apps/desktop/src/locale.ts
 index 5d9d4607c7..49000d53ee 100644
 --- a/apps/desktop/src/locale.ts
@@ -856,7 +1155,7 @@ index 5d9d4607c7..49000d53ee 100644
    updateTitle: 'DeepSeek Harness 更新',
    updateAvailable: '发现新版本 {version}',
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 2afdfd7194..1d0256b78c 100644
+index 2afdfd7194..6b348cea8e 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
 @@ -2,6 +2,8 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
@@ -891,16 +1190,22 @@ index 2afdfd7194..1d0256b78c 100644
  import { desktopErrorState } from './startup-error.ts'
  import { readDesktopLoginShellEnvironment, resolveDesktopLoginShellConfig } from './login-shell-environment.ts'
  import { DesktopMandatoryUpdatePolicy, resolveDesktopPolicyConfig, type DesktopPolicyState } from './mandatory-update-policy.ts'
-@@ -53,6 +58,8 @@ import { desktopClientMetadata, desktopClientVersion } from './client-metadata.t
+@@ -53,6 +58,14 @@ import { desktopClientMetadata, desktopClientVersion } from './client-metadata.t
  import { DesktopMandatoryUpdateWindow } from './mandatory-update-window.ts'
  import { DesktopPolicyTestAuth } from './policy-test-auth.ts'
  import { readDesktopSettings } from './settings.ts'
 +import { applyBrandDefaults, brandWorkspaceBlock } from './brand-defaults.ts'
 +import { BRAND_BILLING_CENTER_URL } from './brand-endpoints.ts'
++import {
++  cloudScreenExternalUrlAllowed,
++  planCloudScreen,
++  requestCloudScreenDelegate,
++  resolveCloudScreenCredential,
++} from './cloud-screen.ts'
  import { DesktopUpdateDialog, type UpdateDialogOptions } from './update-dialog.ts'
  import { readDesktopRuntime } from './runtime-tree.ts'
  import { DesktopBrowserGuests } from './browser-guests.ts'
-@@ -80,9 +87,110 @@ let backendReady = false
+@@ -80,9 +93,110 @@ let backendReady = false
  /** Error-level console output of the primary window, attached to crash reports. */
  const rendererConsole = new RendererConsoleTail()
 
@@ -1013,7 +1318,7 @@ index 2afdfd7194..1d0256b78c 100644
 
  function currentDesktopLocale(): ReturnType<typeof resolveDesktopLocale> {
    return resolveDesktopLocale(windowsLanguage ?? app.getLocale())
-@@ -212,6 +320,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -212,6 +326,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
      minWidth: 520,
      minHeight: 600,
      show,
@@ -1021,7 +1326,7 @@ index 2afdfd7194..1d0256b78c 100644
      ...(process.platform === 'win32' && primary ? {
        titleBarStyle: 'hidden' as const,
        titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
-@@ -238,6 +347,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -238,6 +353,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
        devTools: true,
      },
    })
@@ -1033,7 +1338,7 @@ index 2afdfd7194..1d0256b78c 100644
    window.webContents.setWindowOpenHandler(({ url }) => {
      if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
      return { action: 'deny' }
-@@ -314,13 +428,135 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -314,13 +434,135 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
    return window
  }
 
@@ -1169,7 +1474,7 @@ index 2afdfd7194..1d0256b78c 100644
    const development = !app.isPackaged
    const primaryRuntime = development
      ? developmentPrimaryRuntime()
-@@ -338,7 +574,28 @@ async function main(): Promise<void> {
+@@ -338,7 +580,28 @@ async function main(): Promise<void> {
      return result.environment
    })
    let hostEnvironment: NodeJS.ProcessEnv = process.env
@@ -1199,7 +1504,7 @@ index 2afdfd7194..1d0256b78c 100644
    let quitting = false
    let startup: Promise<void> | undefined
    let workspaceRecovery: Promise<void> | undefined
-@@ -653,7 +910,6 @@ async function main(): Promise<void> {
+@@ -653,7 +916,6 @@ async function main(): Promise<void> {
      // A confirmation on a hidden window would go unseen, so it waits for the next show; the mandatory
      // flow keeps its own taskbar and Dock attention instead.
      if (!isMandatory()) await windowShown()
@@ -1207,7 +1512,36 @@ index 2afdfd7194..1d0256b78c 100644
      if (quitting) return state
      return updates.install(version)
    }
-@@ -813,6 +1069,15 @@ async function main(): Promise<void> {
+@@ -712,6 +974,28 @@ async function main(): Promise<void> {
+     return browserGuests.release(event.sender, lease)
+   })
+
++  // 跨端实时画面（HUI-4001）：主进程持有取票逻辑与「往哪开」的裁决，渲染层只
++  // 执行结果。凭据来自 DSH_CLOUD_SCREEN_TOKEN（平台受众 token 的部署缝）；只有
++  // 品牌 shim 的 sdzdsh_ 授权时如实判 unsupported，绝不把它发给网关换 401——
++  // 那条路径退回系统浏览器（平台 SSO 会话在那里，与账单中心同理）。
++  ipcMain.handle(DESKTOP_IPC.cloudScreenRequest, async (event, screenId: unknown) => {
++    assertProductSender(event)
++    if (typeof screenId !== 'string') throw new Error('dsh desktop: cloud screen id must be text')
++    const { credential } = resolveCloudScreenCredential(process.env, () => {
++      try {
++        return readPaiNuoGrant(readFileSync(join(resolveDshHome(), '.credentials.yaml'), 'utf8'))
++      } catch (_error) { return undefined }
++    })
++    const result = await requestCloudScreenDelegate({ screenId, credential })
++    return planCloudScreen(result)
++  })
++  ipcMain.handle(DESKTOP_IPC.cloudScreenOpenExternal, async (event, url: unknown) => {
++    assertProductSender(event)
++    if (typeof url !== 'string' || !cloudScreenExternalUrlAllowed(url)) return false
++    await shell.openExternal(url)
++    return true
++  })
++
+   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['ws://127.0.0.1/*', 'wss://127.0.0.1/*'] }, (details, callback) => {
+     if (hostUrl === undefined || hostCookie === undefined || details.webContentsId !== mainWindow?.webContents.id) {
+       callback({})
+@@ -813,6 +1097,15 @@ async function main(): Promise<void> {
          if (manual) await Promise.all([checkPolicyManually(), updateSchedule.check(true)])
          return
        }
@@ -1223,7 +1557,7 @@ index 2afdfd7194..1d0256b78c 100644
        let controller: AbortController | undefined
        let progress: Promise<unknown> | undefined
        try {
-@@ -932,7 +1197,8 @@ async function main(): Promise<void> {
+@@ -932,7 +1225,8 @@ async function main(): Promise<void> {
    const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
      : join(process.resourcesPath, 'icon.png')
    app.setAboutPanelOptions({
@@ -1233,7 +1567,7 @@ index 2afdfd7194..1d0256b78c 100644
      applicationVersion: app.getVersion(),
      // The release has no separate build number; omit Electron's bundle version.
      version: '',
-@@ -1232,10 +1498,14 @@ async function main(): Promise<void> {
+@@ -1232,10 +1526,14 @@ async function main(): Promise<void> {
      window.focus()
    }
 
@@ -1363,6 +1697,21 @@ index ce759c61b1..ffe77713e9 100644
      if (owner.isDestroyed()) return
      const generation = this.generation
      this.owner = owner
+diff --git a/apps/desktop/src/preload-app.ts b/apps/desktop/src/preload-app.ts
+index f590b8bc8b..be521872cf 100644
+--- a/apps/desktop/src/preload-app.ts
++++ b/apps/desktop/src/preload-app.ts
+@@ -15,6 +15,10 @@ function createProductApi(): DshDesktopProductApi {
+     protocolVersion: 1,
+     browser: createDesktopBrowserBridge(),
+     deviceInfo: () => ipcRenderer.invoke(DESKTOP_IPC.deviceInfo) as Promise<string>,
++    cloudScreen: {
++      request: screenId => ipcRenderer.invoke(DESKTOP_IPC.cloudScreenRequest, screenId) as ReturnType<DshDesktopProductApi['cloudScreen']['request']>,
++      openExternal: url => ipcRenderer.invoke(DESKTOP_IPC.cloudScreenOpenExternal, url) as Promise<boolean>,
++    },
+     keyboard: {
+       closeWindow: revision => ipcRenderer.invoke(DESKTOP_IPC.shortcutsCloseWindow, revision) as Promise<void>,
+       subscribe: (listener) => {
 diff --git a/apps/desktop/src/update-coordinator.ts b/apps/desktop/src/update-coordinator.ts
 index 3b83cea08f..8ed221e94c 100644
 --- a/apps/desktop/src/update-coordinator.ts
@@ -1767,10 +2116,10 @@ index c239336b22..d5cbf93855 100644
    const stop = backend.watch(
 diff --git a/apps/desktop/tests/brand-endpoints.spec.ts b/apps/desktop/tests/brand-endpoints.spec.ts
 new file mode 100644
-index 0000000000..ef4f48b5df
+index 0000000000..e4981b4733
 --- /dev/null
 +++ b/apps/desktop/tests/brand-endpoints.spec.ts
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,136 @@
 +import { readFileSync } from 'node:fs'
 +import { fileURLToPath } from 'node:url'
 +import { describe, expect, it } from 'vitest'
@@ -1780,6 +2129,7 @@ index 0000000000..ef4f48b5df
 +  assertBrandEndpoint,
 +  assertNoUpstreamEndpointOverrides,
 +  BRAND_AUTH_ORIGIN,
++  BRAND_CLOUD_DESKTOP_API_ORIGIN,
 +  BRAND_DEFAULT_MODEL_ID,
 +  BRAND_INFERENCE_BASE_URL,
 +  BRAND_MODEL_CATALOG_URL,
@@ -1801,6 +2151,8 @@ index 0000000000..ef4f48b5df
 +    pluginMarketIndexes: []
 +    webSearch: null
 +    telemetry: null
++    billingCenterUrl: string
++    cloudDesktopApiOrigin: string
 +  }
 +}
 +
@@ -1814,7 +2166,11 @@ index 0000000000..ef4f48b5df
 +      pluginMarketIndexes: [],
 +      webSearch: null,
 +      telemetry: null,
++      cloudDesktopApiOrigin: BRAND_CLOUD_DESKTOP_API_ORIGIN,
 +    })
++    // The delegate and noVNC surfaces are gateway paths on the billing origin;
++    // a second host would need its own nginx/TLS surface and its own review.
++    expect(new URL(BRAND_CLOUD_DESKTOP_API_ORIGIN).origin).toBe(new URL(brand.endpoints.billingCenterUrl).origin)
 +  })
 +
 +  it.each([
@@ -2025,6 +2381,244 @@ index 0000000000..ccb476dbbd
 +    }
 +    expect(manifest.name).toBe('dsh-profile-desktop')
 +    expect(manifest.dsh?.profile?.bundles).toEqual(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
++  })
++})
+diff --git a/apps/desktop/tests/cloud-screen-preload.spec.ts b/apps/desktop/tests/cloud-screen-preload.spec.ts
+new file mode 100644
+index 0000000000..50c4033e4b
+--- /dev/null
++++ b/apps/desktop/tests/cloud-screen-preload.spec.ts
+@@ -0,0 +1,54 @@
++// @vitest-environment jsdom
++//
++// Cross-client live cloud desktop (HUI-4001): the renderer-facing bridge offers
++// exactly two operations and passes the screen id / URL through unchanged. The
++// main process owns credential classification, the delegate request, and the
++// gateway-origin restriction; this spec pins the preload half of that split.
++import { beforeEach, expect, it, vi } from 'vitest'
++import { DESKTOP_IPC, type DshDesktopProductApi } from '../src/ipc.ts'
++
++const electron = vi.hoisted(() => ({
++  contextBridge: { exposeInMainWorld: vi.fn() },
++  ipcRenderer: { invoke: vi.fn(), on: vi.fn(), off: vi.fn(), send: vi.fn() },
++  webUtils: { getPathForFile: vi.fn() },
++}))
++vi.mock('electron', () => electron)
++vi.mock('../src/preload-platform.ts', () => ({ markDocumentPlatform: vi.fn(), syncWindowFullscreen: vi.fn() }))
++vi.mock('../src/preload-theme.ts', () => ({ syncNativeTheme: vi.fn() }))
++vi.mock('../src/preload-windows.ts', () => ({ syncWindowsAppearance: vi.fn() }))
++vi.mock('../src/preload-mandatory-overlay.ts', () => ({ installMandatoryUpdateOverlay: vi.fn() }))
++
++beforeEach(() => {
++  vi.clearAllMocks()
++  vi.resetModules()
++  vi.stubGlobal('process', { ...process, isMainFrame: true })
++  vi.stubGlobal('location', new URL('dsh-app://app/index.html'))
++})
++
++const productApi = async (): Promise<DshDesktopProductApi> => {
++  await import('../src/preload-app.ts')
++  return electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1] as DshDesktopProductApi
++}
++
++it('routes a screen-id request to the main-process delegate handler', async () => {
++  electron.ipcRenderer.invoke.mockResolvedValueOnce({ kind: 'sidebar-guest', url: 'https://agentbuddy.modelxing.com/api/npw/screen/scrn_1/delegate/open?d=t' })
++  const api = await productApi()
++  const plan = await api.cloudScreen.request('scrn_1')
++  expect(electron.ipcRenderer.invoke).toHaveBeenCalledExactlyOnceWith(DESKTOP_IPC.cloudScreenRequest, 'scrn_1')
++  expect(plan).toEqual({ kind: 'sidebar-guest', url: 'https://agentbuddy.modelxing.com/api/npw/screen/scrn_1/delegate/open?d=t' })
++})
++
++it('routes an explicit system-browser open to the main-process URL check', async () => {
++  electron.ipcRenderer.invoke.mockResolvedValueOnce(true)
++  const api = await productApi()
++  await expect(api.cloudScreen.openExternal('https://agentbuddy.modelxing.com/console.html')).resolves.toBe(true)
++  expect(electron.ipcRenderer.invoke).toHaveBeenCalledExactlyOnceWith(DESKTOP_IPC.cloudScreenOpenExternal, 'https://agentbuddy.modelxing.com/console.html')
++})
++
++it('does not expose a shell opener, a credential, or a raw fetch to product documents', async () => {
++  const api = await productApi()
++  expect(api.cloudScreen).not.toHaveProperty('credential')
++  expect(api.cloudScreen).not.toHaveProperty('shell')
++  expect(api.cloudScreen).not.toHaveProperty('fetch')
++  expect(api).not.toHaveProperty('ipcRenderer')
++})
+diff --git a/apps/desktop/tests/cloud-screen.spec.ts b/apps/desktop/tests/cloud-screen.spec.ts
+new file mode 100644
+index 0000000000..492d441424
+--- /dev/null
++++ b/apps/desktop/tests/cloud-screen.spec.ts
+@@ -0,0 +1,172 @@
++import { describe, expect, it, vi } from 'vitest'
++import {
++  classifyGatewayCredential,
++  cloudScreenConsoleUrl,
++  cloudScreenDelegateUrlAllowed,
++  cloudScreenExternalUrlAllowed,
++  planCloudScreen,
++  requestCloudScreenDelegate,
++  resolveCloudScreenCredential,
++} from '../src/cloud-screen.ts'
++import { BRAND_CLOUD_DESKTOP_API_ORIGIN } from '../src/brand-endpoints.ts'
++
++const origin = BRAND_CLOUD_DESKTOP_API_ORIGIN
++const scrn = 'scrn_01HZZZZZZZZZZZZZZZZZZZZZQA'
++const ticket = 'djF8eyJrIjoiZGVsZWdhdGUifQ'
++const grantedUrl = `${origin}/api/npw/screen/${scrn}/delegate/open?d=${ticket}&c=desktop`
++
++const jsonResponse = (status: number, body: unknown): Response =>
++  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
++
++describe('gateway credential classification', () => {
++  it('routes the two wire forms the gateway accepts', () => {
++    expect(classifyGatewayCredential('sdzs_0123456789abcdef')).toBe('account_session')
++    expect(classifyGatewayCredential('eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ1c3JfMSJ9.c2ln')).toBe('platform_jwt')
++  })
++
++  it('refuses the shim grant and anything malformed instead of sending it', () => {
++    // The model-proxy grant is opaque and audience-bound: an agentbuddy gateway
++    // answers 401, so it must never be sent as a platform credential.
++    expect(classifyGatewayCredential('sdzdsh_abcdef')).toBe('unsupported')
++    expect(classifyGatewayCredential('')).toBe('unsupported')
++    expect(classifyGatewayCredential('   ')).toBe('unsupported')
++    expect(classifyGatewayCredential('not-a-token')).toBe('unsupported')
++    expect(classifyGatewayCredential('two.segments')).toBe('unsupported')
++  })
++
++  it('prefers the deployment credential seam over the stored shim grant', () => {
++    const jwt = 'eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ1c3JfMSJ9.c2ln'
++    expect(resolveCloudScreenCredential({ DSH_CLOUD_SCREEN_TOKEN: jwt }, () => 'sdzdsh_shim')).toEqual({
++      credential: jwt, kind: 'platform_jwt',
++    })
++    expect(resolveCloudScreenCredential({}, () => 'sdzdsh_shim')).toEqual({
++      credential: 'sdzdsh_shim', kind: 'unsupported',
++    })
++    expect(resolveCloudScreenCredential({}, () => undefined)).toEqual({ credential: '', kind: 'unsupported' })
++  })
++})
++
++describe('delegate URL restriction', () => {
++  it('accepts only the gateway origin path for the requested screen with a ticket', () => {
++    expect(cloudScreenDelegateUrlAllowed(grantedUrl, origin, scrn)).toBe(true)
++    expect(cloudScreenDelegateUrlAllowed(`https://evil.example.com/api/npw/screen/${scrn}/delegate/open?d=${ticket}`, origin, scrn)).toBe(false)
++    expect(cloudScreenDelegateUrlAllowed(`${origin}/api/npw/screen/scrn_01HZZZZZZZZZZZZZZZZZZZZZQB/delegate/open?d=${ticket}`, origin, scrn)).toBe(false)
++    expect(cloudScreenDelegateUrlAllowed(`${origin}/api/npw/screen/${scrn}/novnc/vnc.html?d=${ticket}`, origin, scrn)).toBe(false)
++    expect(cloudScreenDelegateUrlAllowed(`${origin}/api/npw/screen/${scrn}/delegate/open?c=desktop`, origin, scrn)).toBe(false)
++    expect(cloudScreenDelegateUrlAllowed(`https://u:p@agentbuddy.modelxing.com/api/npw/screen/${scrn}/delegate/open?d=${ticket}`, origin, scrn)).toBe(false)
++    expect(cloudScreenDelegateUrlAllowed(grantedUrl, 'not an origin', scrn)).toBe(false)
++  })
++})
++
++describe('delegate request', () => {
++  it('posts to the gateway delegate path with the credential and channel=desktop', async () => {
++    const fetchImpl = vi.fn(async () => jsonResponse(200, { url: grantedUrl, screenId: scrn, mode: 'viewer', expiresAt: 1_792_100_060 }))
++    const result = await requestCloudScreenDelegate({
++      screenId: scrn, credential: 'sdzs_session', fetchImpl: fetchImpl as unknown as typeof fetch,
++    })
++    expect(result).toEqual({ kind: 'granted', url: grantedUrl, expiresAt: 1_792_100_060, mode: 'viewer' })
++    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
++    expect(url).toBe(`${origin}/api/npw/screen/${scrn}/delegate?channel=desktop`)
++    expect(init.method).toBe('POST')
++    expect((init.headers as Record<string, string>).authorization).toBe('Bearer sdzs_session')
++  })
++
++  it('never sends an unsupported credential', async () => {
++    const fetchImpl = vi.fn()
++    const result = await requestCloudScreenDelegate({
++      screenId: scrn, credential: 'sdzdsh_shim', fetchImpl: fetchImpl as unknown as typeof fetch,
++    })
++    expect(result).toEqual({ kind: 'unavailable', reason: 'credential_unsupported_for_gateway' })
++    expect(fetchImpl).not.toHaveBeenCalled()
++  })
++
++  it('requires a screen id and a credential', async () => {
++    expect(await requestCloudScreenDelegate({ screenId: '  ', credential: 'sdzs_x' })).toEqual({
++      kind: 'unavailable', reason: 'screen_id_required',
++    })
++    expect(await requestCloudScreenDelegate({ screenId: scrn, credential: '' })).toEqual({
++      kind: 'unavailable', reason: 'credential_missing',
++    })
++  })
++
++  it('maps gateway refusals to their contract code and 503 to a capability gap', async () => {
++    const refused = await requestCloudScreenDelegate({
++      screenId: scrn, credential: 'sdzs_x',
++      fetchImpl: (async () => jsonResponse(403, { error: 'lease_not_holder' })) as unknown as typeof fetch,
++    })
++    expect(refused).toEqual({ kind: 'refused', status: 403, code: 'lease_not_holder' })
++    const absent = await requestCloudScreenDelegate({
++      screenId: scrn, credential: 'sdzs_x',
++      fetchImpl: (async () => jsonResponse(503, { code: 'provider_unavailable' })) as unknown as typeof fetch,
++    })
++    expect(absent).toEqual({ kind: 'unavailable', reason: 'capability_absent' })
++  })
++
++  it('rejects a fabricated payload instead of opening it', async () => {
++    for (const body of [
++      null,
++      {},
++      { url: grantedUrl, screenId: scrn, expiresAt: 0, mode: 'viewer' },
++      { url: grantedUrl, screenId: 'scrn_01HZZZZZZZZZZZZZZZZZZZZZQB', expiresAt: 1, mode: 'viewer' },
++      { url: `https://evil.example.com/api/npw/screen/${scrn}/delegate/open?d=${ticket}`, screenId: scrn, expiresAt: 1, mode: 'viewer' },
++      { url: `${origin}/api/npw/screen/${scrn}/delegate/open?c=desktop`, screenId: scrn, expiresAt: 1, mode: 'viewer' },
++    ]) {
++      const result = await requestCloudScreenDelegate({
++        screenId: scrn, credential: 'sdzs_x',
++        fetchImpl: (async () => jsonResponse(200, body)) as unknown as typeof fetch,
++      })
++      expect(result).toEqual({ kind: 'unavailable', reason: 'bad_payload' })
++    }
++  })
++
++  it('reports network failure and timeout without inventing a URL', async () => {
++    const offline = await requestCloudScreenDelegate({
++      screenId: scrn, credential: 'sdzs_x',
++      fetchImpl: (async () => { throw new Error('offline') }) as unknown as typeof fetch,
++    })
++    expect(offline).toEqual({ kind: 'unavailable', reason: 'network' })
++    // A fetch that only settles when its signal aborts: the deadline is the
++    // reason, not an unrelated transport failure.
++    const timeout = await requestCloudScreenDelegate({
++      screenId: scrn, credential: 'sdzs_x', timeoutMs: 5,
++      fetchImpl: ((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
++        init?.signal?.addEventListener('abort', () => { reject(new Error('aborted')) })
++      })) as unknown as typeof fetch,
++    })
++    expect(timeout).toEqual({ kind: 'unavailable', reason: 'timeout' })
++  })
++})
++
++describe('open plan', () => {
++  it('grants the Sidebar guest only when the gateway issued a ticket', () => {
++    expect(planCloudScreen({ kind: 'granted', url: grantedUrl, expiresAt: 1, mode: 'viewer' })).toEqual({
++      kind: 'sidebar-guest', url: grantedUrl,
++    })
++  })
++
++  it('falls back to the system browser with the reason, and refuses without a screen', () => {
++    expect(planCloudScreen({ kind: 'unavailable', reason: 'credential_unsupported_for_gateway' })).toEqual({
++      kind: 'system-browser', url: cloudScreenConsoleUrl(), reason: 'credential_unsupported_for_gateway',
++    })
++    expect(planCloudScreen({ kind: 'refused', status: 410, code: 'lease_expired' })).toEqual({
++      kind: 'system-browser', url: cloudScreenConsoleUrl(), reason: 'refused',
++    })
++    expect(planCloudScreen({ kind: 'unavailable', reason: 'screen_id_required' })).toEqual({
++      kind: 'unavailable', reason: 'screen_id_required',
++    })
++  })
++
++  it('points the fallback at the branded gateway console, never an upstream host', () => {
++    expect(cloudScreenConsoleUrl()).toBe(`${BRAND_CLOUD_DESKTOP_API_ORIGIN}/console.html`)
++  })
++
++  it('lets the shell open only gateway-origin URLs', () => {
++    expect(cloudScreenExternalUrlAllowed(cloudScreenConsoleUrl())).toBe(true)
++    expect(cloudScreenExternalUrlAllowed(grantedUrl)).toBe(true)
++    expect(cloudScreenExternalUrlAllowed('https://evil.example.com/console.html')).toBe(false)
++    expect(cloudScreenExternalUrlAllowed('file:///etc/passwd')).toBe(false)
++    expect(cloudScreenExternalUrlAllowed('dsh-app://app/')).toBe(false)
++    expect(cloudScreenExternalUrlAllowed('https://u:p@agentbuddy.modelxing.com/console.html')).toBe(false)
++    expect(cloudScreenExternalUrlAllowed('not a url')).toBe(false)
 +  })
 +})
 diff --git a/apps/desktop/tests/deep-link.spec.ts b/apps/desktop/tests/deep-link.spec.ts

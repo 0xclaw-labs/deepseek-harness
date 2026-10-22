@@ -3,6 +3,7 @@
 import type { DesktopKeyboardApi, DesktopShortcutsApi } from '@deepseek-ai/dsh-client-shortcuts/protocol'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { DesktopBrowserBridge } from '@deepseek-ai/dsh-client-ui-sidebar-browser/types'
+import type { CloudScreenPlan } from './cloud-screen.ts'
 
 /** IPC channel names kept private to the desktop application bundle. */
 export const DESKTOP_IPC = {
@@ -20,6 +21,8 @@ export const DESKTOP_IPC = {
   browserAcquire: 'dsh-desktop:browser-acquire',
   browserRelease: 'dsh-desktop:browser-release',
   browserOpenRequested: 'dsh-desktop:browser-open-requested',
+  cloudScreenRequest: 'dsh-desktop:cloud-screen-request',
+  cloudScreenOpenExternal: 'dsh-desktop:cloud-screen-open-external',
   directoryPick: 'dsh-desktop:directory-pick',
   deviceInfo: 'dsh-desktop:device-info',
   localeBootstrap: 'dsh-desktop:locale-bootstrap',
@@ -72,6 +75,24 @@ export interface DesktopUpdatePresentation {
 export interface DshDesktopProductApi {
   readonly protocolVersion: 1
   readonly browser: DesktopBrowserBridge
+  /**
+   * Cloud-desktop (noVNC) entry: the main process owns the delegate request and
+   * the open decision; the renderer only executes the returned plan.
+   */
+  readonly cloudScreen: {
+    /**
+     * Ask the gateway for a one-time delegate URL for one screen.
+     * @param screenId - screen channel id (`scrn_…`) to open.
+     * @returns where to open it (Sidebar guest, system browser) or why nothing can be opened.
+     */
+    request(screenId: string): Promise<CloudScreenPlan>
+    /**
+     * Open a gateway-origin URL in the system browser.
+     * @param url - gateway URL returned by this API.
+     * @returns whether the shell accepted the URL.
+     */
+    openExternal(url: string): Promise<boolean>
+  }
   readonly keyboard: DesktopKeyboardApi
   readonly shortcuts: DesktopShortcutsApi
   /**

@@ -186,3 +186,18 @@ packages/test-support/client-runtime/src/assembly/remote-default-responses.ts
 
 # 2026-10-22: branded account surface changes the host platform-session shape.
 apps/desktop-host/tests/platform-session.spec.ts
+
+# 2026-10-22: cross-client live cloud desktop (HUI-4001). The branded desktop
+# already owns the Sidebar Browser guest infrastructure, but the guest's
+# partition carries no platform session, so the noVNC surface needs the
+# gateway's one-time delegate ticket. The delegate request, credential
+# classification, and gateway-origin restriction live in a fork-owned module
+# (apps/desktop/src/cloud-screen.ts); main.ts, ipc.ts, and preload-app.ts gain
+# only the two-channel wiring that hands the renderer a plan instead of a
+# credential or an arbitrary-URL opener.
+apps/desktop/src/ipc.ts
+apps/desktop/src/preload-app.ts
+apps/desktop/src/cloud-screen.ts
+apps/desktop/tests/cloud-screen.spec.ts
+apps/desktop/tests/cloud-screen-preload.spec.ts
+apps/desktop/tests/brand-endpoints.spec.ts
