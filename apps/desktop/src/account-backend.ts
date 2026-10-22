@@ -16,7 +16,7 @@ export function accountView(value: unknown): AccountView {
   if (!('links' in value) || typeof value.links !== 'object' || value.links === null
     || !('usageUrl' in value.links) || (value.links.usageUrl !== null && typeof value.links.usageUrl !== 'string')
     || !('topUpUrl' in value.links) || (value.links.topUpUrl !== null && typeof value.links.topUpUrl !== 'string')
-    || !('embedded' in value.links) || typeof value.links.embedded !== 'boolean') {
+    || ('embedded' in value.links && typeof value.links.embedded !== 'boolean')) {
     throw new Error('desktop account: invalid platform links')
   }
   if (value.links.usageUrl !== null) validateBrowserDestination(value.links.usageUrl)
@@ -35,7 +35,7 @@ export function accountView(value: unknown): AccountView {
   const parsed = value as AccountView
   return {
     status: parsed.status,
-    links: { usageUrl: parsed.links.usageUrl, topUpUrl: parsed.links.topUpUrl, embedded: parsed.links.embedded },
+    links: { usageUrl: parsed.links.usageUrl, topUpUrl: parsed.links.topUpUrl, embedded: parsed.links.embedded ?? true },
     attempt: parsed.attempt === null ? null : {
       id: parsed.attempt.id, phase: parsed.attempt.phase,
       ...parsed.attempt.authorizeUrl === undefined ? {} : { authorizeUrl: parsed.attempt.authorizeUrl },

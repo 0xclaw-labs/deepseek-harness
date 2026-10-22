@@ -85,7 +85,7 @@ export class DesktopPlatformView {
     // The viewer hands its grant to the document it loads, which only the account
     // origin may receive; a deployment whose account pages live elsewhere names them
     // through the account links, and those open in the browser instead.
-    if (!account.embeddedPages) throw new Error('Platform page unavailable for this account')
+    if (account.embeddedPages === false) throw new Error('Platform page unavailable for this account')
     if (owner.isDestroyed()) return
     const generation = this.generation
     this.owner = owner

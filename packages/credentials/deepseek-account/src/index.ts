@@ -31,7 +31,7 @@ export interface PlatformSession {
    * `origin`. False sends those destinations to the browser; the viewer never
    * resolves a path on an origin that does not serve one.
    */
-  readonly embeddedPages: boolean
+  readonly embeddedPages?: boolean
 }
 
 /** Account operations; only Host consumers can obtain a request credential. */

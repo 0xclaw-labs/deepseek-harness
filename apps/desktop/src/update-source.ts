@@ -105,9 +105,7 @@ function readSealedConfig(path: string): string | undefined {
  * @returns Trimmed field values, or undefined when a field repeats.
  */
 function parseSealedConfig(text: string): SealedUpdateConfig | undefined {
-  const fields: Record<keyof SealedUpdateConfig, string | undefined> = {
-    provider: undefined, url: undefined, channel: undefined,
-  }
+  const fields: { provider?: string; url?: string; channel?: string } = {}
   const seen = new Set<keyof SealedUpdateConfig>()
   for (const raw of text.split(/\r?\n/u)) {
     const line = raw.trim()
@@ -119,7 +117,7 @@ function parseSealedConfig(text: string): SealedUpdateConfig | undefined {
     if (seen.has(key)) return undefined
     seen.add(key)
     const value = line.slice(separator + 1).trim().replace(/^(['"])(.*)\1$/u, '$2')
-    fields[key] = value === '' ? undefined : value
+    if (value !== '') fields[key] = value
   }
   return fields
 }

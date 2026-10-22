@@ -38,9 +38,9 @@ export interface AccountLinks {
   /**
    * Whether the Desktop shows these destinations in its embedded Platform view.
    * True only while the account provider serves them on its own origin, where the
-   * viewer can receive the stored grant; every other destination opens in the browser.
+   * viewer can receive the stored grant; absent keeps the legacy embedded behavior.
    */
-  readonly embedded: boolean
+  readonly embedded?: boolean
 }
 /** Stored-account presence is not a claim that the server has validated its token. */
 export interface AccountView {

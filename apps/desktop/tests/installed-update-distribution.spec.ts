@@ -35,12 +35,12 @@ describe('qualification distribution file planning', () => {
       expect(old!.feed.sha512).not.toBe(next!.feed.sha512)
       expect(old!.binaries.map(file => file.key)).not.toEqual(next!.binaries.map(file => file.key))
       expect(next!.binaries).toHaveLength(2)
-      expect(next!.binaries.every(file => file.key.startsWith('dsh-desk/bin/qualification/'))).toBe(true)
-      expect(next!.feed.key).toMatch(/^dsh-desk\/feeds\/qualification\/[a-f0-9]{24}\/win-x64\/nightly.yml$/u)
+      expect(next!.binaries.every(file => file.key.startsWith('suishendazi-desk/bin/qualification/'))).toBe(true)
+      expect(next!.feed.key).toMatch(/^suishendazi-desk\/feeds\/qualification\/[a-f0-9]{24}\/win-x64\/nightly.yml$/u)
       expect(next!.publicationAuthorized).toBe(false)
       expect(next!.verified).toBe('file-integrity-only')
       expect(load(next!.feed.contents)).toMatchObject({ version: versions[1],
-        files: [{ url: `https://download-test.deepseek.com/${next!.binaries[0]!.key}` }] })
+        files: [{ url: `https://download-test.modelxing.com/${next!.binaries[0]!.key}` }] })
     })
   })
 

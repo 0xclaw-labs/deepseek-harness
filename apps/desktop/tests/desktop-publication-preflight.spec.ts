@@ -31,7 +31,7 @@ it.each(['mac-arm64', 'win-x64'] as const)('preflights a complete retained %s bu
     if (target !== 'win-x64') await writeFile(join(artifacts, `${base}.dmg`), 'fixture DMG')
     await writeFile(join(artifacts, `${target}-release.json`), JSON.stringify({
       schemaVersion: 1, target, environment: 'test', version: '1.0.0', commit, dirty: false,
-      publicUrl: `https://example.com/dsh-desk/${releaseId}/feeds/${target}/`,
+      publicUrl: `https://example.com/suishendazi-desk/${releaseId}/feeds/${target}/`,
     }))
     await writeFile(join(artifacts, target === 'win-x64' ? 'nightly.yml' : 'nightly-mac.yml'), JSON.stringify({
       version: '1.0.0', files: [{ url: `${base}.${extension}`, size: Buffer.byteLength(bytes),

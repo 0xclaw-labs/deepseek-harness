@@ -24,6 +24,13 @@ export const BRAND_INFERENCE_BASE_URL = `${BRAND_AUTH_ORIGIN}/pi/v1`
 /** Live PaiNuo model catalog used to generate the desktop provider patch. */
 export const BRAND_MODEL_CATALOG_URL = `${BRAND_INFERENCE_BASE_URL}/models`
 
+/**
+ * PaiNuo billing/recharge page served by the gateway under a platform session.
+ * The account surface routes Top up and ledger here; `embedded` stays false, so
+ * the page opens in the browser instead of a viewer that cannot hold the grant.
+ */
+export const BRAND_BILLING_CENTER_URL = 'https://agentbuddy.modelxing.com/billing.html'
+
 /** Provider id written into the generated profile patch. */
 export const BRAND_PROVIDER_ID = 'painuo'
 
@@ -38,6 +45,7 @@ const ENDPOINT_OVERRIDE_ENV = [
   'DSH_PLATFORM_ORIGIN',
   'DSH_INFERENCE_ORIGIN',
   'DEEPSEEK_BASE_URL',
+  'DSH_BILLING_CENTER_URL',
   'DSH_TELEMETRY_OTLP_URL',
   'DSH_PRODUCT_ANALYTICS_OTLP_URL',
   'DSH_DESKTOP_UPDATE_ORIGIN',

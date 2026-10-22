@@ -1,6 +1,6 @@
 {
   "schema": "sdz-fork-brand/v1",
-  "productName": "随身搭子",
+  "productName": "\u968f\u8eab\u642d\u5b50",
   "appId": "cc.suishendazi.app",
   "protocolScheme": "suishendazi",
   "artifactPrefix": "suishendazi-harness",
@@ -28,6 +28,7 @@
     "pluginMarketIndexes": [],
     "webSearch": null,
     "telemetry": null,
-    "notes": "null/[] means the branded app disables the capability until a PaiNuo-owned service exists."
+    "notes": "null/[] means the branded app disables the capability until a PaiNuo-owned service exists.",
+    "billingCenterUrl": "https://agentbuddy.modelxing.com/billing.html"
   }
 }

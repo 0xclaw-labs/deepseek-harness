@@ -265,7 +265,7 @@ it('stores a grant before redirecting, restores account presence, and signs out 
   expect(await readFile(join(f.home, 'credentials.yaml'), 'utf8')).toContain('dsh_mock_test')
   // The Host publishes identity from a separate profile read; the snapshot only reuses it.
   await f.account.getProfile(clientMetadata())
-  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test',
+  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test', embeddedPages: true,
     requestHeaders: {} })
   expect(await f.account.resolveToken('https://api.deepseek.com')).toBeUndefined()
   await f.account.signOut(clientMetadata())
@@ -384,7 +384,7 @@ it('removes its callback route without closing the shared server on disposal', a
 
 it('derives every portal link from the private platform origin', async () => {
   const f = await fixture()
-  expect((await f.account.getState()).links).toEqual({ usageUrl: `${f.origin}/usage`, topUpUrl: `${f.origin}/top_up` })
+  expect((await f.account.getState()).links).toEqual({ usageUrl: `${f.origin}/usage`, topUpUrl: `${f.origin}/top_up`, embedded: true })
   await f.account.startSignIn(clientMetadata(), f.callbackOrigin, 'desktop')
   expect((await f.wait('waiting-browser')).attempt?.authorizeUrl).toBe(`${f.origin}/dsh/authorize?authorize_id=test`)
 })
@@ -875,7 +875,7 @@ it('carries the configured embedded frontend selector in the private Platform se
   await f.wait('waiting-browser')
   await fetch(f.callback(), { redirect: 'manual' })
   await f.account.getProfile(clientMetadata())
-  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test', embeddedPageDist: 'feat/test',
+  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test', embeddedPageDist: 'feat/test', embeddedPages: true,
     requestHeaders: {} })
 })
 
@@ -898,7 +898,7 @@ it.each([
   await f.wait('waiting-browser')
   await fetch(f.callback(), { redirect: 'manual' })
   await readDetails(f.account)
-  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test',
+  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test', embeddedPages: true,
     requestHeaders: { cookie: 'test_gate=synthetic', ...overrides } })
   await f.account.signOut(clientMetadata())
   await expect.poll(f.logoutCount).toBe(1)

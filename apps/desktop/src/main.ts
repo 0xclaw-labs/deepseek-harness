@@ -59,6 +59,7 @@ import { DesktopMandatoryUpdateWindow } from './mandatory-update-window.ts'
 import { DesktopPolicyTestAuth } from './policy-test-auth.ts'
 import { readDesktopSettings } from './settings.ts'
 import { applyBrandDefaults, brandWorkspaceBlock } from './brand-defaults.ts'
+import { BRAND_BILLING_CENTER_URL } from './brand-endpoints.ts'
 import { DesktopUpdateDialog, type UpdateDialogOptions } from './update-dialog.ts'
 import { readDesktopRuntime } from './runtime-tree.ts'
 import { DesktopBrowserGuests } from './browser-guests.ts'
@@ -588,6 +589,11 @@ async function main(): Promise<void> {
       delete hostEnvironment.DSH_WEB_URL
       delete hostEnvironment.DSH_SHELL
     }
+    // Route Top up / ledger to the brand billing page, never to the account
+    // origin's upstream /top_up path (the shim does not serve one).
+    hostEnvironment.DSH_BILLING_CENTER_URL = BRAND_BILLING_CENTER_URL
+    // The branded desktop reads its wallet on the billing center, not the account summary.
+    hostEnvironment.DSH_ACCOUNT_SURFACE = 'billing-center'
     if (process.env.DSH_PAINUO_TOKEN !== undefined) hostEnvironment.DSH_PAINUO_TOKEN = process.env.DSH_PAINUO_TOKEN
   }
   let quitting = false

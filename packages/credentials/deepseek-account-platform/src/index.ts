@@ -67,7 +67,7 @@ export const Config = Schema.object({
   desktopPlatform: Schema.union([Schema.const('darwin'), Schema.const('win32'), Schema.const(null)]).default(null),
   embeddedPageDist: Schema.string().default(''),
   inferenceOrigin: Schema.string().default(process.env.DSH_INFERENCE_ORIGIN ?? 'https://auth.modelxing.com'),
-  accountSurface: Schema.union([Schema.const('billing-center'), Schema.const('platform-pages')]).default('billing-center'),
+  accountSurface: Schema.union([Schema.const('billing-center'), Schema.const('platform-pages')]).default(process.env.DSH_ACCOUNT_SURFACE === 'billing-center' ? 'billing-center' : 'platform-pages'),
   billingCenterUrl: Schema.string().default(process.env.DSH_BILLING_CENTER_URL ?? ''),
   allowLoopbackHttp: Schema.boolean().default(false),
   rewriteBrowserOrigin: Schema.boolean().default(false),
@@ -395,7 +395,7 @@ export class PlatformAccount extends DeepSeekAccount {
     return { origin: this.origin, token: stored.token,
       userId: this.lastProfile?.token === stored.token ? this.lastProfile.profile.value.id || null : null,
       ...(this.embeddedPageDist ? { embeddedPageDist: this.embeddedPageDist } : {}),
-      embeddedPages: this.links.embedded, requestHeaders }
+      ...(this.links.embedded === undefined ? {} : { embeddedPages: this.links.embedded }), requestHeaders }
   }
 
   private async readCurrentGrant(lifetime: AbortController): Promise<z.infer<typeof grant> | null> {

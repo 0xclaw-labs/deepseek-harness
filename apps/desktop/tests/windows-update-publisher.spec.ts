@@ -88,6 +88,7 @@ describe('Windows update publisher', () => {
         DSH_DESKTOP_WINDOWS_KEY_CONTAINER: 'test-container',
         DSH_DESKTOP_WINDOWS_TOKEN_PIN: 'test-pin',
         DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+        DSH_DESKTOP_UPDATE_ORIGIN: 'https://updates.modelxing.com',
       }, 'win32', 'x64')
       expect(config.win.forceCodeSigning).toBe(true)
       expect(config.artifactName).toBe('deepseek-harness-${version}-${os}-${arch}.${ext}')

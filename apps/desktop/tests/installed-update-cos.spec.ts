@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
 }))
 
 vi.mock('../scripts/desktop-package-environment.mjs', () => ({ loadDesktopPackageEnvironment: () => ({
-  DSH_DESKTOP_AUTO_UPDATE_ENV: state.settings, DOWNLOAD_TEST_ORIGIN: 'https://download-test.deepseek.com',
+  DSH_DESKTOP_AUTO_UPDATE_ENV: state.settings, DOWNLOAD_TEST_ORIGIN: 'https://download-test.modelxing.com',
   DOWNLOAD_TEST_COS_BUCKET: 'bj-toc-download-test-1320056602', DOWNLOAD_TEST_COS_SECRET_ID: 'fixture-id',
   DOWNLOAD_TEST_COS_SECRET_KEY: 'fixture-key', DSH_DESKTOP_WINDOWS_TOKEN_PIN: 'fixture-pin-not-for-sdk',
 }) }))
@@ -177,7 +177,7 @@ describe('qualification COS transport with real SDK serialization over a loopbac
     const fetch = vi.fn(async () => new Response('public bytes'))
     vi.stubGlobal('fetch', fetch)
     const { store: cos } = await store((_request, response) => { answer(response) })
-    const url = `https://download-test.deepseek.com/${key}`
+    const url = `https://download-test.modelxing.com/${key}`
     expect(await cos.publicRead(url)).toEqual({ size: 12, sha512: createHash('sha512').update('public bytes').digest('base64') })
     expect(fetch).toHaveBeenCalledWith(url, expect.objectContaining({ redirect: 'error', cache: 'no-store' }))
     await expect(cos.publicRead(`${url}?fresh=1`)).rejects.toThrow('exact test public URL')
