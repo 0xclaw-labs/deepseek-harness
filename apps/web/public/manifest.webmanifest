@@ -1,6 +1,6 @@
 {
-  "name": "DeepSeek Harness",
-  "short_name": "DSH",
+  "name": "随身搭子",
+  "short_name": "随身搭子",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
