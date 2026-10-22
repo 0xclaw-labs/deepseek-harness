@@ -231,3 +231,7 @@ it('drains the dependent product channel when the shared OTel plugin unloads', a
   expect(ctx.get('productTelemetry')).toBeUndefined()
   expect(target.captures).toHaveLength(1)
 })
+
+it('has no implicit upstream collector endpoint', () => {
+  expect(Config({ serviceName: 'brand-test', serviceVersion: '1' }).endpoint).toBe('')
+})

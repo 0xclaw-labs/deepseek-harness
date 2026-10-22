@@ -136,7 +136,7 @@ export class PlatformAccount extends DeepSeekAccount {
       maxRetries: resolved.logoutMaxRetries, delayMs: resolved.logoutRetryDelayMs, requestTimeoutMs: this.requestTimeout,
     }
     ctx.authorization.registerFlow({
-      key: KEY, label: 'DeepSeek', methods: [{ id: 'browser', label: 'DeepSeek' }],
+      key: KEY, label: '派诺生态', methods: [{ id: 'browser', label: '派诺生态' }],
       run: (session) => {
         const attempt = this.attempt
         if (attempt === undefined) return Promise.reject(new PlatformAuthError('protocol'))
@@ -410,7 +410,6 @@ export class PlatformAccount extends DeepSeekAccount {
     if (previous !== undefined) {
       await previous.done
       // Disposal can close the provider while the previous attempt settles.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (this.closed) throw new PlatformAuthError('protocol')
       if (this.attempt !== previous) return this.getState()
     }
