@@ -134,3 +134,10 @@ packages/client/ui-settings-account/src/client/assets/onboarding-welcome.webp
 packages/client/ui-settings-account/src/client/assets/onboarding-welcome-dark.webp
 packages/client/ui-settings-account/src/client/assets/onboarding-welcome-zh.webp
 packages/client/ui-settings-account/src/client/assets/onboarding-welcome-zh-dark.webp
+# 2026-10-22: the model selector and the Models page render the catalog name, and the
+# PaiNuo proxy advertises every model by wire id, so those screens listed raw ids such
+# as `deepseek-v4.1-flash-1017-local`. The display module names the proxy route 派诺生态
+# and its models 派诺·<model>; request ids, protocol fields, and the session-log
+# selection keep the provider's own id. brand-endpoints.ts above is already allowlisted.
+apps/desktop/src/model-display.ts
+apps/desktop/tests/model-display.spec.ts

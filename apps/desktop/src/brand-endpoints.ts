@@ -6,10 +6,14 @@
  * of those defaults; `custom/branding/brand.json` records the same values for
  * packaging and review, and `apps/desktop/tests/brand-endpoints.spec.ts` pins
  * the two together. Upstream adapters may still describe their own public
- * endpoints in source, but the branded composition disables those rows.
+ * endpoints in source, but the branded composition disables those rows. Catalog
+ * display names come from `./model-display.ts`, so the patch this module
+ * generates shows the brand while every wire id stays the provider's own.
  *
  * @module
  */
+
+import { displayModelName, displayProviderName } from './model-display.ts'
 
 /** PaiNuo ecosystem account shim origin (login redirect, grant exchange, account). */
 export const BRAND_AUTH_ORIGIN = 'https://auth.modelxing.com'
@@ -133,19 +137,25 @@ export function readPaiNuoGrant(text: string): string | undefined {
  * Generate the profile patch that mounts the PaiNuo provider and selects its
  * default model. An empty catalog produces no patch, so a signed-out app keeps
  * the brand provider disabled rather than falling back to an upstream route.
+ *
+ * Each entry keeps the catalog's wire id and gains a branded display name
+ * (`displayModelName`); the adapter resolves requests, the session log, and the
+ * agent default by id, so a rename here never reaches the wire.
  * @param models - live PaiNuo catalog entries.
  * @returns YAML patch block, or an empty string without a catalog.
  */
 export function paiNuoProviderPatch(models: readonly BrandCatalogModel[]): string {
   const defaultModel = chooseDefaultModel(models)
   if (defaultModel === undefined) return ''
-  const list = models.map(model => JSON.stringify({ id: model.id, name: model.name })).join(',')
+  const list = models
+    .map(model => JSON.stringify({ id: model.id, name: displayModelName(model.id, model.name) }))
+    .join(',')
   return '# paiNuo-model-provider: PaiNuo ecosystem model catalog (auth.modelxing.com proxy).\n'
     + '- id: llm-pi-ai\n'
     + '  config:\n'
     + '    providers:\n'
     + `      ${BRAND_PROVIDER_ID}:\n`
-    + '        displayName: 派诺生态\n'
+    + `        displayName: ${displayProviderName(BRAND_PROVIDER_ID)}\n`
     + '        apiKeyEnv: DSH_PAINUO_TOKEN\n'
     + '        api: openai-completions\n'
     + `        baseURL: ${BRAND_INFERENCE_BASE_URL}\n`

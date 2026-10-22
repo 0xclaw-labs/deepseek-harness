@@ -6,10 +6,16 @@
 // brand.json are copied over upstream asset paths. Upstream files stay pristine
 // in git, so upstream upgrades do not conflict on UI copy.
 //
+// A rule may carry `skipWhenPrecededBy`, which leaves an occurrence that already
+// carries that prefix untouched; a prefix rule (`X -> 派诺·X`) therefore stays
+// idempotent when --write runs twice on one worktree. Where a rule's `to` is not
+// the product name, the summary prints the real target.
+//
 // Usage:
 //   node custom/branding/apply-brand.mjs --root <worktree> [--brand <brand.json>]
 //        [--replacements <replacements.json>] [--write] [--check] [--strict] [--json]
-// Default is --check (report only). Exit 0 on success, 1 on --strict violation,
+// Default is --check (report only). Exit 0 on success, 1 when --check finds a
+// rule whose string no longer exists in the tree or --strict is violated,
 // 2 on bad invocation. Never follows symlinks, never writes outside --root.
 import { copyFileSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, extname, join, relative, resolve, sep } from 'node:path'
@@ -82,8 +88,44 @@ for (const dir of spec.includeDirs ?? []) {
 }
 
 const replacements = (spec.replacements ?? []).filter((r) => typeof r?.from === 'string' && r.from !== '')
-const totals = { filesScanned: files.length, filesChanged: 0, replacements: 0, perString: {} }
-for (const r of replacements) totals.perString[r.from] = 0
+const totals = { filesScanned: files.length, filesChanged: 0, replacements: 0, perString: {}, matchedPerString: {} }
+for (const r of replacements) { totals.perString[r.from] = 0; totals.matchedPerString[r.from] = 0 }
+
+/**
+ * Apply one rule to one file's text. A rule may declare
+ * `skipWhenPrecededBy: "<prefix>"`; an occurrence already carrying that prefix
+ * counts as matched but stays untouched, which keeps a prefix rule
+ * (`X -> 派诺·X`) idempotent when the transform runs twice on one worktree.
+ * @param {string} text - file contents.
+ * @param {{from: string, to?: unknown, skipWhenPrecededBy?: unknown}} rule - replacement rule.
+ * @returns {{text: string, matched: number, applied: number}} transformed text and counts.
+ */
+function applyRule(text, rule) {
+  const guard = typeof rule.skipWhenPrecededBy === 'string' ? rule.skipWhenPrecededBy : ''
+  const to = String(rule.to ?? '')
+  if (guard === '') {
+    const parts = text.split(rule.from)
+    return { text: parts.join(to), matched: parts.length - 1, applied: parts.length - 1 }
+  }
+  let out = ''
+  let index = 0
+  let matched = 0
+  let applied = 0
+  for (;;) {
+    const at = text.indexOf(rule.from, index)
+    if (at === -1) break
+    matched += 1
+    if (at >= guard.length && text.startsWith(guard, at - guard.length)) {
+      out += text.slice(index, at + rule.from.length)
+    } else {
+      out += text.slice(index, at) + to
+      applied += 1
+    }
+    index = at + rule.from.length
+  }
+  return { text: out + text.slice(index), matched, applied }
+}
+
 for (const file of files) {
   let text
   try {
@@ -94,12 +136,11 @@ for (const file of files) {
   let next = text
   let changed = 0
   for (const r of replacements) {
-    const parts = next.split(r.from)
-    if (parts.length > 1) {
-      changed += parts.length - 1
-      next = parts.join(String(r.to ?? ''))
-      totals.perString[r.from] += parts.length - 1
-    }
+    const result = applyRule(next, r)
+    next = result.text
+    changed += result.applied
+    totals.perString[r.from] += result.applied
+    totals.matchedPerString[r.from] += result.matched
   }
   if (changed === 0) continue
   totals.filesChanged += 1
@@ -134,8 +175,24 @@ if (args.json) console.log(JSON.stringify(summary, null, 2))
 else {
   console.log(`apply-brand[${args.mode}] root=${root}`)
   console.log(`  scanned=${totals.filesScanned} changed=${totals.filesChanged} replacements=${totals.replacements}`)
-  for (const [from, count] of Object.entries(totals.perString)) console.log(`  "${from}" -> ${JSON.stringify(brand.productName)} × ${count}`)
+  for (const r of replacements) {
+    const already = totals.matchedPerString[r.from] - totals.perString[r.from]
+    const suffix = already > 0 ? ` (${already} already branded)` : ''
+    console.log(`  "${r.from}" -> ${JSON.stringify(String(r.to ?? ''))} × ${totals.perString[r.from]}${suffix}`)
+  }
   for (const a of assetResults) console.log(`  asset ${a.to} source=${a.sourceExists ? 'ok' : 'missing'}${args.mode === 'write' ? ` copied=${a.copied === true}` : ''}`)
+}
+// A rule whose string is gone from the tree brands nothing, and upstream copy
+// drift is the usual cause. --check runs on the pristine checkout (CI guard and
+// the post-merge sync), so it must fail loud there; --write also runs on an
+// already-branded worktree, where the strings a previous pass consumed are
+// expected to be absent, so it reports instead.
+const stale = replacements.filter((r) => totals.matchedPerString[r.from] === 0)
+if (stale.length > 0) {
+  const names = stale.map((r) => JSON.stringify(r.from)).join(', ')
+  const message = `brand string not found in this tree (upstream copy may have changed; update replacements.json): ${names}`
+  if (args.mode === 'check') { console.error(`apply-brand: ${message}`); process.exit(1) }
+  console.warn(`apply-brand: ${message}`)
 }
 if (args.strict) {
   const missingAssets = assetResults.filter((a) => !a.sourceExists)
