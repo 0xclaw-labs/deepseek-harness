@@ -155,3 +155,34 @@ apps/desktop/tests/update-coordinator.spec.ts
 apps/desktop/tests/update-presentation.spec.ts
 apps/desktop/tests/update-schedule.spec.ts
 apps/desktop/tests/main-startup.spec.ts
+
+# 2026-10-22: branded account surface (billing-center links, external wallet,
+# honest top-up), branded update feed destinations and the fixtures/snapshots
+# those contracts are pinned by. The desktop account plumbing, the settings
+# account/onboarding UI, the credential packages and their tests move together;
+# request wire ids and upstream package names are unchanged.
+apps/desktop/src/account-backend.ts
+apps/desktop/src/host-process.ts
+apps/desktop/src/platform-view.ts
+apps/desktop/src/update-journal.ts
+apps/desktop/scripts/installed-update-*.ts
+apps/desktop/publishing/*
+apps/desktop/tests/*.spec.ts
+apps/desktop/tests/*.spec.tsx
+apps/desktop/tests/*.client.spec.tsx
+apps/desktop/tests/*.e2e.ts
+apps/desktop/tests/expected/*
+apps/desktop/tests/installed-update/*
+apps/desktop/tests/installed-update/*/*
+apps/web/tests/settings-appearance.e2e.ts
+packages/api/account-controller/tests/controller.spec.ts
+packages/client/ui-settings-account/src/client/*
+packages/client/ui-settings-account/tests/*
+packages/credentials/deepseek-account-platform/src/protocol.ts
+packages/credentials/deepseek-account-platform/tests/account.spec.ts
+packages/credentials/deepseek-account/src/index.ts
+packages/credentials/deepseek-account/src/types.ts
+packages/test-support/client-runtime/src/assembly/remote-default-responses.ts
+
+# 2026-10-22: branded account surface changes the host platform-session shape.
+apps/desktop-host/tests/platform-session.spec.ts

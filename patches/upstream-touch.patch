@@ -39,6 +39,19 @@ index 3086755b0b..23b59aee32 100644
            PATH: `${process.argv[6] ?? ''}${delimiter}${process.env.PATH ?? ''}`,
          },
        },
+diff --git a/apps/desktop-host/tests/platform-session.spec.ts b/apps/desktop-host/tests/platform-session.spec.ts
+index 73c2322621..7f8d2d82a0 100644
+--- a/apps/desktop-host/tests/platform-session.spec.ts
++++ b/apps/desktop-host/tests/platform-session.spec.ts
+@@ -5,7 +5,7 @@ import { installPlatformSessionPublisher } from '../src/platform-session.ts'
+
+ const state: AccountView = {
+   status: 'credential-stored', attempt: null,
+-  links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up' },
++  links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up', embedded: true },
+ }
+
+ class Account extends DeepSeekAccount {
 diff --git a/apps/desktop/package.json b/apps/desktop/package.json
 index 1d44f92b93..34d453eee1 100644
 --- a/apps/desktop/package.json
@@ -52,6 +65,32 @@ index 1d44f92b93..34d453eee1 100644
    "private": true,
    "license": "MIT",
    "type": "module",
+diff --git a/apps/desktop/publishing/README.md b/apps/desktop/publishing/README.md
+index 71c52c1d75..0d3a147472 100644
+--- a/apps/desktop/publishing/README.md
++++ b/apps/desktop/publishing/README.md
+@@ -59,7 +59,7 @@ pnpm run package:desktop:mac:arm64
+ pnpm run upload:mac:arm64
+ ```
+
+-The target dotenv file for internal-test packaging explicitly sets `DSH_DESKTOP_AUTO_UPDATE_ENV=test` and `DOWNLOAD_TEST_ORIGIN=https://download-test.deepseek.com`; uploads use `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602` and separate test credentials. Both test and production use the fixed Nightly channel; deployment selection does not enable channel switching.
++The target dotenv file for internal-test packaging explicitly sets `DSH_DESKTOP_AUTO_UPDATE_ENV=test` and `DOWNLOAD_TEST_ORIGIN=https://download-test.modelxing.com`; uploads use `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602` and separate test credentials. Both test and production use the fixed Nightly channel; deployment selection does not enable channel switching.
+
+ Early internal-test packages use the `test` deployment. Select `production` explicitly only for a production release; changing upload credentials does not retarget an existing package. Packaging requires no COS credentials, disables electron-builder publishing, strips COS credentials from child processes, and records completion only after signing and notarization succeed. Upload validates this record, deployment, target, shared version, filenames, sizes, and SHA-512 before reading credentials. Packages and blockmaps upload before YAML; historical objects are retained. Every release publishes `nightly.yml` or `nightly-mac.yml`; stable releases also publish `latest.yml` or `latest-mac.yml` pointing at the same artifacts. Published YAML uses absolute binary URLs. The uploader leaves Cache-Control unset, including the empty header the COS SDK would otherwise add: deployment infrastructure owns cache policy, with uncached feeds and separately configurable binary caching. Serialize publication per target and verify public artifacts and feed contents before release qualification.
+
+diff --git a/apps/desktop/publishing/README.zh.md b/apps/desktop/publishing/README.zh.md
+index 22952efae4..5013e8545c 100644
+--- a/apps/desktop/publishing/README.zh.md
++++ b/apps/desktop/publishing/README.zh.md
+@@ -59,7 +59,7 @@ pnpm run package:desktop:mac:arm64
+ pnpm run upload:mac:arm64
+ ```
+
+-内测打包在目标 `.env` 中显式设置 `DSH_DESKTOP_AUTO_UPDATE_ENV=test` 和 `DOWNLOAD_TEST_ORIGIN=https://download-test.deepseek.com`；上传使用 `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602` 及独立测试凭据。test 和 production 都使用固定 Nightly 通道，部署选择不提供通道切换。
++内测打包在目标 `.env` 中显式设置 `DSH_DESKTOP_AUTO_UPDATE_ENV=test` 和 `DOWNLOAD_TEST_ORIGIN=https://download-test.modelxing.com`；上传使用 `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602` 及独立测试凭据。test 和 production 都使用固定 Nightly 通道，部署选择不提供通道切换。
+
+ 前期内测包使用 `test` 部署。只有正式发布才显式选择 `production`；更换上传凭据不会改变已有安装包的更新目标。打包不需要 COS 凭据，会禁用 electron-builder 发布、移除子进程的 COS 凭据，并且仅在签名与公证成功后记录完成状态。上传在读取凭据前验证该记录、部署、目标、共同版本号、文件名、大小与 SHA-512。安装包和 blockmap 先于 YAML 上传；历史对象继续保留。每个版本发布 `nightly.yml` 或 `nightly-mac.yml`；稳定版本还发布指向相同产物的 `latest.yml` 或 `latest-mac.yml`。发布的 YAML 使用安装包绝对 URL。上传器不设置 Cache-Control，包括 COS SDK 否则会添加的空头部：缓存策略由部署基础设施负责，清单不缓存，安装包缓存单独配置。同一目标应串行发布，并在发布验收前验证公网产物与清单内容。
+
 diff --git a/apps/desktop/renderer/assets/welcome-brand.svg b/apps/desktop/renderer/assets/welcome-brand.svg
 index 67c917d0bc..d545b56f02 100644
 --- a/apps/desktop/renderer/assets/welcome-brand.svg
@@ -258,6 +297,50 @@ index 4b9cd27a8d..abe1f2b174 100644
        entitlements: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
        entitlementsInherit: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
        // Prepared runtime files retain their signatures; PAK resources are sealed by their enclosing bundle.
+diff --git a/apps/desktop/scripts/installed-update-cos.ts b/apps/desktop/scripts/installed-update-cos.ts
+index 7dcff940b4..d5d80019de 100644
+--- a/apps/desktop/scripts/installed-update-cos.ts
++++ b/apps/desktop/scripts/installed-update-cos.ts
+@@ -8,7 +8,7 @@ import { loadDesktopPackageEnvironment } from './desktop-package-environment.mjs
+ import type { InstalledUpdatePublicationStore, InstalledUpdateRemoteObject } from './installed-update-publication.ts'
+
+ const BUCKET = 'bj-toc-download-test-1320056602'
+-const ORIGIN = 'https://download-test.deepseek.com'
++const ORIGIN = 'https://download-test.modelxing.com'
+
+ /** COS reports a missing key through this error code; no other status means absence. */
+ function isMissingObject(error: unknown): boolean {
+diff --git a/apps/desktop/scripts/installed-update-qualification.ts b/apps/desktop/scripts/installed-update-qualification.ts
+index 40877759d7..738cfe8a5f 100644
+--- a/apps/desktop/scripts/installed-update-qualification.ts
++++ b/apps/desktop/scripts/installed-update-qualification.ts
+@@ -48,9 +48,9 @@ export async function createInstalledUpdateRun(
+   const run: InstalledUpdateRun = {
+     schemaVersion: 1, id, root, createdAt: new Date().toISOString(), source, versions,
+     appId: `com.deepseek.dsh.qualification.q${id}`, productName: `DSH Update Test ${id}`,
+-    environment: 'test', origin: 'https://download-test.deepseek.com', bucket: 'bj-toc-download-test-1320056602',
+-    feedKey: `dsh-desk/feeds/qualification/${id}/win-x64/nightly.yml`,
+-    binPrefix: `dsh-desk/bin/qualification/${id}/win-x64`,
++    environment: 'test', origin: 'https://download-test.modelxing.com', bucket: 'bj-toc-download-test-1320056602',
++    feedKey: `suishendazi-desk/feeds/qualification/${id}/win-x64/nightly.yml`,
++    binPrefix: `suishendazi-desk/bin/qualification/${id}/win-x64`,
+   }
+   await writeFile(join(root, 'run.json'), `${JSON.stringify(run, null, 2)}\n`, { flag: 'wx', mode: 0o600, flush: true })
+   return run
+@@ -75,10 +75,10 @@ export async function readInstalledUpdateRun(path: string): Promise<InstalledUpd
+   const row = value as Record<string, unknown>
+   if (row.schemaVersion !== 1 || typeof row.id !== 'string' || !/^[a-f0-9]{24}$/u.test(row.id)
+     || row.root !== resolve(dirname(path)) || row.environment !== 'test'
+-    || row.origin !== 'https://download-test.deepseek.com' || row.bucket !== 'bj-toc-download-test-1320056602'
++    || row.origin !== 'https://download-test.modelxing.com' || row.bucket !== 'bj-toc-download-test-1320056602'
+     || row.appId !== `com.deepseek.dsh.qualification.q${row.id}` || row.productName !== `DSH Update Test ${row.id}`
+-    || row.feedKey !== `dsh-desk/feeds/qualification/${row.id}/win-x64/nightly.yml`
+-    || row.binPrefix !== `dsh-desk/bin/qualification/${row.id}/win-x64`
++    || row.feedKey !== `suishendazi-desk/feeds/qualification/${row.id}/win-x64/nightly.yml`
++    || row.binPrefix !== `suishendazi-desk/bin/qualification/${row.id}/win-x64`
+     || !Array.isArray(row.versions) || row.versions.length !== 2 || row.versions.some(version => typeof version !== 'string')) {
+     throw new Error('installed update: manifest identity, location, versions, or test destination changed')
+   }
 diff --git a/apps/desktop/scripts/package-macos.ts b/apps/desktop/scripts/package-macos.ts
 index 4ba0fd12ca..ec09189eca 100644
 --- a/apps/desktop/scripts/package-macos.ts
@@ -303,6 +386,37 @@ index 6c3c12c857..1c2d8b2dc5 100644
  const descriptor = await verifyDesktopRuntime(paths.dsh, readDesktopRuntime(paths.dsh).release.version,
    resolveDesktopPackageTarget(target))
  if (windows && !values.unsigned) await verifyWindowsCode(application)
+diff --git a/apps/desktop/src/account-backend.ts b/apps/desktop/src/account-backend.ts
+index 862b8f81ed..012d2f42a2 100644
+--- a/apps/desktop/src/account-backend.ts
++++ b/apps/desktop/src/account-backend.ts
+@@ -14,12 +14,13 @@ export function accountView(value: unknown): AccountView {
+     throw new Error('desktop account: invalid state')
+   }
+   if (!('links' in value) || typeof value.links !== 'object' || value.links === null
+-    || !('usageUrl' in value.links) || typeof value.links.usageUrl !== 'string'
+-    || !('topUpUrl' in value.links) || typeof value.links.topUpUrl !== 'string') {
++    || !('usageUrl' in value.links) || (value.links.usageUrl !== null && typeof value.links.usageUrl !== 'string')
++    || !('topUpUrl' in value.links) || (value.links.topUpUrl !== null && typeof value.links.topUpUrl !== 'string')
++    || ('embedded' in value.links && typeof value.links.embedded !== 'boolean')) {
+     throw new Error('desktop account: invalid platform links')
+   }
+-  validateBrowserDestination(value.links.usageUrl)
+-  validateBrowserDestination(value.links.topUpUrl)
++  if (value.links.usageUrl !== null) validateBrowserDestination(value.links.usageUrl)
++  if (value.links.topUpUrl !== null) validateBrowserDestination(value.links.topUpUrl)
+   const attempt = value.attempt
+   if (attempt !== null && (typeof attempt !== 'object' || !('id' in attempt) || typeof attempt.id !== 'string'
+     || !('phase' in attempt) || !['initializing', 'waiting-browser', 'exchanging', 'committing', 'succeeded', 'cancelled', 'expired', 'failed'].includes(String(attempt.phase))
+@@ -34,7 +35,7 @@ export function accountView(value: unknown): AccountView {
+   const parsed = value as AccountView
+   return {
+     status: parsed.status,
+-    links: { usageUrl: parsed.links.usageUrl, topUpUrl: parsed.links.topUpUrl },
++    links: { usageUrl: parsed.links.usageUrl, topUpUrl: parsed.links.topUpUrl, embedded: parsed.links.embedded ?? true },
+     attempt: parsed.attempt === null ? null : {
+       id: parsed.attempt.id, phase: parsed.attempt.phase,
+       ...parsed.attempt.authorizeUrl === undefined ? {} : { authorizeUrl: parsed.attempt.authorizeUrl },
 diff --git a/apps/desktop/src/brand-defaults.ts b/apps/desktop/src/brand-defaults.ts
 new file mode 100644
 index 0000000000..b34572134e
@@ -426,10 +540,10 @@ index 0000000000..b34572134e
 +}
 diff --git a/apps/desktop/src/brand-endpoints.ts b/apps/desktop/src/brand-endpoints.ts
 new file mode 100644
-index 0000000000..8b73e5d87e
+index 0000000000..d2ff1f0afc
 --- /dev/null
 +++ b/apps/desktop/src/brand-endpoints.ts
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,214 @@
 +/**
 + * Brand deployment endpoints for the 随身搭子 desktop.
 + *
@@ -456,6 +570,13 @@ index 0000000000..8b73e5d87e
 +/** Live PaiNuo model catalog used to generate the desktop provider patch. */
 +export const BRAND_MODEL_CATALOG_URL = `${BRAND_INFERENCE_BASE_URL}/models`
 +
++/**
++ * PaiNuo billing/recharge page served by the gateway under a platform session.
++ * The account surface routes Top up and ledger here; `embedded` stays false, so
++ * the page opens in the browser instead of a viewer that cannot hold the grant.
++ */
++export const BRAND_BILLING_CENTER_URL = 'https://agentbuddy.modelxing.com/billing.html'
++
 +/** Provider id written into the generated profile patch. */
 +export const BRAND_PROVIDER_ID = 'painuo'
 +
@@ -470,6 +591,7 @@ index 0000000000..8b73e5d87e
 +  'DSH_PLATFORM_ORIGIN',
 +  'DSH_INFERENCE_ORIGIN',
 +  'DEEPSEEK_BASE_URL',
++  'DSH_BILLING_CENTER_URL',
 +  'DSH_TELEMETRY_OTLP_URL',
 +  'DSH_PRODUCT_ANALYTICS_OTLP_URL',
 +  'DSH_DESKTOP_UPDATE_ORIGIN',
@@ -693,8 +815,48 @@ index 0000000000..7a6cc20d7c
 +  const target = `${url.hostname}${url.pathname}`.replace(/\/+$/u, '')
 +  return target === 'open' || target === '' ? 'focus-primary-window' : undefined
 +}
+diff --git a/apps/desktop/src/host-process.ts b/apps/desktop/src/host-process.ts
+index 948a88e6b0..25af83b0f7 100644
+--- a/apps/desktop/src/host-process.ts
++++ b/apps/desktop/src/host-process.ts
+@@ -66,6 +66,7 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
+       if (!('userId' in session) || (session.userId !== null
+         && (typeof session.userId !== 'string' || session.userId.length === 0))) return false
+       if ('embeddedPageDist' in session && typeof session.embeddedPageDist !== 'string') return false
++      if ('embeddedPages' in session && typeof session.embeddedPages !== 'boolean') return false
+       if ('requestHeaders' in session && (typeof session.requestHeaders !== 'object' || session.requestHeaders === null
+         || Array.isArray(session.requestHeaders)
+         || Object.entries(session.requestHeaders).some(([name, value]) => typeof value !== 'string'
+diff --git a/apps/desktop/src/locale.ts b/apps/desktop/src/locale.ts
+index 5d9d4607c7..49000d53ee 100644
+--- a/apps/desktop/src/locale.ts
++++ b/apps/desktop/src/locale.ts
+@@ -129,6 +129,11 @@ export const en = {
+   updateTasksChanged: 'New tasks have started. Confirm again to stop the tasks and update.',
+   updateTasksUnavailable: 'Task status is unavailable. Try updating again when the workspace is ready.',
+   updateStopFailed: 'Could not safely stop the tasks. The update has not been installed. Please try again later.',
++  updateUnavailableTitle: 'Automatic Updates Unavailable',
++  updateUnavailableAbsent: 'This build does not provide automatic updates.',
++  updateUnavailableAbsentDetail: 'This build ships without a configured update source, so the app never checks for or installs updates, and it never contacts an upstream service. Install a signed branded release when you want automatic updates.',
++  updateUnavailableRejected: 'Automatic updates are disabled for this build.',
++  updateUnavailableRejectedDetail: 'The update source sealed into this application failed validation, so the app stopped checking. Reinstall an official branded release, or ask the maintainer to repair the update source.',
+   updateTechnicalDetails: 'View technical details',
+   updateTitle: 'DeepSeek Harness Update',
+   updateAvailable: 'New version available: {version}',
+@@ -300,6 +305,11 @@ export const zh = {
+   updateTasksChanged: '有新任务开始运行，请重新确认是否停止任务并更新。',
+   updateTasksUnavailable: '无法确认任务状态，请在工作区就绪后重试更新。',
+   updateStopFailed: '未能安全停止任务，更新尚未安装，请稍后重试。',
++  updateUnavailableTitle: '自动更新不可用',
++  updateUnavailableAbsent: '本构建不提供自动更新。',
++  updateUnavailableAbsentDetail: '本构建没有内置更新源，因此不会检查或安装更新，也不会连接上游服务。需要自动更新时，请安装已签名的品牌发布版本。',
++  updateUnavailableRejected: '本构建已禁用自动更新。',
++  updateUnavailableRejectedDetail: '本应用内置的更新源未通过校验，已停止检查更新。请重新安装官方品牌版本，或联系维护者修复更新源。',
+   updateTechnicalDetails: '查看技术详情',
+   updateTitle: 'DeepSeek Harness 更新',
+   updateAvailable: '发现新版本 {version}',
 diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
-index 2afdfd7194..051e3b40b2 100644
+index 2afdfd7194..1d0256b78c 100644
 --- a/apps/desktop/src/main.ts
 +++ b/apps/desktop/src/main.ts
 @@ -2,6 +2,8 @@ import type { ProductEventMap, ProductEvent } from '@deepseek-ai/dsh-client-prod
@@ -716,7 +878,7 @@ index 2afdfd7194..051e3b40b2 100644
  import { DesktopProjectManager } from './project-manager.ts'
  import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
  import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-view.ts'
-@@ -42,6 +46,7 @@ import { pruneCrashReports, RendererConsoleTail, writeCrashReport, type CrashRep
+@@ -42,10 +46,11 @@ import { pruneCrashReports, RendererConsoleTail, writeCrashReport, type CrashRep
  import { openWelcomeWindow } from './welcome-window.ts'
  import { WELCOME_IPC, needsWelcome, type WelcomeNotice } from './welcome-api.ts'
  import { connectDesktopWelcome, type DesktopWelcomeBackend } from './welcome-backend.ts'
@@ -724,15 +886,21 @@ index 2afdfd7194..051e3b40b2 100644
  import { DesktopUpdateJournal } from './update-journal.ts'
  import { DesktopUpdatePreparationError } from './update-error.ts'
  import { DesktopUpdateSchedule, resolveDesktopUpdateScheduleConfig } from './update-schedule.ts'
-@@ -53,6 +58,7 @@ import { desktopClientMetadata, desktopClientVersion } from './client-metadata.t
+-import { desktopUpdateErrorSummary, presentDesktopUpdate } from './update-presentation.ts'
++import { desktopUpdateErrorSummary, desktopUpdateUnavailableContent, presentDesktopUpdate } from './update-presentation.ts'
+ import { desktopErrorState } from './startup-error.ts'
+ import { readDesktopLoginShellEnvironment, resolveDesktopLoginShellConfig } from './login-shell-environment.ts'
+ import { DesktopMandatoryUpdatePolicy, resolveDesktopPolicyConfig, type DesktopPolicyState } from './mandatory-update-policy.ts'
+@@ -53,6 +58,8 @@ import { desktopClientMetadata, desktopClientVersion } from './client-metadata.t
  import { DesktopMandatoryUpdateWindow } from './mandatory-update-window.ts'
  import { DesktopPolicyTestAuth } from './policy-test-auth.ts'
  import { readDesktopSettings } from './settings.ts'
 +import { applyBrandDefaults, brandWorkspaceBlock } from './brand-defaults.ts'
++import { BRAND_BILLING_CENTER_URL } from './brand-endpoints.ts'
  import { DesktopUpdateDialog, type UpdateDialogOptions } from './update-dialog.ts'
  import { readDesktopRuntime } from './runtime-tree.ts'
  import { DesktopBrowserGuests } from './browser-guests.ts'
-@@ -80,9 +86,110 @@ let backendReady = false
+@@ -80,9 +87,110 @@ let backendReady = false
  /** Error-level console output of the primary window, attached to crash reports. */
  const rendererConsole = new RendererConsoleTail()
 
@@ -845,7 +1013,7 @@ index 2afdfd7194..051e3b40b2 100644
 
  function currentDesktopLocale(): ReturnType<typeof resolveDesktopLocale> {
    return resolveDesktopLocale(windowsLanguage ?? app.getLocale())
-@@ -212,6 +319,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -212,6 +320,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
      minWidth: 520,
      minHeight: 600,
      show,
@@ -853,7 +1021,7 @@ index 2afdfd7194..051e3b40b2 100644
      ...(process.platform === 'win32' && primary ? {
        titleBarStyle: 'hidden' as const,
        titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
-@@ -238,6 +346,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -238,6 +347,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
        devTools: true,
      },
    })
@@ -865,7 +1033,7 @@ index 2afdfd7194..051e3b40b2 100644
    window.webContents.setWindowOpenHandler(({ url }) => {
      if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
      return { action: 'deny' }
-@@ -314,13 +427,135 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+@@ -314,13 +428,135 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
    return window
  }
 
@@ -1001,7 +1169,7 @@ index 2afdfd7194..051e3b40b2 100644
    const development = !app.isPackaged
    const primaryRuntime = development
      ? developmentPrimaryRuntime()
-@@ -338,7 +573,23 @@ async function main(): Promise<void> {
+@@ -338,7 +574,28 @@ async function main(): Promise<void> {
      return result.environment
    })
    let hostEnvironment: NodeJS.ProcessEnv = process.env
@@ -1021,12 +1189,17 @@ index 2afdfd7194..051e3b40b2 100644
 +      delete hostEnvironment.DSH_WEB_URL
 +      delete hostEnvironment.DSH_SHELL
 +    }
++    // Route Top up / ledger to the brand billing page, never to the account
++    // origin's upstream /top_up path (the shim does not serve one).
++    hostEnvironment.DSH_BILLING_CENTER_URL = BRAND_BILLING_CENTER_URL
++    // The branded desktop reads its wallet on the billing center, not the account summary.
++    hostEnvironment.DSH_ACCOUNT_SURFACE = 'billing-center'
 +    if (process.env.DSH_PAINUO_TOKEN !== undefined) hostEnvironment.DSH_PAINUO_TOKEN = process.env.DSH_PAINUO_TOKEN
 +  }
    let quitting = false
    let startup: Promise<void> | undefined
    let workspaceRecovery: Promise<void> | undefined
-@@ -653,7 +904,6 @@ async function main(): Promise<void> {
+@@ -653,7 +910,6 @@ async function main(): Promise<void> {
      // A confirmation on a hidden window would go unseen, so it waits for the next show; the mandatory
      // flow keeps its own taskbar and Dock attention instead.
      if (!isMandatory()) await windowShown()
@@ -1034,7 +1207,23 @@ index 2afdfd7194..051e3b40b2 100644
      if (quitting) return state
      return updates.install(version)
    }
-@@ -932,7 +1182,8 @@ async function main(): Promise<void> {
+@@ -813,6 +1069,15 @@ async function main(): Promise<void> {
+         if (manual) await Promise.all([checkPolicyManually(), updateSchedule.check(true)])
+         return
+       }
++      // A build without a usable feed has no update to offer and no failure to
++      // report: state the deployment fact instead of running an impossible check.
++      const availability = updates.availability
++      if (availability.kind !== 'configured') {
++        updateJournal?.action(`update-source-${availability.kind}`)
++        const content = desktopUpdateUnavailableContent(availability, locale.messages)
++        await ordinaryMessageBox({ type: 'info', title: content.title, message: content.message, detail: content.detail })
++        return
++      }
+       let controller: AbortController | undefined
+       let progress: Promise<unknown> | undefined
+       try {
+@@ -932,7 +1197,8 @@ async function main(): Promise<void> {
    const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
      : join(process.resourcesPath, 'icon.png')
    app.setAboutPanelOptions({
@@ -1044,7 +1233,7 @@ index 2afdfd7194..051e3b40b2 100644
      applicationVersion: app.getVersion(),
      // The release has no separate build number; omit Electron's bundle version.
      version: '',
-@@ -1232,10 +1483,14 @@ async function main(): Promise<void> {
+@@ -1232,10 +1498,14 @@ async function main(): Promise<void> {
      window.focus()
    }
 
@@ -1151,6 +1340,431 @@ index 0000000000..581df6592e
 +  if (base === '' || base.startsWith(BRAND_MODEL_DISPLAY_PREFIX)) return base
 +  return `${BRAND_MODEL_DISPLAY_PREFIX}${base.split('-').map(displayToken).join('-')}`
 +}
+diff --git a/apps/desktop/src/platform-view.ts b/apps/desktop/src/platform-view.ts
+index ce759c61b1..ffe77713e9 100644
+--- a/apps/desktop/src/platform-view.ts
++++ b/apps/desktop/src/platform-view.ts
+@@ -59,6 +59,7 @@ export class DesktopPlatformView {
+   setSession(next: PlatformSession | null): void {
+     if (next?.token === this.account?.token && next?.origin === this.account?.origin
+       && next?.embeddedPageDist === this.account?.embeddedPageDist
++      && next?.embeddedPages === this.account?.embeddedPages
+       && JSON.stringify(next?.requestHeaders) === JSON.stringify(this.account?.requestHeaders)) {
+       if (next?.userId === this.account?.userId || this.account?.userId === null) {
+         this.account = next
+@@ -81,6 +82,10 @@ export class DesktopPlatformView {
+     this.close()
+     const account = this.account
+     if (account === null) throw new Error('Platform account unavailable')
++    // The viewer hands its grant to the document it loads, which only the account
++    // origin may receive; a deployment whose account pages live elsewhere names them
++    // through the account links, and those open in the browser instead.
++    if (account.embeddedPages === false) throw new Error('Platform page unavailable for this account')
+     if (owner.isDestroyed()) return
+     const generation = this.generation
+     this.owner = owner
+diff --git a/apps/desktop/src/update-coordinator.ts b/apps/desktop/src/update-coordinator.ts
+index 3b83cea08f..8ed221e94c 100644
+--- a/apps/desktop/src/update-coordinator.ts
++++ b/apps/desktop/src/update-coordinator.ts
+@@ -1,6 +1,5 @@
+ /** User-authorized downloads and separate installation of one version-bound Desktop release. */
+
+-import { existsSync } from 'node:fs'
+ import { join } from 'node:path'
+ import { app } from 'electron'
+ import electronUpdater, { type AppUpdater, type ProgressInfo, type UpdateInfo } from 'electron-updater'
+@@ -8,9 +7,26 @@ import { gt, valid } from 'semver'
+ import type { DesktopUpdateState } from './ipc.ts'
+ import { DesktopUpdateHttpExecutor } from './update-http-executor.ts'
+ import { DesktopUpdatePreparationError } from './update-error.ts'
++import { resolveDesktopUpdateSource, type DesktopUpdateSource } from './update-source.ts'
+
+ const { autoUpdater } = electronUpdater
+
++/**
++ * Resolve the feed sealed into this installation. A source launch, a dev run,
++ * or any process without a packaged resources directory ships no feed.
++ * @param channel - Channel sealed into the installed application manifest.
++ * @returns Validated source, or the absent source outside a packaged app.
++ */
++function packagedUpdateSource(channel: 'nightly' | 'latest'): DesktopUpdateSource {
++  const resources = process.resourcesPath
++  if (!app.isPackaged || resources === undefined) return { kind: 'absent' }
++  return resolveDesktopUpdateSource({
++    packaged: true,
++    configPath: join(resources, 'app-update.yml'),
++    expectedChannel: channel,
++  })
++}
++
+ /** Owns one updater target until its download and installation settle. */
+ export class DesktopUpdateCoordinator {
+   private current: DesktopUpdateState = { phase: 'idle' }
+@@ -20,6 +36,7 @@ export class DesktopUpdateCoordinator {
+   private checkOperation: Promise<DesktopUpdateState> | undefined
+   private downloadOperation: Promise<DesktopUpdateState> | undefined
+   private installOperation: Promise<DesktopUpdateState> | undefined
++  private readonly source: DesktopUpdateSource
+
+   private readonly onProgress = (progress: ProgressInfo): void => {
+     if (this.downloadOperation === undefined || this.downloaded) return
+@@ -43,7 +60,8 @@ export class DesktopUpdateCoordinator {
+    * @param publish - Receives observable states for every Desktop window.
+    * @param beforeRestart - Completes task authorization, admission locking, and owned-process shutdown.
+    * @param updater - Process-owned Electron updater, replaceable at the network/platform test boundary.
+-   * @param enabled - Whether this process has a packaged update source.
++   * @param source - Resolves the packaged feed policy; omitted resolves from the installed
++   *   application, and a build without a feed performs no check at all.
+    * @param currentVersion - Actual installed application version.
+    * @param channel - Installed package channel; omitted test/local callers retain nightly.
+    * @param downloadResult - Once per completed download attempt, including platform preparation failures.
+@@ -52,11 +70,12 @@ export class DesktopUpdateCoordinator {
+     private readonly publish: (state: DesktopUpdateState) => DesktopUpdateState,
+     private readonly beforeRestart: () => Promise<boolean>,
+     private readonly updater: AppUpdater = autoUpdater,
+-    private readonly enabled: () => boolean = () => app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml')),
++    source: (() => DesktopUpdateSource) | undefined = undefined,
+     private readonly currentVersion: () => string = () => app.getVersion(),
+     private readonly downloadResult?: (success: boolean, reason?: string) => void,
+     private readonly channel: 'nightly' | 'latest' = 'nightly',
+   ) {
++    this.source = source?.() ?? packagedUpdateSource(channel)
+     if (updater === autoUpdater) {
+       // electron-updater omits this internal transport property from its public declarations.
+       // Real-Electron qualification exercises the pinned dependency integration.
+@@ -80,6 +99,12 @@ export class DesktopUpdateCoordinator {
+   /** Latest observable state; complete download identity remains main-process-owned. */
+   get state(): DesktopUpdateState { return this.current }
+
++  /**
++   * Deployment of the packaged feed, resolved once for this process.
++   * @returns The validated feed, an absent build, or the rejection reason.
++   */
++  get availability(): DesktopUpdateSource { return this.source }
++
+   /**
+    * Check metadata without downloading, joining any current check.
+    * @param manual - Whether a failed check must remain visible in the status indicator.
+@@ -87,6 +112,9 @@ export class DesktopUpdateCoordinator {
+    */
+   async check(manual = false): Promise<DesktopUpdateState> {
+     this.assertLive()
++    // A build with no usable feed has nothing to check: report the idle state the
++    // shell already shows instead of a failure the user cannot act on.
++    if (this.source.kind !== 'configured') return this.current
+     if (this.downloadOperation !== undefined || this.installOperation !== undefined || this.downloaded) return this.current
+     if (!manual && this.current.phase === 'error' && this.current.failedOperation === 'download') return this.current
+     this.checkOperation ??= Promise.resolve().then(() => this.doCheck())
+@@ -184,7 +212,9 @@ export class DesktopUpdateCoordinator {
+   private async doCheck(): Promise<DesktopUpdateState> {
+     try {
+       this.assertLive()
+-      if (!this.enabled()) throw new Error('desktop update: this application has no packaged update source')
++      // `check` refuses every non-configured source, so this only guards a future
++      // caller that reaches the transport directly.
++      if (this.source.kind !== 'configured') throw new Error('desktop update: no packaged update source is configured')
+       const result = await this.updater.checkForUpdates()
+       if (result === null) throw new Error('desktop update: no check result was returned')
+       const version = result.updateInfo.version
+diff --git a/apps/desktop/src/update-journal.ts b/apps/desktop/src/update-journal.ts
+index bb6a179d6f..177a72259b 100644
+--- a/apps/desktop/src/update-journal.ts
++++ b/apps/desktop/src/update-journal.ts
+@@ -5,7 +5,7 @@ import { isAbsolute, join } from 'node:path'
+ import type { DesktopUpdateState } from './ipc.ts'
+
+ /** User and process milestones that connect update states across application restarts. */
+-export type DesktopUpdateJournalAction = 'started' | 'workspace-ready' | 'workspace-failed'
++export type DesktopUpdateJournalAction = 'started' | 'workspace-ready' | 'workspace-failed' | 'update-source-absent' | 'update-source-rejected'
+   | 'check-requested' | 'download-requested' | 'install-confirmed' | 'quit-requested'
+   | 'policy-login-opened' | 'policy-login-returned' | 'policy-login-cancelled' | 'policy-login-failed'
+
+diff --git a/apps/desktop/src/update-presentation.ts b/apps/desktop/src/update-presentation.ts
+index 42119d93a2..f76bb4fcfe 100644
+--- a/apps/desktop/src/update-presentation.ts
++++ b/apps/desktop/src/update-presentation.ts
+@@ -1,6 +1,7 @@
+ /** Semantic content for the Web-localized optional Desktop status indicator. */
+ import type { DesktopUpdateFailureKind, DesktopUpdatePresentation, DesktopUpdateState } from './ipc.ts'
+ import type { DesktopMessages } from './locale.ts'
++import type { DesktopUpdateSource } from './update-source.ts'
+
+ const NETWORK_FAILURE = /\b(?:ERR_CONNECTION_CLOSED|ERR_CONNECTION_RESET|ERR_INTERNET_DISCONNECTED|ERR_NAME_NOT_RESOLVED|ETIMEDOUT)\b/u
+
+@@ -49,3 +50,30 @@ export function presentDesktopUpdate(state: DesktopUpdateState): DesktopUpdatePr
+     ...(state.phase === 'error' ? { failure: desktopUpdateFailureKind(state) } : {}),
+   }
+ }
++
++/** Localized dialog content for a build whose update source is unusable. */
++export interface DesktopUpdateUnavailableContent {
++  readonly title: string
++  readonly message: string
++  readonly detail: string
++}
++
++/**
++ * Describe an unavailable update source in the user's language. A build with no
++ * feed and a build whose sealed feed failed validation are different facts, so
++ * they never share a message; neither one is reported as a check failure.
++ * @param source - Resolved deployment of the packaged feed.
++ * @param messages - Selected shell locale.
++ * @returns Dialog title, message, and detail for the unavailable source.
++ */
++export function desktopUpdateUnavailableContent(
++  source: DesktopUpdateSource,
++  messages: DesktopMessages,
++): DesktopUpdateUnavailableContent {
++  if (source.kind === 'rejected') {
++    return { title: messages.updateUnavailableTitle, message: messages.updateUnavailableRejected,
++      detail: messages.updateUnavailableRejectedDetail }
++  }
++  return { title: messages.updateUnavailableTitle, message: messages.updateUnavailableAbsent,
++    detail: messages.updateUnavailableAbsentDetail }
++}
+diff --git a/apps/desktop/src/update-source.ts b/apps/desktop/src/update-source.ts
+new file mode 100644
+index 0000000000..308ba20181
+--- /dev/null
++++ b/apps/desktop/src/update-source.ts
+@@ -0,0 +1,174 @@
++/**
++ * Packaged auto-update source policy for the branded Desktop.
++ *
++ * A branded build ships either with a PaiNuo-operated generic feed or with no
++ * feed at all; it never polls an upstream DeepSeek destination. The packaging
++ * path already refuses to build a production release without an explicit
++ * `DSH_DESKTOP_UPDATE_ORIGIN` (`desktop-auto-update-environment.mjs`), and this
++ * module re-validates the feed sealed into the installed application before the
++ * updater is allowed to make a request. A build without a feed is a supported
++ * deployment, not a failure: the shell reports "no automatic updates" instead
++ * of a fake check failure, and the coordinator performs no network work.
++ *
++ * The sealed file is electron-updater's `app-update.yml`, written by
++ * electron-builder (Windows) or `macos-app-update-config.mjs` (macOS) before
++ * code signing. Only the `generic` provider is accepted; a GitHub or COS
++ * publisher row would resolve to a different transport than the reviewed one.
++ *
++ * @module @deepseek-ai/dsh-desktop/update-source
++ */
++
++import { readFileSync } from 'node:fs'
++import { isUpstreamDeepSeekHost } from './brand-endpoints.ts'
++
++/** Installer-owned update channel; mirrors the packaged manifest channel. */
++export type DesktopUpdateSourceChannel = 'nightly' | 'latest'
++
++/**
++ * Why a sealed feed is unusable. The shell shows localized copy for the kind;
++ * the reason stays in logs and diagnostics.
++ */
++export type DesktopUpdateSourceRejection =
++  | 'config-unreadable'
++  | 'config-malformed'
++  | 'provider-unsupported'
++  | 'url-malformed'
++  | 'url-insecure'
++  | 'upstream-host'
++  | 'channel-mismatch'
++
++/** A validated PaiNuo-operated generic feed the updater may poll. */
++export interface DesktopUpdateSourceConfigured {
++  readonly kind: 'configured'
++  readonly url: string
++  readonly channel: DesktopUpdateSourceChannel
++}
++
++/** A build that ships no update feed; automatic updates are unsupported. */
++export interface DesktopUpdateSourceAbsent {
++  readonly kind: 'absent'
++}
++
++/** A sealed feed that failed validation; the updater must not use it. */
++export interface DesktopUpdateSourceRejected {
++  readonly kind: 'rejected'
++  readonly reason: DesktopUpdateSourceRejection
++}
++
++/** Validated deployment of the packaged updater. */
++export type DesktopUpdateSource =
++  | DesktopUpdateSourceConfigured
++  | DesktopUpdateSourceAbsent
++  | DesktopUpdateSourceRejected
++
++/** Inputs for one source resolution; the reader is injectable for tests. */
++export interface DesktopUpdateSourceOptions {
++  /** Whether this process runs from an installed application bundle. */
++  readonly packaged: boolean
++  /** Absolute path of the sealed `app-update.yml`. */
++  readonly configPath: string
++  /** Channel sealed into the installed application manifest. */
++  readonly expectedChannel: DesktopUpdateSourceChannel
++  /** Returns the file contents, or undefined when the file does not exist. */
++  readonly readConfig?: (path: string) => string | undefined
++}
++
++/** Fields read from one sealed updater configuration. */
++interface SealedUpdateConfig {
++  readonly provider?: string
++  readonly url?: string
++  readonly channel?: string
++}
++
++/**
++ * Read one sealed configuration, tolerating only an absent file.
++ * @param path - Absolute path of `app-update.yml`.
++ * @returns File contents, or undefined when the file does not exist.
++ * @throws when the file exists but cannot be read.
++ */
++function readSealedConfig(path: string): string | undefined {
++  try {
++    return readFileSync(path, 'utf8')
++  } catch (error) {
++    // A missing file is the normal state of an unsigned/dev build; any other
++    // failure must reach the caller instead of looking like "no feed".
++    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
++    throw error
++  }
++}
++
++/**
++ * Read the three scalar fields this policy validates from electron-updater's
++ * configuration. Other keys (`updaterCacheDirName`, publisher rows) are
++ * ignored: the updater still reads them, while only these select a destination.
++ * @param text - Sealed configuration text.
++ * @returns Trimmed field values, or undefined when a field repeats.
++ */
++function parseSealedConfig(text: string): SealedUpdateConfig | undefined {
++  const fields: { provider?: string; url?: string; channel?: string } = {}
++  const seen = new Set<keyof SealedUpdateConfig>()
++  for (const raw of text.split(/\r?\n/u)) {
++    const line = raw.trim()
++    if (line === '' || line.startsWith('#')) continue
++    const separator = line.indexOf(':')
++    if (separator === -1) continue
++    const key = line.slice(0, separator).trim()
++    if (key !== 'provider' && key !== 'url' && key !== 'channel') continue
++    if (seen.has(key)) return undefined
++    seen.add(key)
++    const value = line.slice(separator + 1).trim().replace(/^(['"])(.*)\1$/u, '$2')
++    if (value !== '') fields[key] = value
++  }
++  return fields
++}
++
++/**
++ * Validate one parsed feed URL. Only an absolute HTTPS origin with a path
++ * accepts updates; credentials, queries, and fragments are rejected because
++ * the packaged writer never emits them and they change the request target.
++ * @param value - Parsed `url` field.
++ * @returns Normalized feed URL, or the rejection reason.
++ */
++function validateFeedUrl(value: string): { url: string } | { reason: DesktopUpdateSourceRejection } {
++  let parsed: URL
++  try {
++    parsed = new URL(value)
++  } catch (_error) {
++    return { reason: 'url-malformed' }
++  }
++  if (parsed.protocol !== 'https:') return { reason: 'url-insecure' }
++  if (parsed.username !== '' || parsed.password !== '' || parsed.search !== '' || parsed.hash !== '') {
++    return { reason: 'url-malformed' }
++  }
++  if (!parsed.pathname.endsWith('/')) return { reason: 'url-malformed' }
++  if (isUpstreamDeepSeekHost(parsed.hostname)) return { reason: 'upstream-host' }
++  return { url: parsed.toString() }
++}
++
++/**
++ * Resolve the deployment of the packaged updater. Every rejection is final for
++ * this process: the coordinator never falls back to another destination,
++ * because a branded build has no reviewed second feed.
++ * @param options - Packaged state, sealed configuration path, and expected channel.
++ * @returns Validated source, an absent source, or a typed rejection.
++ */
++export function resolveDesktopUpdateSource(options: DesktopUpdateSourceOptions): DesktopUpdateSource {
++  if (!options.packaged) return { kind: 'absent' }
++  const read = options.readConfig ?? readSealedConfig
++  let text: string | undefined
++  try {
++    text = read(options.configPath)
++  } catch (_error) {
++    return { kind: 'rejected', reason: 'config-unreadable' }
++  }
++  if (text === undefined) return { kind: 'absent' }
++  const config = parseSealedConfig(text)
++  if (config === undefined) return { kind: 'rejected', reason: 'config-malformed' }
++  if (config.provider !== 'generic') return { kind: 'rejected', reason: 'provider-unsupported' }
++  if (config.channel !== options.expectedChannel) return { kind: 'rejected', reason: 'channel-mismatch' }
++  if (config.url === undefined) return { kind: 'rejected', reason: 'config-malformed' }
++  const validated = validateFeedUrl(config.url)
++  return 'reason' in validated
++    ? { kind: 'rejected', reason: validated.reason }
++    : { kind: 'configured', url: validated.url, channel: options.expectedChannel }
++}
+diff --git a/apps/desktop/tests/account-backend.spec.ts b/apps/desktop/tests/account-backend.spec.ts
+index c239336b22..d5cbf93855 100644
+--- a/apps/desktop/tests/account-backend.spec.ts
++++ b/apps/desktop/tests/account-backend.spec.ts
+@@ -4,22 +4,22 @@ import { expect, it, onTestFinished, vi } from 'vitest'
+ import { accountView, desktopAccountBackend } from '../src/account-backend.ts'
+
+ it('projects only safe account fields and refuses non-browser authorization schemes', () => {
+-  const state = { links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', token: 'not-for-the-renderer',
++  const state = { links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', token: 'not-for-the-renderer',
+     attempt: { id: 'test', phase: 'waiting-browser', authorizeUrl: 'https://platform.deepseek.com/dsh/authorize', codeVerifier: 'private' } }
+-  expect(accountView(state)).toEqual({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: {
++  expect(accountView(state)).toEqual({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: {
+     id: 'test', phase: 'waiting-browser', authorizeUrl: 'https://platform.deepseek.com/dsh/authorize',
+   } })
+   for (const authorizeUrl of ['file:///tmp/example', 'javascript:alert(1)', 'http://example.com/login']) {
+     expect(() => accountView({ ...state, attempt: { ...state.attempt, authorizeUrl } })).toThrow()
+   }
+-  expect(() => accountView({ ...state, links: { usageUrl: 'file:///tmp/example', topUpUrl: 'https://example.com/top_up' } })).toThrow()
++  expect(() => accountView({ ...state, links: { usageUrl: 'file:///tmp/example', topUpUrl: 'https://example.com/top_up', embedded: true } })).toThrow()
+   expect(() => accountView({ ...state, attempt: { ...state.attempt, expiresAt: 'tomorrow' } })).toThrow()
+   expect(() => accountView({ ...state, attempt: { ...state.attempt, errorCode: 'raw-server-message' } })).toThrow()
+ })
+
+ it('accepts a no-response login failure without discarding the account projection', () => {
+   const state = { status: 'signed-out', attempt: { id: 'test', phase: 'failed', errorCode: 'no-response' },
+-    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' } }
++    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true } }
+   expect(accountView(state)).toEqual(state)
+ })
+
+@@ -27,10 +27,10 @@ it('uses account Remote commands without returning additional wire fields', asyn
+   const requests: unknown[] = []
+   const backend = desktopAccountBackend('http://127.0.0.1:1234', (request) => {
+     requests.push(request)
+-    return Promise.resolve({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null, token: 'private' })
++    return Promise.resolve({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: null, token: 'private' })
+   }, () => Promise.resolve(''))
+   const client = { version: '1.2.3', locale: 'en', timezoneOffsetSeconds: 28_800 }
+-  expect(await backend.start(client)).toEqual({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null })
++  expect(await backend.start(client)).toEqual({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: null })
+   expect(await backend.signOut(client)).toMatchObject({ status: 'signed-out' })
+   expect(requests).toEqual([
+     { namespace: 'account', method: 'startSignIn', args: { client, callbackOrigin: 'http://127.0.0.1:1234', loginSource: 'desktop' } },
+@@ -40,7 +40,7 @@ it('uses account Remote commands without returning additional wire fields', asyn
+
+ it('does not replay an expiry reason from an account snapshot', () => {
+   const state = { status: 'signed-out', attempt: null,
+-    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' } }
++    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true } }
+   expect(accountView({ ...state, signOutReason: 'expired' })).toEqual(state)
+ })
+
+@@ -57,7 +57,7 @@ it('receives live expiry separately from account snapshots', async () => {
+   const expired = vi.fn()
+   const onAnalyticsEnabledChanged = vi.fn()
+   const snapshot = { status: 'signed-out', attempt: null,
+-    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' } }
++    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true } }
+   const received = Promise.withResolvers<undefined>()
+   const backend = desktopAccountBackend(`http://127.0.0.1:${address.port}`, () => Promise.resolve(snapshot), () => Promise.resolve(''))
+   const stop = backend.watch(
 diff --git a/apps/desktop/tests/brand-endpoints.spec.ts b/apps/desktop/tests/brand-endpoints.spec.ts
 new file mode 100644
 index 0000000000..ef4f48b5df
@@ -1545,6 +2159,19 @@ index 9fbe629c89..8b57885b95 100644
      }, 'win32', 'x64')).toThrow(/DOWNLOAD_PROD_COS_BUCKET/u)
    })
 
+diff --git a/apps/desktop/tests/desktop-publication-preflight.spec.ts b/apps/desktop/tests/desktop-publication-preflight.spec.ts
+index 39e717a827..47c07e8b19 100644
+--- a/apps/desktop/tests/desktop-publication-preflight.spec.ts
++++ b/apps/desktop/tests/desktop-publication-preflight.spec.ts
+@@ -31,7 +31,7 @@ it.each(['mac-arm64', 'win-x64'] as const)('preflights a complete retained %s bu
+     if (target !== 'win-x64') await writeFile(join(artifacts, `${base}.dmg`), 'fixture DMG')
+     await writeFile(join(artifacts, `${target}-release.json`), JSON.stringify({
+       schemaVersion: 1, target, environment: 'test', version: '1.0.0', commit, dirty: false,
+-      publicUrl: `https://example.com/dsh-desk/${releaseId}/feeds/${target}/`,
++      publicUrl: `https://example.com/suishendazi-desk/${releaseId}/feeds/${target}/`,
+     }))
+     await writeFile(join(artifacts, target === 'win-x64' ? 'nightly.yml' : 'nightly-mac.yml'), JSON.stringify({
+       version: '1.0.0', files: [{ url: `${base}.${extension}`, size: Buffer.byteLength(bytes),
 diff --git a/apps/desktop/tests/desktop-publish-config.spec.ts b/apps/desktop/tests/desktop-publish-config.spec.ts
 index 9577581d82..9b4eb49d1f 100644
 --- a/apps/desktop/tests/desktop-publish-config.spec.ts
@@ -1567,6 +2194,503 @@ index 9577581d82..9b4eb49d1f 100644
        githubApp: { clientId: 'app-id', privateKeyFile: join(root, 'key.pem') } }
      for (const githubApp of [
        { ...config.githubApp, clientId: 'app-id\nother=value' },
+diff --git a/apps/desktop/tests/desktop-upload-plan.spec.ts b/apps/desktop/tests/desktop-upload-plan.spec.ts
+index def8cb19bf..3b8eb1ea8c 100644
+--- a/apps/desktop/tests/desktop-upload-plan.spec.ts
++++ b/apps/desktop/tests/desktop-upload-plan.spec.ts
+@@ -40,7 +40,7 @@ async function fixture(
+   environment: 'test' | 'production' = 'test',
+   channel: 'nightly' | 'latest' = 'nightly',
+ ): Promise<Fixture> {
+-  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-upload-'))
++  const root = await mkdtemp(join(tmpdir(), 'suishendazi-desktop-upload-'))
+   temporaryDirectories.push(root)
+   const repositoryRoot = join(root, 'repository')
+   const appRoot = join(repositoryRoot, 'apps', 'desktop')
+@@ -53,14 +53,14 @@ async function fixture(
+   const base = `deepseek-harness-${version}-${os}-${arch}`
+   const origin = environment === 'test'
+     ? TEST_ORIGIN
+-    : 'https://download.deepseek.com'
++    : 'https://updates.modelxing.com'
+   await writeFile(join(artifactsRoot, `${target}-release.json`), `${JSON.stringify({
+     schemaVersion: 1,
+     channel,
+     target,
+     version,
+     environment,
+-    publicUrl: `${origin}/dsh-desk/${environment === 'test' ? `${RELEASE_ID}/` : ''}feeds/${target}/`,
++    publicUrl: `${origin}/suishendazi-desk/${environment === 'test' ? `${RELEASE_ID}/` : ''}feeds/${target}/`,
+   })}\n`)
+
+   if (os === 'mac') {
+@@ -104,6 +104,7 @@ async function fixture(
+       : {
+         DSH_DESKTOP_UPDATE_CHANNEL: channel,
+         DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
++        DSH_DESKTOP_UPDATE_ORIGIN: 'https://updates.modelxing.com',
+         DOWNLOAD_PROD_COS_BUCKET: PRODUCTION_BUCKET,
+       },
+   }
+@@ -189,14 +190,14 @@ describe('desktop upload plan', () => {
+     const paths = await fixture('win-x64', '1.2.3', 'production')
+     const plan = await createDesktopUploadPlan('win-x64', paths)
+     expect(plan.artifacts.map(artifact => artifact.key)).toEqual([
+-      'dsh-desk/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe',
+-      'dsh-desk/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe.blockmap',
+-      'dsh-desk/feeds/win-x64/nightly.yml',
++      'suishendazi-desk/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe',
++      'suishendazi-desk/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe.blockmap',
++      'suishendazi-desk/feeds/win-x64/nightly.yml',
+     ])
+     expect(load(plan.artifacts[2]!.contents!)).toMatchObject({
+       version: '1.2.3',
+       files: [{
+-        url: 'https://download.deepseek.com/dsh-desk/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe',
++        url: 'https://updates.modelxing.com/suishendazi-desk/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe',
+         sha512: digest('signed NSIS executable fixture'),
+       }],
+     })
+@@ -209,7 +210,7 @@ describe('desktop upload plan', () => {
+     expect(plan).toMatchObject({
+       environment: 'test',
+       version: '1.2.3',
+-      publicUrl: `https://desktop-updates.example.com/dsh-desk/${RELEASE_ID}/feeds/mac-arm64/`,
++      publicUrl: `https://desktop-updates.example.com/suishendazi-desk/${RELEASE_ID}/feeds/mac-arm64/`,
+       bucket: TEST_BUCKET,
+     })
+     expect(plan.artifacts.map(artifact => artifact.filename)).toEqual([
+@@ -226,7 +227,7 @@ describe('desktop upload plan', () => {
+   it.each(['mac-arm64', 'mac-x64', 'win-x64'] as const)('publishes every %s object and YAML reference inside the test release directory', async (target) => {
+     const paths = await fixture(target)
+     const plan = await createDesktopUploadPlan(target, paths)
+-    const prefix = `dsh-desk/${RELEASE_ID}`
++    const prefix = `suishendazi-desk/${RELEASE_ID}`
+     const payload = plan.artifacts.find(artifact => artifact.filename.endsWith(target === 'win-x64' ? '.exe' : '.zip'))!
+     for (const artifact of plan.artifacts) {
+       expect(artifact.key).toBe(`${prefix}/${artifact.channelMetadata ? 'feeds' : 'bin'}/${target}/${artifact.filename}`)
+@@ -271,7 +272,7 @@ describe('desktop upload plan', () => {
+       'nightly.yml',
+     ])
+     expect(plan).toMatchObject({
+-      publicUrl: 'https://download.deepseek.com/dsh-desk/feeds/win-x64/',
++      publicUrl: 'https://updates.modelxing.com/suishendazi-desk/feeds/win-x64/',
+       bucket: PRODUCTION_BUCKET,
+     })
+   })
+diff --git a/apps/desktop/tests/expected/latest-installer-uploads.json b/apps/desktop/tests/expected/latest-installer-uploads.json
+index b4b6d90b4f..c73d86420d 100644
+--- a/apps/desktop/tests/expected/latest-installer-uploads.json
++++ b/apps/desktop/tests/expected/latest-installer-uploads.json
+@@ -3,7 +3,7 @@
+     "environment": "production",
+     "target": "mac-arm64",
+     "bucket": "production-download-bucket-1250000000",
+-    "publicUrl": "https://download.deepseek.com/desktop/dsh-latest-macos-arm64.dmg",
++    "publicUrl": "https://updates.modelxing.com/desktop/dsh-latest-macos-arm64.dmg",
+     "filename": "dsh-latest-macos-arm64.dmg",
+     "key": "desktop/dsh-latest-macos-arm64.dmg",
+     "contentType": "application/x-apple-diskimage",
+@@ -13,7 +13,7 @@
+     "environment": "production",
+     "target": "mac-x64",
+     "bucket": "production-download-bucket-1250000000",
+-    "publicUrl": "https://download.deepseek.com/desktop/dsh-latest-macos-x64.dmg",
++    "publicUrl": "https://updates.modelxing.com/desktop/dsh-latest-macos-x64.dmg",
+     "filename": "dsh-latest-macos-x64.dmg",
+     "key": "desktop/dsh-latest-macos-x64.dmg",
+     "contentType": "application/x-apple-diskimage",
+@@ -23,7 +23,7 @@
+     "environment": "production",
+     "target": "win-x64",
+     "bucket": "production-download-bucket-1250000000",
+-    "publicUrl": "https://download.deepseek.com/desktop/dsh-latest-windows-x64.exe",
++    "publicUrl": "https://updates.modelxing.com/desktop/dsh-latest-windows-x64.exe",
+     "filename": "dsh-latest-windows-x64.exe",
+     "key": "desktop/dsh-latest-windows-x64.exe",
+     "contentType": "application/vnd.microsoft.portable-executable",
+diff --git a/apps/desktop/tests/expected/publication-mac-arm64.md b/apps/desktop/tests/expected/publication-mac-arm64.md
+index 7b376d9d65..5b0aba0462 100644
+--- a/apps/desktop/tests/expected/publication-mac-arm64.md
++++ b/apps/desktop/tests/expected/publication-mac-arm64.md
+@@ -10,8 +10,8 @@
+ | 升级通道 | <code>nightly</code> |
+ | 平台 | <code>mac-arm64</code> |
+ | 测试 release ID | <code>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</code><br>测试下载路径的随机前缀，用于降低地址被猜到的可能性；连续升级测试需使用相同值。 |
+-| 下载地址预览 | <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.dmg">https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.dmg</a><br>发布后的目标地址，审批前不保证可下载。 |
+-| 升级 YAML | <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/mac-arm64/nightly-mac.yml">https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/mac-arm64/nightly-mac.yml</a><br>本次发布将更新此文件；审批前可能不存在或仍指向旧版本。 |
++| 下载地址预览 | <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.dmg">https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.dmg</a><br>发布后的目标地址，审批前不保证可下载。 |
++| 升级 YAML | <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/mac-arm64/nightly-mac.yml">https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/mac-arm64/nightly-mac.yml</a><br>本次发布将更新此文件；审批前可能不存在或仍指向旧版本。 |
+ | 打包来源 | <a href="https&#58;//github.com/owner/repo/actions/runs/10/attempts/2">查看打包运行 #10 · 第 2 次尝试</a><br>源码：<code>master @ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</code><br>打包机器：<code>fixture-runner</code> |
+ | 签名与公证 | DMG 校验通过<br>ZIP 内应用校验通过 |
+ | Git tag | 不创建（test 环境） |
+@@ -37,10 +37,10 @@ release ID 取自原打包产物清单。打包时优先使用表单 `test_relea
+
+ | 文件 | 大小 | SHA-256 |
+ | --- | --- | --- |
+-| <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.dmg">deepseek-harness-1.0.0-mac-arm64.dmg</a> | 11 字节 | <code>eac5da462cb16554774d722fa4093739ffc9ade2f4c6e8ee54041e71908f1408</code> |
+-| <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.zip">deepseek-harness-1.0.0-mac-arm64.zip</a> | 23 字节 | <code>7039e7b3e00d39fbfb2948ba31b6216ac9ffff01b4117a1cec08025255d9ad10</code> |
+-| <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.zip.blockmap">deepseek-harness-1.0.0-mac-arm64.zip.blockmap</a> | 16 字节 | <code>4fd6c7d73e713d7f54f173dfc845d046d267f9e62c80a92670b0696131bfb74a</code> |
+-| <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/mac-arm64/nightly-mac.yml">nightly-mac.yml</a> | 276 字节 | <code>86180a8b9207744d8300e993040f28ad8812f16cf30367b2f04f5dcfadb87452</code> |
++| <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.dmg">deepseek-harness-1.0.0-mac-arm64.dmg</a> | 11 字节 | <code>eac5da462cb16554774d722fa4093739ffc9ade2f4c6e8ee54041e71908f1408</code> |
++| <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.zip">deepseek-harness-1.0.0-mac-arm64.zip</a> | 23 字节 | <code>7039e7b3e00d39fbfb2948ba31b6216ac9ffff01b4117a1cec08025255d9ad10</code> |
++| <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/mac-arm64/deepseek-harness-1.0.0-mac-arm64.zip.blockmap">deepseek-harness-1.0.0-mac-arm64.zip.blockmap</a> | 16 字节 | <code>4fd6c7d73e713d7f54f173dfc845d046d267f9e62c80a92670b0696131bfb74a</code> |
++| <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/mac-arm64/nightly-mac.yml">nightly-mac.yml</a> | 284 字节 | <code>be96882c566dd563591b85470c5f685def4a24f05362030616e2698c805af758</code> |
+
+ </details>
+
+diff --git a/apps/desktop/tests/expected/publication-win-x64.md b/apps/desktop/tests/expected/publication-win-x64.md
+index aa7569c0a2..f7ff22c557 100644
+--- a/apps/desktop/tests/expected/publication-win-x64.md
++++ b/apps/desktop/tests/expected/publication-win-x64.md
+@@ -10,8 +10,8 @@
+ | 升级通道 | <code>nightly</code> |
+ | 平台 | <code>win-x64</code> |
+ | 测试 release ID | <code>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</code><br>测试下载路径的随机前缀，用于降低地址被猜到的可能性；连续升级测试需使用相同值。 |
+-| 下载地址预览 | <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/deepseek-harness-1.0.0-win-x64.exe">https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/deepseek-harness-1.0.0-win-x64.exe</a><br>发布后的目标地址，审批前不保证可下载。 |
+-| 升级 YAML | <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/win-x64/nightly.yml">https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/win-x64/nightly.yml</a><br>本次发布将更新此文件；审批前可能不存在或仍指向旧版本。 |
++| 下载地址预览 | <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/deepseek-harness-1.0.0-win-x64.exe">https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/deepseek-harness-1.0.0-win-x64.exe</a><br>发布后的目标地址，审批前不保证可下载。 |
++| 升级 YAML | <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/win-x64/nightly.yml">https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/win-x64/nightly.yml</a><br>本次发布将更新此文件；审批前可能不存在或仍指向旧版本。 |
+ | 打包来源 | <a href="https&#58;//github.com/owner/repo/actions/runs/10/attempts/2">查看打包运行 #10 · 第 2 次尝试</a><br>源码：<code>master @ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</code><br>打包机器：<code>fixture-runner</code> |
+ | 签名与公证 | EXE 签名校验通过 |
+ | Git tag | 不创建（test 环境） |
+@@ -37,9 +37,9 @@ release ID 取自原打包产物清单。打包时优先使用表单 `test_relea
+
+ | 文件 | 大小 | SHA-256 |
+ | --- | --- | --- |
+-| <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/deepseek-harness-1.0.0-win-x64.exe">deepseek-harness-1.0.0-win-x64.exe</a> | 23 字节 | <code>7039e7b3e00d39fbfb2948ba31b6216ac9ffff01b4117a1cec08025255d9ad10</code> |
+-| <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/deepseek-harness-1.0.0-win-x64.exe.blockmap">deepseek-harness-1.0.0-win-x64.exe.blockmap</a> | 16 字节 | <code>4fd6c7d73e713d7f54f173dfc845d046d267f9e62c80a92670b0696131bfb74a</code> |
+-| <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/win-x64/nightly.yml">nightly.yml</a> | 272 字节 | <code>faccf50f8398d6781568114dda9a678751e4c01044dd9424d00237c69e58cb59</code> |
++| <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/deepseek-harness-1.0.0-win-x64.exe">deepseek-harness-1.0.0-win-x64.exe</a> | 23 字节 | <code>7039e7b3e00d39fbfb2948ba31b6216ac9ffff01b4117a1cec08025255d9ad10</code> |
++| <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/deepseek-harness-1.0.0-win-x64.exe.blockmap">deepseek-harness-1.0.0-win-x64.exe.blockmap</a> | 16 字节 | <code>4fd6c7d73e713d7f54f173dfc845d046d267f9e62c80a92670b0696131bfb74a</code> |
++| <a href="https&#58;//example.com/suishendazi-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/feeds/win-x64/nightly.yml">nightly.yml</a> | 280 字节 | <code>2955152ff41386b8d9417f1399b2e523871d81f16c9016cc2a27e552eae42d1f</code> |
+
+ </details>
+
+diff --git a/apps/desktop/tests/expected/test-release-upload-mac-arm64.json b/apps/desktop/tests/expected/test-release-upload-mac-arm64.json
+index 69af29ec01..9961106c1e 100644
+--- a/apps/desktop/tests/expected/test-release-upload-mac-arm64.json
++++ b/apps/desktop/tests/expected/test-release-upload-mac-arm64.json
+@@ -1,15 +1,15 @@
+ [
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.dmg"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.dmg"
+   },
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.zip"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.zip"
+   },
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.zip.blockmap"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.zip.blockmap"
+   },
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/feeds/mac-arm64/nightly-mac.yml",
+-    "contents": "version: 1.2.3\npath: >-\n  https://desktop-updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.zip\nfiles:\n  - url: >-\n      https://desktop-updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.zip\n    size: 24\n    sha512: >-\n      IgtiHRPFjickTxiSTW6k0ltyBNOF/gpMGj/xflzVV2iRIzUSFPY6BG45u9fR4GmAJSVtN+FMh3NZx7mddUfJLw==\n"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/feeds/mac-arm64/nightly-mac.yml",
++    "contents": "version: 1.2.3\npath: >-\n  https://desktop-updates.example.com/suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.zip\nfiles:\n  - url: >-\n      https://desktop-updates.example.com/suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-arm64/deepseek-harness-1.2.3-mac-arm64.zip\n    size: 24\n    sha512: >-\n      IgtiHRPFjickTxiSTW6k0ltyBNOF/gpMGj/xflzVV2iRIzUSFPY6BG45u9fR4GmAJSVtN+FMh3NZx7mddUfJLw==\n"
+   }
+ ]
+diff --git a/apps/desktop/tests/expected/test-release-upload-mac-x64.json b/apps/desktop/tests/expected/test-release-upload-mac-x64.json
+index 2c085140ce..4f7e094784 100644
+--- a/apps/desktop/tests/expected/test-release-upload-mac-x64.json
++++ b/apps/desktop/tests/expected/test-release-upload-mac-x64.json
+@@ -1,15 +1,15 @@
+ [
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.dmg"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.dmg"
+   },
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.zip"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.zip"
+   },
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.zip.blockmap"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.zip.blockmap"
+   },
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/feeds/mac-x64/nightly-mac.yml",
+-    "contents": "version: 1.2.3\npath: >-\n  https://desktop-updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.zip\nfiles:\n  - url: >-\n      https://desktop-updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.zip\n    size: 24\n    sha512: >-\n      IgtiHRPFjickTxiSTW6k0ltyBNOF/gpMGj/xflzVV2iRIzUSFPY6BG45u9fR4GmAJSVtN+FMh3NZx7mddUfJLw==\n"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/feeds/mac-x64/nightly-mac.yml",
++    "contents": "version: 1.2.3\npath: >-\n  https://desktop-updates.example.com/suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.zip\nfiles:\n  - url: >-\n      https://desktop-updates.example.com/suishendazi-desk/0123456789abcdef0123456789abcdef/bin/mac-x64/deepseek-harness-1.2.3-mac-x64.zip\n    size: 24\n    sha512: >-\n      IgtiHRPFjickTxiSTW6k0ltyBNOF/gpMGj/xflzVV2iRIzUSFPY6BG45u9fR4GmAJSVtN+FMh3NZx7mddUfJLw==\n"
+   }
+ ]
+diff --git a/apps/desktop/tests/expected/test-release-upload-win-x64.json b/apps/desktop/tests/expected/test-release-upload-win-x64.json
+index 9c7db67400..104be1cda8 100644
+--- a/apps/desktop/tests/expected/test-release-upload-win-x64.json
++++ b/apps/desktop/tests/expected/test-release-upload-win-x64.json
+@@ -1,12 +1,12 @@
+ [
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe"
+   },
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe.blockmap"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe.blockmap"
+   },
+   {
+-    "key": "dsh-desk/0123456789abcdef0123456789abcdef/feeds/win-x64/nightly.yml",
+-    "contents": "version: 1.2.3\npath: >-\n  https://desktop-updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe\nfiles:\n  - url: >-\n      https://desktop-updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe\n    size: 30\n    sha512: >-\n      eVumVOW1yvT3fAgGKUnliEzSfhmn8jUfzpNaUPufU1yekWrwJe8wRPC+JOrHH2Hmc/eLynwxjX1yIiER8tVOTA==\n"
++    "key": "suishendazi-desk/0123456789abcdef0123456789abcdef/feeds/win-x64/nightly.yml",
++    "contents": "version: 1.2.3\npath: >-\n  https://desktop-updates.example.com/suishendazi-desk/0123456789abcdef0123456789abcdef/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe\nfiles:\n  - url: >-\n      https://desktop-updates.example.com/suishendazi-desk/0123456789abcdef0123456789abcdef/bin/win-x64/deepseek-harness-1.2.3-win-x64.exe\n    size: 30\n    sha512: >-\n      eVumVOW1yvT3fAgGKUnliEzSfhmn8jUfzpNaUPufU1yekWrwJe8wRPC+JOrHH2Hmc/eLynwxjX1yIiER8tVOTA==\n"
+   }
+ ]
+diff --git a/apps/desktop/tests/installed-update-builder.spec.ts b/apps/desktop/tests/installed-update-builder.spec.ts
+index 12e5a82258..402310410a 100644
+--- a/apps/desktop/tests/installed-update-builder.spec.ts
++++ b/apps/desktop/tests/installed-update-builder.spec.ts
+@@ -18,7 +18,7 @@ vi.mock('../scripts/windows-sign.mjs', () => ({
+ }))
+
+ const versions = ['0.1.6-nightly.20260914.1', '0.1.6-nightly.20260914.2'] as const
+-const environment = { DSH_DESKTOP_AUTO_UPDATE_ENV: 'test', DOWNLOAD_TEST_ORIGIN: 'https://download-test.deepseek.com', DOWNLOAD_TEST_RELEASE_ID: '0123456789abcdef0123456789abcdef',
++const environment = { DSH_DESKTOP_AUTO_UPDATE_ENV: 'test', DOWNLOAD_TEST_ORIGIN: 'https://download-test.modelxing.com', DOWNLOAD_TEST_RELEASE_ID: '0123456789abcdef0123456789abcdef',
+   DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://policy.example.com',
+   DSH_DESKTOP_MANDATORY_UPDATE_CONFIG: JSON.stringify({ allowedAuthOrigins: ['https://login.example.com'] }),
+   DOWNLOAD_TEST_COS_BUCKET: 'bj-toc-download-test-1320056602' }
+@@ -98,7 +98,7 @@ describe('installed-update application inputs and builder configuration', () =>
+         expect(typeof config.beforeBuild).toBe('function')
+         expect(config.nsis.include).toMatch(/scripts[\\/]installer\.nsh$/u)
+         expect(config.publish[0]!.url)
+-          .toMatch(/^https:\/\/download-test\.deepseek\.com\/dsh-desk\/feeds\/qualification\/[a-f0-9]{24}\/win-x64\/$/u)
++          .toMatch(/^https:\/\/download-test\.modelxing\.com\/suishendazi-desk\/feeds\/qualification\/[a-f0-9]{24}\/win-x64\/$/u)
+       }
+     })
+   })
+@@ -115,7 +115,7 @@ describe('installed-update application inputs and builder configuration', () =>
+   it.each([
+     { DSH_DESKTOP_AUTO_UPDATE_ENV: 'production' },
+     { DSH_DESKTOP_UNSIGNED: '1' },
+-    { DOWNLOAD_TEST_ORIGIN: 'https://download.deepseek.com' },
++    { DOWNLOAD_TEST_ORIGIN: 'https://updates.modelxing.com' },
+   ])('rejects incompatible qualification settings %j', async (override) => {
+     await fixture(async (manifest) => {
+       await expect(createInstalledUpdateBuilderConfig(manifest, versions[0], { ...environment, ...override })).rejects.toThrow('test deployment')
+diff --git a/apps/desktop/tests/installed-update-cos.spec.ts b/apps/desktop/tests/installed-update-cos.spec.ts
+index ca8dd93ec0..389c52f9aa 100644
+--- a/apps/desktop/tests/installed-update-cos.spec.ts
++++ b/apps/desktop/tests/installed-update-cos.spec.ts
+@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
+ }))
+
+ vi.mock('../scripts/desktop-package-environment.mjs', () => ({ loadDesktopPackageEnvironment: () => ({
+-  DSH_DESKTOP_AUTO_UPDATE_ENV: state.settings, DOWNLOAD_TEST_ORIGIN: 'https://download-test.deepseek.com',
++  DSH_DESKTOP_AUTO_UPDATE_ENV: state.settings, DOWNLOAD_TEST_ORIGIN: 'https://download-test.modelxing.com',
+   DOWNLOAD_TEST_COS_BUCKET: 'bj-toc-download-test-1320056602', DOWNLOAD_TEST_COS_SECRET_ID: 'fixture-id',
+   DOWNLOAD_TEST_COS_SECRET_KEY: 'fixture-key', DSH_DESKTOP_WINDOWS_TOKEN_PIN: 'fixture-pin-not-for-sdk',
+ }) }))
+@@ -177,7 +177,7 @@ describe('qualification COS transport with real SDK serialization over a loopbac
+     const fetch = vi.fn(async () => new Response('public bytes'))
+     vi.stubGlobal('fetch', fetch)
+     const { store: cos } = await store((_request, response) => { answer(response) })
+-    const url = `https://download-test.deepseek.com/${key}`
++    const url = `https://download-test.modelxing.com/${key}`
+     expect(await cos.publicRead(url)).toEqual({ size: 12, sha512: createHash('sha512').update('public bytes').digest('base64') })
+     expect(fetch).toHaveBeenCalledWith(url, expect.objectContaining({ redirect: 'error', cache: 'no-store' }))
+     await expect(cos.publicRead(`${url}?fresh=1`)).rejects.toThrow('exact test public URL')
+diff --git a/apps/desktop/tests/installed-update-distribution.spec.ts b/apps/desktop/tests/installed-update-distribution.spec.ts
+index 100a9723ec..60c6e898d6 100644
+--- a/apps/desktop/tests/installed-update-distribution.spec.ts
++++ b/apps/desktop/tests/installed-update-distribution.spec.ts
+@@ -35,12 +35,12 @@ describe('qualification distribution file planning', () => {
+       expect(old!.feed.sha512).not.toBe(next!.feed.sha512)
+       expect(old!.binaries.map(file => file.key)).not.toEqual(next!.binaries.map(file => file.key))
+       expect(next!.binaries).toHaveLength(2)
+-      expect(next!.binaries.every(file => file.key.startsWith('dsh-desk/bin/qualification/'))).toBe(true)
+-      expect(next!.feed.key).toMatch(/^dsh-desk\/feeds\/qualification\/[a-f0-9]{24}\/win-x64\/nightly.yml$/u)
++      expect(next!.binaries.every(file => file.key.startsWith('suishendazi-desk/bin/qualification/'))).toBe(true)
++      expect(next!.feed.key).toMatch(/^suishendazi-desk\/feeds\/qualification\/[a-f0-9]{24}\/win-x64\/nightly.yml$/u)
+       expect(next!.publicationAuthorized).toBe(false)
+       expect(next!.verified).toBe('file-integrity-only')
+       expect(load(next!.feed.contents)).toMatchObject({ version: versions[1],
+-        files: [{ url: `https://download-test.deepseek.com/${next!.binaries[0]!.key}` }] })
++        files: [{ url: `https://download-test.modelxing.com/${next!.binaries[0]!.key}` }] })
+     })
+   })
+
+diff --git a/apps/desktop/tests/installed-update-qualification.spec.ts b/apps/desktop/tests/installed-update-qualification.spec.ts
+index 49dabbca12..8857598a71 100644
+--- a/apps/desktop/tests/installed-update-qualification.spec.ts
++++ b/apps/desktop/tests/installed-update-qualification.spec.ts
+@@ -43,9 +43,9 @@ describe('installed-update qualification materials', () => {
+       expect(first.root).not.toBe(next.root)
+       expect(first.appId).not.toBe(next.appId)
+       expect(first.feedKey).not.toBe(next.feedKey)
+-      expect(first.origin).toBe('https://download-test.deepseek.com')
++      expect(first.origin).toBe('https://download-test.modelxing.com')
+       expect(first.environment).toBe('test')
+-      expect(first.feedKey).toBe(`dsh-desk/feeds/qualification/${first.id}/win-x64/nightly.yml`)
++      expect(first.feedKey).toBe(`suishendazi-desk/feeds/qualification/${first.id}/win-x64/nightly.yml`)
+       expect(JSON.parse(await readFile(join(first.root, 'run.json'), 'utf8'))).toEqual(first)
+       expect(await readdir(first.root)).toEqual(['run.json'])
+     })
+diff --git a/apps/desktop/tests/installed-update/publication/README.md b/apps/desktop/tests/installed-update/publication/README.md
+index ae91020f4d..9d0781a9ee 100644
+--- a/apps/desktop/tests/installed-update/publication/README.md
++++ b/apps/desktop/tests/installed-update/publication/README.md
+@@ -23,7 +23,7 @@ Upload both verified versions without advertising version 2, then publish its fi
+
+ Complete both package verifications in the [walkthrough](../README.md). Retain successful `verification/check-*/result.json` receipts and unchanged materials. The publisher revalidates each receipt against current installer, blockmap, feed, and manifest bytes. It never signs or installs anything.
+
+-The existing `.env.windows` loader supplies `DSH_DESKTOP_AUTO_UPDATE_ENV=test`, `DOWNLOAD_TEST_ORIGIN=https://download-test.deepseek.com`, `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602`, and `DOWNLOAD_TEST_COS_SECRET_ID` / `DOWNLOAD_TEST_COS_SECRET_KEY`. Only those two upload secrets enter the COS client; never put them in commands or records. The transport restricts requests to the test bucket and private Windows qualification paths.
++The existing `.env.windows` loader supplies `DSH_DESKTOP_AUTO_UPDATE_ENV=test`, `DOWNLOAD_TEST_ORIGIN=https://download-test.modelxing.com`, `DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602`, and `DOWNLOAD_TEST_COS_SECRET_ID` / `DOWNLOAD_TEST_COS_SECRET_KEY`. Only those two upload secrets enter the COS client; never put them in commands or records. The transport restricts requests to the test bucket and private Windows qualification paths.
+
+ The binary-upload operation adds a bucket-versioning query and refuses writes unless the query succeeds with neither enabled nor suspended status. Feed publication reuses a successful binary-upload receipt instead of repeating that query or downloading binaries. COS documents that [`x-cos-forbid-overwrite`](https://cloud.tencent.cn/document/product/436/7749) does not protect objects in versioned buckets. A denied query leaves that configuration unknown; it does not establish that uploads are denied.
+
+diff --git a/apps/desktop/tests/installed-update/publication/README.zh.md b/apps/desktop/tests/installed-update/publication/README.zh.md
+index fa119a2371..9ca28b04ba 100644
+--- a/apps/desktop/tests/installed-update/publication/README.zh.md
++++ b/apps/desktop/tests/installed-update/publication/README.zh.md
+@@ -23,7 +23,7 @@ description: "将测试二进制上传与人工授权的固定 feed 发布分离
+
+ 完成[演练指南](../README.zh.md)中的两个安装包验证。保留通过的 `verification/check-*/result.json` 回执及未修改物料。发布工具将回执与当前安装包、blockmap、feed 和清单字节重新核对。它绝不签名或安装任何文件。
+
+-现有 `.env.windows` 加载器提供 `DSH_DESKTOP_AUTO_UPDATE_ENV=test`、`DOWNLOAD_TEST_ORIGIN=https://download-test.deepseek.com`、`DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602` 及 `DOWNLOAD_TEST_COS_SECRET_ID` / `DOWNLOAD_TEST_COS_SECRET_KEY`。只有这两个上传秘密进入 COS 客户端；绝不放入命令或记录。传输实现将请求限制在 test 存储桶和独立的 Windows 验收路径内。
++现有 `.env.windows` 加载器提供 `DSH_DESKTOP_AUTO_UPDATE_ENV=test`、`DOWNLOAD_TEST_ORIGIN=https://download-test.modelxing.com`、`DOWNLOAD_TEST_COS_BUCKET=bj-toc-download-test-1320056602` 及 `DOWNLOAD_TEST_COS_SECRET_ID` / `DOWNLOAD_TEST_COS_SECRET_KEY`。只有这两个上传秘密进入 COS 客户端；绝不放入命令或记录。传输实现将请求限制在 test 存储桶和独立的 Windows 验收路径内。
+
+ 二进制上传操作额外查询存储桶版本控制；查询成功且既非启用也非暂停状态之前，它拒绝写入。feed 发布复用成功的二进制上传回执，不重复查询桶配置或下载安装包。COS 文档说明 [`x-cos-forbid-overwrite`](https://cloud.tencent.cn/document/product/436/7749) 无法保护开启版本控制的存储桶中的对象。查询被拒绝仅意味着该配置未知，不能证明上传被拒绝。
+
+diff --git a/apps/desktop/tests/installer-packaging.spec.ts b/apps/desktop/tests/installer-packaging.spec.ts
+index 15a4610d98..1d5dc2e1f9 100644
+--- a/apps/desktop/tests/installer-packaging.spec.ts
++++ b/apps/desktop/tests/installer-packaging.spec.ts
+@@ -16,6 +16,7 @@ describe('installer preparation preserves application dependencies', () => {
+     const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+     expect(() => createElectronBuilderConfig({ DSH_DESKTOP_APP_ID: 'com.example.installer',
+       DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
++      DSH_DESKTOP_UPDATE_ORIGIN: 'https://updates.modelxing.com',
+       DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://test.example.com',
+     }, platform, 'x64')).toThrow('DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN')
+   })
+@@ -90,7 +91,8 @@ describe('installer preparation preserves application dependencies', () => {
+     const config = createElectronBuilderConfig({
+       DSH_DESKTOP_APP_ID: 'com.example.installer',
+       DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+-      DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://harness-test.deepseek.com',
++      DSH_DESKTOP_UPDATE_ORIGIN: 'https://updates.modelxing.com',
++      DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://updates-test.modelxing.com',
+       DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN: 'https://policy.example.com',
+       DSH_DESKTOP_MACOS_SIGNING_IDENTITY: 'Example Company (TEAMID1234)',
+       DSH_DESKTOP_MACOS_TEAM_ID: 'TEAMID1234',
+diff --git a/apps/desktop/tests/macos-disk-image-signature.spec.ts b/apps/desktop/tests/macos-disk-image-signature.spec.ts
+index 5aaf21f969..7c9bda4d93 100644
+--- a/apps/desktop/tests/macos-disk-image-signature.spec.ts
++++ b/apps/desktop/tests/macos-disk-image-signature.spec.ts
+@@ -12,6 +12,7 @@ const signingIdentity = 'Example Company (TEAMID1234)'
+ const teamId = 'TEAMID1234'
+ const environment = {
+   DSH_DESKTOP_APP_ID: 'com.example.desktop', DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
++  DSH_DESKTOP_UPDATE_ORIGIN: 'https://updates.modelxing.com',
+   DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN: 'https://policy.example.com',
+   DOWNLOAD_PROD_ORIGIN: 'https://updates.example.com',
+   DSH_DESKTOP_MACOS_SIGNING_IDENTITY: signingIdentity, DSH_DESKTOP_MACOS_TEAM_ID: teamId,
+diff --git a/apps/desktop/tests/macos-signature.spec.ts b/apps/desktop/tests/macos-signature.spec.ts
+index 0d9f486bdd..9fde768c26 100644
+--- a/apps/desktop/tests/macos-signature.spec.ts
++++ b/apps/desktop/tests/macos-signature.spec.ts
+@@ -87,7 +87,7 @@ describe('desktop macOS release signature', () => {
+       },
+       publish: [{
+         provider: 'generic',
+-        url: 'https://desktop-updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/feeds/mac-arm64/',
++        url: 'https://desktop-updates.example.com/suishendazi-desk/0123456789abcdef0123456789abcdef/feeds/mac-arm64/',
+         channel: 'nightly',
+       }],
+     })
+diff --git a/apps/desktop/tests/main-startup.spec.ts b/apps/desktop/tests/main-startup.spec.ts
+index d9a8f3103b..77f7f25c37 100644
+--- a/apps/desktop/tests/main-startup.spec.ts
++++ b/apps/desktop/tests/main-startup.spec.ts
+@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
+ import { tmpdir } from 'node:os'
+ import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
+ import { DESKTOP_IPC, type DesktopUpdateState } from '../src/ipc.ts'
++import type { DesktopUpdateSource } from '../src/update-source.ts'
+ import { MANDATORY_IPC } from '../src/mandatory-update-ipc.ts'
+ import { DesktopHostFatalError, DesktopHostUncleanExitError } from '../src/host-process.ts'
+ import { en, zh } from '../src/locale.ts'
+@@ -51,6 +52,9 @@ const harness = await vi.hoisted(async () => {
+   let embeddedPolicy: unknown
+   let closeWindowsOnQuit = false
+   let updateState: DesktopUpdateState = { phase: 'idle' }
++  let updateAvailability: DesktopUpdateSource = {
++    kind: 'configured', url: 'https://dl.modelxing.com/suishendazi-desk/feeds/mac-arm64/', channel: 'nightly',
++  }
+   let platformDisposeDeferred: ReturnType<typeof deferred> | undefined
+   // The native Platform view owns persistent browser storage; Desktop startup tests replace it so
+   // each quit can control when that cleanup settles.
+@@ -211,6 +215,8 @@ const harness = await vi.hoisted(async () => {
+     ipcOn: vi.fn<(channel: string, listener: (event: { sender: unknown; senderFrame: unknown }, ...args: unknown[]) => void) => void>(),
+     get updateState() { return updateState },
+     set updateState(value: DesktopUpdateState) { updateState = value },
++    get updateAvailability() { return updateAvailability },
++    set updateAvailability(value: DesktopUpdateSource) { updateAvailability = value },
+     get prepareUpdate() { return prepareUpdate! },
+     set prepareUpdate(value: () => Promise<boolean>) { prepareUpdate = value },
+     get publishUpdate() { return publishUpdate! },
+@@ -250,6 +256,9 @@ const harness = await vi.hoisted(async () => {
+       prepareUpdate = undefined
+       publishUpdate = undefined
+       updateState = { phase: 'idle' }
++      updateAvailability = {
++        kind: 'configured', url: 'https://dl.modelxing.com/suishendazi-desk/feeds/mac-arm64/', channel: 'nightly',
++      }
+       updateCheck.mockReset().mockImplementation(async () => updateState)
+       loginShell.mockReset().mockImplementation(base => readLoginShell(base))
+       updateDownload.mockReset().mockImplementation(async () => updateState)
+@@ -344,6 +353,7 @@ vi.mock('../src/update-coordinator.ts', () => ({ DesktopUpdateCoordinator: class
+     harness.publishUpdate = publish
+   }
+   get state() { return harness.updateState }
++  get availability() { return harness.updateAvailability }
+   readonly check = harness.updateCheck
+   readonly download = harness.updateDownload
+   readonly install = harness.updateInstall
+@@ -616,6 +626,23 @@ describe('desktop main startup', () => {
+       .not.toContain(en.policyLoginRequired)
+   })
+
++  it.each([
++    [{ kind: 'absent' } as const, en.updateUnavailableAbsent, en.updateUnavailableAbsentDetail],
++    [{ kind: 'rejected', reason: 'upstream-host' } as const, en.updateUnavailableRejected, en.updateUnavailableRejectedDetail],
++  ])('states an unusable update source instead of running a check: $kind $reason', async (availability, message, detail) => {
++    await readyForUpdate()
++    await vi.advanceTimersByTimeAsync(0)
++    harness.updateCheck.mockClear()
++    harness.updateAvailability = availability
++    const checkUpdates = applicationMenuItems().find(item => item.label === en.checkUpdatesMenu)!.click as () => void
++    checkUpdates()
++    await vi.advanceTimersByTimeAsync(10_000)
++    expect(harness.updateCheck).not.toHaveBeenCalled()
++    expect(harness.updateDownload).not.toHaveBeenCalled()
++    expect(harness.dialog.showMessageBox.mock.calls.map(call => (call.at(-1) as { message: string; detail: string })))
++      .toContainEqual(expect.objectContaining({ message, detail }))
++  })
++
+   it.each([false, true])('retains anonymous production checks with popup permission %s', async (allow) => {
+     configureTestAuthPopup(allow)
+     harness.embeddedPolicy = { origin: 'https://policy.example.com', authentication: 'anonymous',
+@@ -2339,7 +2366,7 @@ it.each(['failed', 'expired'] as const)('focuses DSH once when browser authoriza
+   const window = harness.windows[0]!
+   window.focus.mockClear()
+   const state: AccountView = {
+-    status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
++    status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true },
+     attempt: { id: 'test-failed-attempt' as NonNullable<AccountView['attempt']>['id'], phase },
+   }
+   harness.publishAccount(state)
+@@ -2356,7 +2383,7 @@ it.each([['light', false], ['dark', true]] as const)('opens Platform authorizati
+   await Promise.resolve(invoke(DESKTOP_IPC.boot))
+   harness.nativeTheme.shouldUseDarkColors = shouldUseDarkColors
+   const state: AccountView = {
+-    status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
++    status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true },
+     attempt: { id: 'test-theme-attempt' as NonNullable<AccountView['attempt']>['id'], phase: 'waiting-browser',
+       authorizeUrl: 'https://platform.deepseek.com/dsh/authorize?state=state-1' },
+   }
 diff --git a/apps/desktop/tests/model-display.spec.ts b/apps/desktop/tests/model-display.spec.ts
 new file mode 100644
 index 0000000000..50cdea0c5a
@@ -1637,6 +2761,446 @@ index 0000000000..50cdea0c5a
 +    expect(displayModelName('vendor-x/future-model-v2')).toBe('派诺·Vendor-X/future-Model-V2')
 +  })
 +})
+diff --git a/apps/desktop/tests/package-macos.spec.ts b/apps/desktop/tests/package-macos.spec.ts
+index e8fb5dcf34..95edade6cf 100644
+--- a/apps/desktop/tests/package-macos.spec.ts
++++ b/apps/desktop/tests/package-macos.spec.ts
+@@ -33,7 +33,7 @@ async function fixture(arch: 'arm64' | 'x64' = 'arm64') {
+   await mkdir(join(appPath, 'Contents', 'Resources'), { recursive: true })
+   await writeFile(join(appPath, 'payload'), 'signed content')
+   await writeMacOSAppUpdateConfig(join(appPath, 'Contents', 'Resources'), {
+-    publicUrl: `https://desktop-updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/feeds/mac-${arch}/`,
++    publicUrl: `https://desktop-updates.example.com/suishendazi-desk/0123456789abcdef0123456789abcdef/feeds/mac-${arch}/`,
+   }, 'deepseek-harness-updater')
+   const version = '1.2.3-alpha.1'
+   const base = `deepseek-harness-${version}-mac-${arch}`
+@@ -107,7 +107,7 @@ describe('parallel macOS artifacts', () => {
+         .toEqual({ payload: 'signed content', appTicket: false })
+       expect(await readFile(join(f.appPath, 'ticket'), 'utf8')).toBe('accepted')
+       expect(await readFile(join(f.appPath, 'Contents', 'Resources', 'app-update.yml'), 'utf8'))
+-        .toContain(`/dsh-desk/0123456789abcdef0123456789abcdef/feeds/mac-${arch}/`)
++        .toContain(`/suishendazi-desk/0123456789abcdef0123456789abcdef/feeds/mac-${arch}/`)
+       expect((await readdir(f.root)).sort()).toEqual(['artifacts'])
+       expect(f.apple.verifySignature).toHaveBeenCalledTimes(4)
+       expect(f.apple.verifyNotarization).toHaveBeenCalledTimes(1)
+diff --git a/apps/desktop/tests/package-target-stages.spec.ts b/apps/desktop/tests/package-target-stages.spec.ts
+index 1d8b067390..6bd473cf7d 100644
+--- a/apps/desktop/tests/package-target-stages.spec.ts
++++ b/apps/desktop/tests/package-target-stages.spec.ts
+@@ -65,7 +65,7 @@ it('requires one signing preflight before building, then records only the comple
+   }
+   expect(writeFileSync).toHaveBeenCalledOnce()
+   const record = JSON.parse(vi.mocked(writeFileSync).mock.calls[0]![1] as string) as { publicUrl: string }
+-  expect(record.publicUrl).toBe('https://updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/feeds/win-x64/')
++  expect(record.publicUrl).toBe('https://updates.example.com/suishendazi-desk/0123456789abcdef0123456789abcdef/feeds/win-x64/')
+ })
+
+ it('initializes shared storage only after acquiring the preflight stage lock', async () => {
+diff --git a/apps/desktop/tests/update-coordinator.spec.ts b/apps/desktop/tests/update-coordinator.spec.ts
+index 1c6e9da1c7..2f463fdf7f 100644
+--- a/apps/desktop/tests/update-coordinator.spec.ts
++++ b/apps/desktop/tests/update-coordinator.spec.ts
+@@ -4,6 +4,7 @@ import type { AppUpdater } from 'electron-updater'
+ import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
+ import { parseDesktopRelease } from '../src/release.ts'
+ import type { DesktopUpdateState } from '../src/ipc.ts'
++import type { DesktopUpdateSource } from '../src/update-source.ts'
+ import { DesktopUpdatePreparationError } from '../src/update-error.ts'
+ import { zh } from '../src/locale.ts'
+
+@@ -66,12 +67,27 @@ function fixture(channel: 'nightly' | 'latest' = 'nightly', version = '1.1.0-alp
+   const updater = Object.assign(events, { checkForUpdates, downloadUpdate, quitAndInstall }) as unknown as AppUpdater
+   const coordinator = new DesktopUpdateCoordinator(
+     (state) => { states.push(state); return state },
+-    beforeRestart, updater, () => true, () => version, downloadResult, channel,
++    beforeRestart, updater,
++    () => ({ kind: 'configured', url: 'https://dl.modelxing.com/feeds/mac-arm64/', channel }),
++    () => version, downloadResult, channel,
+   )
+   coordinators.push(coordinator)
+   return { coordinator, updater, events, states, checkForUpdates, downloadUpdate, quitAndInstall, beforeRestart, downloadResult }
+ }
+
++function unavailableFixture(source: DesktopUpdateSource) {
++  const checkForUpdates = vi.fn()
++  const states: DesktopUpdateState[] = []
++  const coordinator = new DesktopUpdateCoordinator(
++    (state) => { states.push(state); return state },
++    async () => true,
++    Object.assign(new EventEmitter(), { checkForUpdates }) as unknown as AppUpdater,
++    () => source, () => '1.1.0-alpha.1',
++  )
++  coordinators.push(coordinator)
++  return { coordinator, checkForUpdates, states }
++}
++
+ describe('desktop update coordinator', () => {
+   it('keeps safe preparation diagnostics separate and clears them on an explicit retry', async () => {
+     const f = fixture()
+@@ -257,3 +273,30 @@ it('keeps a stable-version nightly installation on nightly and rejects prereleas
+   expect((await latest.coordinator.check()).phase).toBe('error')
+   expect(latest.downloadUpdate).not.toHaveBeenCalled()
+ })
++
++it.each([
++  { kind: 'absent' } as const,
++  { kind: 'rejected', reason: 'upstream-host' } as const,
++  { kind: 'rejected', reason: 'channel-mismatch' } as const,
++])('performs no check and publishes no failure for an unusable update source: $kind $reason', async (source) => {
++  const f = unavailableFixture(source)
++  expect(f.coordinator.availability).toEqual(source)
++  expect(await f.coordinator.check()).toEqual({ phase: 'idle' })
++  expect(await f.coordinator.check(true)).toEqual({ phase: 'idle' })
++  expect(f.coordinator.state).toEqual({ phase: 'idle' })
++  expect(f.checkForUpdates).not.toHaveBeenCalled()
++  expect(f.states).toEqual([])
++  await expect(f.coordinator.download('1.1.0-rc.2')).rejects.toThrow(/no checked update/u)
++})
++
++it('resolves the packaged source when the caller supplies none', async () => {
++  const coordinator = new DesktopUpdateCoordinator(
++    state => state, async () => true,
++    Object.assign(new EventEmitter(), {}) as unknown as AppUpdater,
++    undefined, () => '1.1.0-alpha.1',
++  )
++  coordinators.push(coordinator)
++  // The mocked Electron app reports isPackaged: false, which is an absent feed.
++  expect(coordinator.availability).toEqual({ kind: 'absent' })
++  expect(await coordinator.check(true)).toEqual({ phase: 'idle' })
++})
+diff --git a/apps/desktop/tests/update-presentation.spec.ts b/apps/desktop/tests/update-presentation.spec.ts
+index 9d3ce5009e..8bc0ca42b3 100644
+--- a/apps/desktop/tests/update-presentation.spec.ts
++++ b/apps/desktop/tests/update-presentation.spec.ts
+@@ -1,7 +1,8 @@
+ import { expect, it } from 'vitest'
+-import { desktopUpdateErrorSummary, presentDesktopUpdate } from '../src/update-presentation.ts'
++import { desktopUpdateErrorSummary, desktopUpdateUnavailableContent, presentDesktopUpdate } from '../src/update-presentation.ts'
+ import { en, zh } from '../src/locale.ts'
+ import type { DesktopUpdateState, DshDesktopProductApi } from '../src/ipc.ts'
++import type { DesktopUpdateSource } from '../src/update-source.ts'
+ import type { DesktopUpdateBridge } from '@deepseek-ai/dsh-client-ui-settings-general/types'
+
+ it('keeps the Electron preload assignable to the product consumer', () => {
+@@ -9,6 +10,24 @@ it('keeps the Electron preload assignable to the product consumer', () => {
+   expect(assign).toBeTypeOf('function')
+ })
+
++it('states the update deployment honestly instead of reporting a check failure', () => {
++  const absent: DesktopUpdateSource = { kind: 'absent' }
++  const rejected: DesktopUpdateSource = { kind: 'rejected', reason: 'upstream-host' }
++  for (const messages of [en, zh]) {
++    const none = desktopUpdateUnavailableContent(absent, messages)
++    expect(none.message).toBe(messages.updateUnavailableAbsent)
++    expect(none.detail).toBe(messages.updateUnavailableAbsentDetail)
++    const blocked = desktopUpdateUnavailableContent(rejected, messages)
++    expect(blocked.message).toBe(messages.updateUnavailableRejected)
++    expect(blocked.detail).toBe(messages.updateUnavailableRejectedDetail)
++    // The raw transport diagnostic must never reach the user.
++    expect(JSON.stringify([none, blocked])).not.toContain('no packaged update source')
++    expect(JSON.stringify([none, blocked])).not.toContain('updateCheckFailed')
++  }
++  expect(desktopUpdateUnavailableContent(absent, en).message).not.toBe(en.updateCheckFailed)
++  expect(desktopUpdateUnavailableContent(rejected, zh).message).not.toBe(zh.updateCheckFailed)
++})
++
+ it('records visible ordinary-update states without authorizing downloads or installation', async () => {
+   const phases: DesktopUpdateState['phase'][] = ['idle', 'available', 'downloading', 'verifying', 'ready', 'installing', 'error']
+   const states = phases.map(phase => presentDesktopUpdate({ phase, version: '0.1.5-rc.2', percent: 58 }))
+diff --git a/apps/desktop/tests/update-schedule.spec.ts b/apps/desktop/tests/update-schedule.spec.ts
+index 9d481f21fc..ddcd2f7970 100644
+--- a/apps/desktop/tests/update-schedule.spec.ts
++++ b/apps/desktop/tests/update-schedule.spec.ts
+@@ -26,7 +26,7 @@ function fixture(jitter = 0, random = () => 0.5) {
+   const updater = Object.assign(events, { checkForUpdates, downloadUpdate, quitAndInstall: vi.fn() }) as unknown as AppUpdater
+   const states: DesktopUpdateState[] = []
+   const coordinator = new DesktopUpdateCoordinator((state) => { states.push(state); return state }, async () => true,
+-    updater, () => true, () => '1.0.0')
++    updater, () => ({ kind: 'configured', url: 'https://dl.modelxing.com/feeds/mac-arm64/', channel: 'nightly' }), () => '1.0.0')
+   const schedule = new DesktopUpdateSchedule(coordinator, { intervalMs: 10_000, maxBackoffMs: 40_000, jitter }, random)
+   cleanup.push(() => { schedule.dispose(); coordinator.dispose() })
+   return { schedule, coordinator, states, checkForUpdates, downloadUpdate }
+diff --git a/apps/desktop/tests/update-source.spec.ts b/apps/desktop/tests/update-source.spec.ts
+new file mode 100644
+index 0000000000..1e3af1910b
+--- /dev/null
++++ b/apps/desktop/tests/update-source.spec.ts
+@@ -0,0 +1,100 @@
++import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { afterEach, describe, expect, it } from 'vitest'
++import { resolveDesktopUpdateSource } from '../src/update-source.ts'
++
++const temporaryDirectories: string[] = []
++afterEach(() => { for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true }) })
++
++function temporaryDirectory(): string {
++  const directory = mkdtempSync(join(tmpdir(), 'dsh-update-source-'))
++  temporaryDirectories.push(directory)
++  return directory
++}
++
++function sealedConfig(fields: Record<string, string>): string {
++  return Object.entries(fields).map(([key, value]) => `${key}: ${value}`).join('\n') + '\n'
++}
++
++const BRAND_FEED = 'https://dl.modelxing.com/suishendazi-desk/feeds/mac-arm64/'
++
++function resolve(text: string | undefined, channel: 'nightly' | 'latest' = 'nightly') {
++  return resolveDesktopUpdateSource({
++    packaged: true, configPath: '/app/resources/app-update.yml', expectedChannel: channel,
++    readConfig: () => text,
++  })
++}
++
++describe('desktop update source', () => {
++  it('reports no feed outside a packaged application, even when a configuration exists', () => {
++    expect(resolveDesktopUpdateSource({
++      packaged: false, configPath: '/app/resources/app-update.yml', expectedChannel: 'nightly',
++      readConfig: () => sealedConfig({ provider: 'generic', url: BRAND_FEED, channel: 'nightly' }),
++    })).toEqual({ kind: 'absent' })
++  })
++
++  it('reads a sealed configuration from disk and treats only ENOENT as absent', () => {
++    const directory = temporaryDirectory()
++    const configPath = join(directory, 'app-update.yml')
++    const options = { packaged: true, configPath, expectedChannel: 'nightly' as const }
++    expect(resolveDesktopUpdateSource(options)).toEqual({ kind: 'absent' })
++    writeFileSync(configPath, sealedConfig({ provider: 'generic', url: BRAND_FEED, channel: 'nightly', updaterCacheDirName: 'suishendazi-updater' }))
++    expect(resolveDesktopUpdateSource(options)).toEqual({ kind: 'configured', url: BRAND_FEED, channel: 'nightly' })
++  })
++
++  it('accepts one generic PaiNuo HTTPS feed and ignores unrelated updater keys', () => {
++    expect(resolve(sealedConfig({
++      provider: 'generic', url: BRAND_FEED, channel: 'nightly',
++      updaterCacheDirName: 'suishendazi-updater', useMultipleRangeRequest: 'false',
++    }))).toEqual({ kind: 'configured', url: BRAND_FEED, channel: 'nightly' })
++    expect(resolve(sealedConfig({ provider: 'generic', url: `"${BRAND_FEED}"`, channel: 'latest' }), 'latest'))
++      .toEqual({ kind: 'configured', url: BRAND_FEED, channel: 'latest' })
++  })
++
++  it.each([
++    'https://download.deepseek.com/feeds/mac-arm64/',
++    'https://download-test.deepseek.com/feeds/mac-arm64/',
++    'https://dsh-otel-collector.deepseeksvc.com/feeds/mac-arm64/',
++  ])('rejects the upstream feed host %s before any request', (url) => {
++    expect(resolve(sealedConfig({ provider: 'generic', url, channel: 'nightly' })))
++      .toEqual({ kind: 'rejected', reason: 'upstream-host' })
++  })
++
++  it('rejects a feed that is not an HTTPS path without credentials, query, or fragment', () => {
++    const cases: readonly (readonly [string, string])[] = [
++      ['http://dl.modelxing.com/feed/', 'url-insecure'],
++      ['https://user:secret@dl.modelxing.com/feed/', 'url-malformed'],
++      ['https://dl.modelxing.com/feed/?channel=nightly', 'url-malformed'],
++      ['https://dl.modelxing.com/feed/#fragment', 'url-malformed'],
++      ['https://dl.modelxing.com/feed', 'url-malformed'],
++      ['not a url', 'url-malformed'],
++    ]
++    for (const [url, reason] of cases) {
++      expect(resolve(sealedConfig({ provider: 'generic', url, channel: 'nightly' })), url)
++        .toEqual({ kind: 'rejected', reason })
++    }
++  })
++
++  it('rejects a non-generic provider, a malformed configuration, and a channel mismatch', () => {
++    expect(resolve(sealedConfig({ provider: 'github', url: BRAND_FEED, channel: 'nightly' })))
++      .toEqual({ kind: 'rejected', reason: 'provider-unsupported' })
++    expect(resolve(sealedConfig({ url: BRAND_FEED, channel: 'nightly' })))
++      .toEqual({ kind: 'rejected', reason: 'provider-unsupported' })
++    expect(resolve(sealedConfig({ provider: 'generic', channel: 'nightly' })))
++      .toEqual({ kind: 'rejected', reason: 'config-malformed' })
++    expect(resolve('provider: generic\nurl: https://a.example.com/x/\nurl: https://b.example.com/x/\nchannel: nightly\n'))
++      .toEqual({ kind: 'rejected', reason: 'config-malformed' })
++    // An empty value is a missing field, never a default destination.
++    expect(resolve('provider: generic\nurl:\nchannel: nightly\n')).toEqual({ kind: 'rejected', reason: 'config-malformed' })
++    expect(resolve(sealedConfig({ provider: 'generic', url: BRAND_FEED, channel: 'latest' })))
++      .toEqual({ kind: 'rejected', reason: 'channel-mismatch' })
++  })
++
++  it('rejects a configuration that exists but cannot be read', () => {
++    expect(resolveDesktopUpdateSource({
++      packaged: true, configPath: '/app/resources/app-update.yml', expectedChannel: 'nightly',
++      readConfig: () => { throw new Error('EACCES') },
++    })).toEqual({ kind: 'rejected', reason: 'config-unreadable' })
++  })
++})
+diff --git a/apps/desktop/tests/welcome-host.spec.ts b/apps/desktop/tests/welcome-host.spec.ts
+index dea2905583..d3d18c5563 100644
+--- a/apps/desktop/tests/welcome-host.spec.ts
++++ b/apps/desktop/tests/welcome-host.spec.ts
+@@ -17,7 +17,7 @@ function transport(preference?: string) {
+       payload: { args: { ref: string; value: string; refs: string[] } }
+     }
+     let value: unknown
+-    if (method === 'account/getState') value = { links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null }
++    if (method === 'account/getState') value = { links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: null }
+     else if (method === 'settings/describe') value = { namespaces }
+     else if (method === 'llm/listConfigurableProviders') value = [{ settingsNs: 'llm-pi-ai', settingsPath: ['profiles', 'example'] }]
+     else if (method === 'productAnalytics/enabled') value = true
+diff --git a/apps/desktop/tests/welcome-renderer.client.spec.tsx b/apps/desktop/tests/welcome-renderer.client.spec.tsx
+index 575c7423a0..4d43ca8020 100644
+--- a/apps/desktop/tests/welcome-renderer.client.spec.tsx
++++ b/apps/desktop/tests/welcome-renderer.client.spec.tsx
+@@ -19,8 +19,8 @@ function mount(language = 'zh-CN', takeNotice = vi.fn<() => Promise<WelcomeNotic
+     analytics: vi.fn(async (_event: string, _attributes: object) => {}),
+     analyticsEnabled: async () => true,
+     onAccountState: vi.fn((_listener: (state: AccountView) => void) => stopAccount),
+-    startSignIn: vi.fn(async (): Promise<AccountView> => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null })),
+-    cancelSignIn: vi.fn(async (): Promise<AccountView> => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null })),
++    startSignIn: vi.fn(async (): Promise<AccountView> => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: null })),
++    cancelSignIn: vi.fn(async (): Promise<AccountView> => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: null })),
+     copySignInLink: vi.fn(async () => undefined),
+     ...resolveDesktopLocale(language),
+     saveApiKey: vi.fn<(value: string) => Promise<WelcomeSaveResult>>().mockResolvedValue({ ok: true }),
+@@ -159,7 +159,7 @@ describe('desktop welcome presentation', () => {
+ it.each(['zh-CN', 'en'])('renders %s timeout with manual retry and API-key alternative', async (language) => {
+   const view = mount(language)
+   const receive = (state: AccountView) => { act(() => { view.api.onAccountState.mock.calls[0]![0](state) }) }
+-  receive({ status: 'signed-out', links: { usageUrl: '', topUpUrl: '' }, attempt: { id: 'expired' as NonNullable<AccountView['attempt']>['id'], phase: 'expired' } })
++  receive({ status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true }, attempt: { id: 'expired' as NonNullable<AccountView['attempt']>['id'], phase: 'expired' } })
+   expect(view.button('#auth-retry').hidden).toBe(false)
+   expect(view.button('#auth-api-key').hidden).toBe(false)
+   expect(view.api.startSignIn).not.toHaveBeenCalled()
+@@ -172,7 +172,7 @@ it.each(['zh-CN', 'en'])('renders %s timeout with manual retry and API-key alter
+ it.each(['zh-CN', 'en'])('renders %s browser fallback and copies only the active login link', async (language) => {
+   const view = mount(language)
+   const receive = (state: AccountView) => { act(() => { view.api.onAccountState.mock.calls[0]![0](state) }) }
+-  const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
++  const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
+     attempt: { id: 'waiting' as NonNullable<AccountView['attempt']>['id'], phase: 'waiting-browser', authorizeUrl: 'https://example.test/login' } }
+   receive(waiting)
+   await expect(view.copy() + view.document.querySelector('#auth-description')!.textContent + '\n')
+@@ -198,7 +198,7 @@ it('keeps a newer account notification when the start response arrives late', as
+   view.api.startSignIn.mockReturnValueOnce(started.promise)
+   fireEvent.click(view.button('#sign-in'))
+   expect(view.button('#auth-cancel').disabled).toBe(true)
+-  const state: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
++  const state: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
+     attempt: { id: 'attempt' as NonNullable<AccountView['attempt']>['id'], phase: 'expired' } }
+   act(() => { view.api.onAccountState.mock.calls[0]![0](state) })
+   await act(async () => { started.resolve({ ...state, attempt: { ...state.attempt!, phase: 'waiting-browser' } }); await started.promise })
+@@ -210,7 +210,7 @@ it('does not restore a copied-link status after leaving the waiting phase', asyn
+   const view = mount()
+   const copied = Promise.withResolvers<undefined>()
+   view.api.copySignInLink.mockReturnValueOnce(copied.promise)
+-  const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
++  const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
+     attempt: { id: 'attempt' as NonNullable<AccountView['attempt']>['id'], phase: 'waiting-browser' } }
+   act(() => { view.api.onAccountState.mock.calls[0]![0](waiting) })
+   fireEvent.click(view.button('#auth-copy'))
+@@ -225,7 +225,7 @@ it('keeps the key draft while account notifications arrive and releases the subs
+   const view = mount()
+   fireEvent.click(view.button('#api-key'))
+   view.enterKey('sk-draft')
+-  act(() => { view.api.onAccountState.mock.calls[0]![0]({ status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
++  act(() => { view.api.onAccountState.mock.calls[0]![0]({ status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
+     attempt: { id: 'expired' as NonNullable<AccountView['attempt']>['id'], phase: 'expired' } }) })
+   expect(view.document.querySelector<HTMLElement>('#key-form')!.hidden).toBe(false)
+   expect(view.input.value).toBe('sk-draft')
+@@ -238,7 +238,7 @@ it.each(['copied', 'failed'] as const)('restores the copy action after %s feedba
+   try {
+     const view = mount('en')
+     if (result === 'failed') view.api.copySignInLink.mockRejectedValue(new Error('clipboard unavailable'))
+-    const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
++    const waiting: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
+       attempt: { id: 'waiting' as NonNullable<AccountView['attempt']>['id'], phase: 'waiting-browser' } }
+     act(() => { view.api.onAccountState.mock.calls[0]![0](waiting) })
+     const feedback = result === 'copied' ? view.api.messages.welcomeAuthCopied : view.api.messages.welcomeAuthCopyFailed
+@@ -272,7 +272,7 @@ it.each(['zh-CN', 'en'])('keeps the expiry notice visible after returning to Wel
+     await act(async () => {})
+     const publish = view.api.onAccountState.mock.calls[0]![0]
+     const expired: AccountView = { status: 'signed-out', attempt: null,
+-      links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' } }
++      links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true } }
+     await act(async () => { publish(expired) })
+     const notice = screen.getByRole('alert')
+     expect(notice.textContent).toBe(view.api.messages.welcomeSessionExpired)
+@@ -293,7 +293,7 @@ it('does not infer a notification from a retained expired account snapshot', asy
+   const view = mount()
+   await act(async () => {
+     view.api.onAccountState.mock.calls[0]![0]({ status: 'signed-out', attempt: null,
+-      links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' } })
++      links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true } })
+   })
+   expect(screen.queryByRole('alert')).toBeNull()
+ })
+@@ -319,7 +319,7 @@ it('ignores a notification received after its renderer unmounts', async () => {
+ it.each(['zh-CN', 'en'])('returns from completed sign-in to the initial page after sign-out: %s', async (language) => {
+   const view = mount(language)
+   const publish = view.api.onAccountState.mock.calls[0]![0]
+-  const links = { usageUrl: 'https://example.test/usage', topUpUrl: 'https://example.test/top_up' }
++  const links = { usageUrl: 'https://example.test/usage', topUpUrl: 'https://example.test/top_up', embedded: true }
+   act(() => { publish({ status: 'credential-stored', links,
+     attempt: { id: 'completed' as NonNullable<AccountView['attempt']>['id'], phase: 'succeeded' } }) })
+   expect(view.document.querySelector<HTMLElement>('#auth-page')!.hidden).toBe(false)
+@@ -338,6 +338,6 @@ it('reports each return to the welcome entry once, including account cancellatio
+   const pending = Promise.withResolvers<AccountView>()
+   view.api.startSignIn.mockReturnValueOnce(pending.promise)
+   fireEvent.click(view.button('#sign-in'))
+-  await act(async () => { pending.resolve({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out', attempt: null }) })
++  await act(async () => { pending.resolve({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out', attempt: null }) })
+   expect(view.api.analytics.mock.calls.map(([action]) => action)).toEqual(['auth_page_click', 'auth_page_view', 'auth_page_click', 'auth_page_view'])
+ })
+diff --git a/apps/desktop/tests/welcome-startup.spec.ts b/apps/desktop/tests/welcome-startup.spec.ts
+index 7915248243..55ad2a90ac 100644
+--- a/apps/desktop/tests/welcome-startup.spec.ts
++++ b/apps/desktop/tests/welcome-startup.spec.ts
+@@ -17,7 +17,7 @@ const state = vi.hoisted(() => ({
+   expiryListener: undefined as (() => void) | undefined,
+   accountListener: undefined as ((value: AccountView) => void) | undefined,
+   accountState: vi.fn<() => Promise<AccountView>>().mockResolvedValue({
+-    status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' },
++    status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '', embedded: true },
+   }),
+   quit: vi.fn(),
+   startHost: vi.fn().mockResolvedValue({ url: 'http://127.0.0.1:3080/?token=test', injections: [] }),
+@@ -178,7 +178,7 @@ it.each([false, true])('starts welcome onboarding without carrying update focus
+   state.preference = 'zh'
+   state.hasApiKey = false
+   state.operations = undefined
+-  state.accountState.mockResolvedValue({ status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' } })
++  state.accountState.mockResolvedValue({ status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '', embedded: true } })
+   if (updated) vi.stubGlobal('process', { ...process, platform: 'win32', argv: ['desktop', '--updated'] })
+   vi.useFakeTimers()
+   vi.stubEnv('DSH_CLIENT_VERSION', '1.2.3')
+@@ -221,7 +221,7 @@ it.each([false, true])('starts welcome onboarding without carrying update focus
+   expect(await state.operations!.takeNotice()).toBeUndefined()
+   expect(state.dialogLocale!().id).toBe('zh-CN')
+   const attemptId = 'login' as NonNullable<AccountView['attempt']>['id']
+-  const account: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
++  const account: AccountView = { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
+     attempt: { id: attemptId, phase: 'waiting-browser', authorizeUrl: 'https://example.test/login' } }
+   state.accountState.mockResolvedValue(account)
+   await state.operations!.copySignInLink(attemptId)
+diff --git a/apps/desktop/tests/welcome-window.spec.ts b/apps/desktop/tests/welcome-window.spec.ts
+index 6d2807c425..5d6506a11f 100644
+--- a/apps/desktop/tests/welcome-window.spec.ts
++++ b/apps/desktop/tests/welcome-window.spec.ts
+@@ -42,8 +42,8 @@ beforeEach(() => { electron.create.mockReset(); electron.handlers.clear() })
+ const operations = {
+   analyticsEnabled: async () => true,
+   takeNotice: async () => undefined,
+-  startSignIn: async () => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out' as const, attempt: null }),
+-  cancelSignIn: async () => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up' }, status: 'signed-out' as const, attempt: null }),
++  startSignIn: async () => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out' as const, attempt: null }),
++  cancelSignIn: async () => ({ links: { usageUrl: 'http://localhost/usage', topUpUrl: 'http://localhost/top_up', embedded: true }, status: 'signed-out' as const, attempt: null }),
+   copySignInLink: async () => undefined,
+   saveApiKey: () => Promise.resolve({ ok: true as const }),
+   skip: () => Promise.resolve(),
+diff --git a/apps/desktop/tests/windows-update-publisher.spec.ts b/apps/desktop/tests/windows-update-publisher.spec.ts
+index a1af8d5416..35b7b85e8c 100644
+--- a/apps/desktop/tests/windows-update-publisher.spec.ts
++++ b/apps/desktop/tests/windows-update-publisher.spec.ts
+@@ -88,6 +88,7 @@ describe('Windows update publisher', () => {
+         DSH_DESKTOP_WINDOWS_KEY_CONTAINER: 'test-container',
+         DSH_DESKTOP_WINDOWS_TOKEN_PIN: 'test-pin',
+         DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
++        DSH_DESKTOP_UPDATE_ORIGIN: 'https://updates.modelxing.com',
+       }, 'win32', 'x64')
+       expect(config.win.forceCodeSigning).toBe(true)
+       expect(config.artifactName).toBe('deepseek-harness-${version}-${os}-${arch}.${ext}')
 diff --git a/apps/plugin-market-generator/package.json b/apps/plugin-market-generator/package.json
 index b013bc93ff..c2b3aa4e62 100644
 --- a/apps/plugin-market-generator/package.json
@@ -1715,6 +3279,19 @@ index 6592d6a700..230fe45548 100644
    "start_url": "./",
    "scope": "./",
    "display": "fullscreen",
+diff --git a/apps/web/tests/settings-appearance.e2e.ts b/apps/web/tests/settings-appearance.e2e.ts
+index 8f51764f88..1d694ad5e2 100644
+--- a/apps/web/tests/settings-appearance.e2e.ts
++++ b/apps/web/tests/settings-appearance.e2e.ts
+@@ -33,7 +33,7 @@ it('shares settings card materials and control sizes in both palettes', async ()
+   const account = scaffold.ctx.deepseekAccount
+   const state: AccountView = {
+     status: 'credential-stored', attempt: null,
+-    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
++    links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true },
+   }
+   // The Platform provider supplies synthetic identity and wallets; renderer, RPC, and settings remain real.
+   const mocks = [
 diff --git a/package.json b/package.json
 index a5e45dbf91..0647d947cf 100644
 --- a/package.json
@@ -1753,6 +3330,19 @@ index 088357e98f..61a45249ef 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/api/account-controller/tests/controller.spec.ts b/packages/api/account-controller/tests/controller.spec.ts
+index 2360bdc84e..be850364c1 100644
+--- a/packages/api/account-controller/tests/controller.spec.ts
++++ b/packages/api/account-controller/tests/controller.spec.ts
+@@ -8,7 +8,7 @@ import AccountController from '../src/index.ts'
+
+ const roots: Context[] = []
+ afterEach(async () => { await Promise.all(roots.splice(0).map(ctx => ctx.fiber.dispose())) })
+-const state: AccountView = { status: 'signed-out', links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up' }, attempt: null }
++const state: AccountView = { status: 'signed-out', links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up', embedded: true }, attempt: null }
+ const client: AccountClientMetadata = { version: '0.0.0-test', locale: 'zh-CN', timezoneOffsetSeconds: 28_800 }
+
+ function fixture() {
 diff --git a/packages/api/gateway/package.json b/packages/api/gateway/package.json
 index d525c2dedf..b5beef0288 100644
 --- a/packages/api/gateway/package.json
@@ -3285,6 +4875,230 @@ index 80697ffbe8..671899a2bc 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/client/ui-settings-account/src/client/AccountQuotaNotice.tsx b/packages/client/ui-settings-account/src/client/AccountQuotaNotice.tsx
+index 01170a5456..cf233db43a 100644
+--- a/packages/client/ui-settings-account/src/client/AccountQuotaNotice.tsx
++++ b/packages/client/ui-settings-account/src/client/AccountQuotaNotice.tsx
+@@ -30,7 +30,11 @@ export function AccountQuotaNotice({ matched, openPlatformPage, useAccount, useP
+   const { dismiss, keepOpen, message } = matched
+   const accountStatus = useAccount(snapshot => snapshot.view?.status)
+   const accountFailed = useAccount(snapshot => snapshot.failed)
++  const links = useAccount(snapshot => snapshot.view?.links)
+   const signedIn = accountStatus === 'credential-stored'
++  // Only the Platform's own page can load in the native host; every other destination
++  // opens in the browser, and an absent one leaves the generic warning in place.
++  const embedded = openPlatformPage !== undefined && links?.embedded === true
+   const platformPage = usePlatformPage(current => current)
+   const [opened, setOpened] = useState(false)
+   const previousSignedIn = useRef(signedIn)
+@@ -56,26 +60,33 @@ export function AccountQuotaNotice({ matched, openPlatformPage, useAccount, useP
+     previousSignedIn.current = signedIn
+   }, [dismiss, signedIn])
+   // Await the first account snapshot without letting a Toast timer discard the
+-  // notice before the native account action becomes available. A terminal stream
++  // notice before the account action becomes available. A terminal stream
+   // failure ends that wait and leaves the generic warning available.
+   if (accountStatus === undefined && !accountFailed && openPlatformPage !== undefined) return null
+-  // Signed out, unavailable, or without the native host, use generic notice copy.
+-  if (!signedIn || openPlatformPage === undefined) {
++  // Signed out, or without a recharge destination, use generic notice copy.
++  if (!signedIn || links?.topUpUrl == null) {
+     return <Toast text={message} icon={<IconWarningOutlineRegular size={18} />} onDone={dismiss} />
+   }
+-  // Defer the Modal until the native page closes; do not mount hidden focus or
+-  // Escape handlers under the opaque view.
++  const topUpUrl = links.topUpUrl
++  // Defer the Modal while the native page owns the window; do not mount hidden focus
++  // or Escape handlers under the opaque view.
+   if (opened || platformPage !== null) return null
+   return <Modal open title={t('quotaTitle')} closeLabel={t('close')} onClose={dismiss}
+     description={t('quotaDescription')}
+     footer={<>
+       <Button variant="outline" onClick={dismiss}>{t('cancel')}</Button>
+       <Button variant="primary" onClick={() => {
+-        // Retain the notice before its page mounts; a later failure would
+-        // otherwise republish it and remount this entry.
+-        releaseHold.current = keepOpen()
+-        releasePage.current = openPlatformPage('top-up', () => { releasePage.current = undefined; dismiss() })
+         setOpened(true)
++        if (embedded && openPlatformPage !== undefined) {
++          // Retain the notice before its page mounts; a later failure would
++          // otherwise republish it and remount this entry.
++          releaseHold.current = keepOpen()
++          releasePage.current = openPlatformPage('top-up', () => { releasePage.current = undefined; dismiss() })
++          return
++        }
++        // A browser destination owns its own session; the notice has nothing left to show.
++        window.open(topUpUrl, '_blank', 'noopener,noreferrer')
++        dismiss()
+       }}>{t('quotaTopUp')}</Button>
+     </>} />
+ }
+diff --git a/packages/client/ui-settings-account/src/client/AccountSection.tsx b/packages/client/ui-settings-account/src/client/AccountSection.tsx
+index e65252994e..51fce470ae 100644
+--- a/packages/client/ui-settings-account/src/client/AccountSection.tsx
++++ b/packages/client/ui-settings-account/src/client/AccountSection.tsx
+@@ -102,11 +102,20 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
+   const wallets = details?.balance?.status === 'ready' ? details.balance.value : undefined
+   const bonusWallets = details?.balance?.status === 'ready'
+     ? details.balance.bonusWallets.filter(wallet => new Big(wallet.balance).gt(0)) : []
+-  const showBonusRow = details?.balance?.status !== 'ready' || bonusWallets.length > 0
++  const balance = details?.balance
++  // One wallet row while the account page owns the balance: that page reports the same
++  // recharge and granted money as a single balance, not two Harness-side totals.
++  const showBonusRow = balance?.status !== 'external'
++    && (balance?.status !== 'ready' || bonusWallets.length > 0)
+   const attempt = state?.attempt
+   const active = attempt !== null && attempt !== undefined
+     && ['initializing', 'waiting-browser', 'exchanging', 'committing'].includes(attempt.phase)
+   const signedIn = state?.status === 'credential-stored'
++  const links = state?.links
++  // Only the Platform's own account pages can load in the native view, because it hands
++  // the viewer a grant scoped to the account origin. Every other destination, and an
++  // absent one, stays in this document.
++  const embedded = openPlatformPage !== undefined && signedIn && links?.embedded === true
+   useEffect(() => () => { releasePage.current?.(); releasePage.current = undefined }, [])
+   useEffect(() => {
+     if (signedIn) return
+@@ -123,25 +132,27 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
+     try { await action() } catch { setFailed(true) } finally { setBusy(false) }
+   }
+   /**
+-   * @param event - click on a Platform destination link.
+-   * @returns nothing; on Desktop the embedded page replaces the pending navigation.
++   * @param page - destination this entry opens.
++   * @returns the click handler; an embeddable page replaces the pending navigation and
++   * every other destination keeps its own browser navigation.
+    */
+-  const openUsage = (event: MouseEvent<HTMLAnchorElement>): void => {
+-    if (openPlatformPage !== undefined && signedIn) { event.preventDefault(); showPage(openPlatformPage, 'usage') }
++  const openPage = (page: PlatformPage) => (event: MouseEvent<HTMLAnchorElement>): void => {
++    if (embedded && openPlatformPage !== undefined) { event.preventDefault(); showPage(openPlatformPage, page) }
+   }
+   /**
+    * The Platform entry the balance rows share with the Usage action: an embedded page on
+    * Desktop, a new tab elsewhere. A wallet read that failed still reaches the same
+    * destination, so the user can inspect the balance the Harness could not load; the
+-   * destination comes from the account links, not from the wallet response.
++   * destination comes from the account links, not from the wallet response. A deployment
++   * that serves no such page states that instead of offering a link to nowhere.
+    * @param label - localized link copy.
+    * @param className - link treatment for the row that renders it, absent when the sheet has no such rule.
+-   * @returns the Platform anchor.
++   * @param url - destination from the account links, null when this deployment serves none.
++   * @returns the Platform anchor, or the unavailable statement.
+    */
+-  const platformLink = (label: string, className: string | undefined) => (
+-    <a className={className} href={state?.links.usageUrl} aria-disabled={state === undefined}
+-      target="_blank" rel="noreferrer" onClick={openUsage}>{label}</a>
+-  )
++  const platformLink = (label: string, className: string | undefined, url: string | null | undefined) => url == null
++    ? <span className={css.unavailable}>{t('accountPageUnavailable')}</span>
++    : <a className={className} href={url} target="_blank" rel="noreferrer" onClick={openPage('usage')}>{label}</a>
+   const status = failed || streamFailed || attempt?.phase === 'failed' ? t('failed')
+     : attempt?.phase === 'expired' ? t('expired')
+       : active ? t(attempt.phase === 'initializing' ? 'initializing' : attempt.phase === 'waiting-browser' ? 'waiting' : 'completing')
+@@ -172,9 +183,11 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
+             <span className={css.status} role="status">{status}</span>
+           </div>
+         </div>
+-        {signedIn && <a className={css.accountInfo} href={new URL('/', state.links.usageUrl).href} target="_blank" rel="noopener noreferrer">
+-          {t('accountInfo')}<IconRightUpOutlineRegular size={12} />
+-        </a>}
++        {signedIn && links !== undefined && links.usageUrl !== null
++          && <a className={css.accountInfo} href={links.embedded ? new URL('/', links.usageUrl).href : links.usageUrl}
++            target="_blank" rel="noopener noreferrer">
++            {t('accountInfo')}<IconRightUpOutlineRegular size={12} />
++          </a>}
+       </div>
+       {active && <div className={css.actions}>
+         {attempt.authorizeUrl && <a className={css.linkButton} href={authorizeUrlWithTheme(attempt.authorizeUrl, colorScheme)}
+@@ -193,7 +206,7 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
+             </span>)}</span>
+             : !signedIn || details?.balance === undefined
+               ? <span className={css.unavailable}>{t(!signedIn ? 'balanceSignedOut' : 'loading')}</span>
+-              : platformLink(t('balanceUnavailable'), css.unavailableLink)}
++              : platformLink(t('balanceUnavailable'), css.unavailableLink, links?.usageUrl)}
+         </div>
+         {signedIn && showBonusRow && <>
+           <div className={css.divider} />
+@@ -206,7 +219,7 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
+                 </span>)}</span>
+                 : details?.balance === undefined
+                   ? <span className={css.unavailable}>{t('loading')}</span>
+-                  : platformLink(t('balanceUnavailable'), css.unavailableLink)}
++                  : platformLink(t('balanceUnavailable'), css.unavailableLink, links?.usageUrl)}
+             </span>
+           </div>
+         </>}
+@@ -214,10 +227,11 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
+         <div className={css.row}>
+           <span className={css.secondary}>{t('more')}</span>
+           <div className={css.links}>
+-            {platformLink(t('usage'), css.linkButton)}
+-            <a className={`${css.linkButton} ${css.primary}`} href={state?.links.topUpUrl} aria-disabled={state === undefined}
+-              target="_blank" rel="noreferrer"
+-              onClick={(event) => { if (openPlatformPage !== undefined && signedIn) { event.preventDefault(); showPage(openPlatformPage, 'top-up') } }}>{t('topUp')}</a>
++            {platformLink(t('usage'), css.linkButton, links?.usageUrl)}
++            {links?.topUpUrl == null
++              ? <span className={`${css.linkButton} ${css.unavailable}`} aria-disabled="true" title={t('accountPageUnavailable')}>{t('topUp')}</span>
++              : <a className={`${css.linkButton} ${css.primary}`} href={links.topUpUrl}
++                target="_blank" rel="noreferrer" onClick={openPage('top-up')}>{t('topUp')}</a>}
+           </div>
+         </div>
+       </div>
+diff --git a/packages/client/ui-settings-account/src/client/DesktopOnboarding.module.css b/packages/client/ui-settings-account/src/client/DesktopOnboarding.module.css
+index 718b70a3d0..8317f28e46 100644
+--- a/packages/client/ui-settings-account/src/client/DesktopOnboarding.module.css
++++ b/packages/client/ui-settings-account/src/client/DesktopOnboarding.module.css
+@@ -113,6 +113,7 @@
+
+ .creditIllustration { width: 100%; height: auto; aspect-ratio: 594 / 509; object-fit: contain; }
+ .credit .copy { max-width: 400px; }
++.creditHint { margin: 16px 0 0; font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-tertiary); }
+ .creditActions { display: flex; gap: 24px; margin-top: 60px; }
+ .creditActions > button { flex: 1; max-width: 160px; }
+ .creditActions .laterAction { background: var(--dsw-alias-onboarding-secondary-fill); }
+diff --git a/packages/client/ui-settings-account/src/client/DesktopOnboarding.tsx b/packages/client/ui-settings-account/src/client/DesktopOnboarding.tsx
+index 99c1bc4d2a..f24524806e 100644
+--- a/packages/client/ui-settings-account/src/client/DesktopOnboarding.tsx
++++ b/packages/client/ui-settings-account/src/client/DesktopOnboarding.tsx
+@@ -85,12 +85,20 @@ export function DesktopOnboarding({
+     track?.('onboarding_page_click', { page_name: pageName, button_name, ...selected_content === undefined ? {} : { selected_content } })
+   }
+   const go = (next: 'welcome' | 'credit' | 'purpose' | 'process') => { void update({ step: next }) }
+-  const canRecharge = openPlatformPage !== undefined
++  const links = account.view?.links
++  // Recharge needs a destination. The Platform's own page loads in the native host; every
++  // other destination opens in the browser, where the user's own session already lives.
++  // A deployment without one states that instead of offering a button that cannot work.
++  const canRecharge = links?.topUpUrl != null
+   const recharge = () => {
+     setDialog(null)
+     releaseRecharge.current?.()
+-    // Every control that reaches this is disabled without the callback.
+-    releaseRecharge.current = openPlatformPage?.('top-up', () => { releaseRecharge.current = undefined })
++    if (links?.topUpUrl == null) return
++    if (links.embedded && openPlatformPage !== undefined) {
++      releaseRecharge.current = openPlatformPage('top-up', () => { releaseRecharge.current = undefined })
++      return
++    }
++    window.open(links.topUpUrl, '_blank', 'noopener,noreferrer')
+   }
+   const later = () => {
+     const balance = account.details?.balance
+diff --git a/packages/client/ui-settings-account/src/client/OnboardingCreditStep.tsx b/packages/client/ui-settings-account/src/client/OnboardingCreditStep.tsx
+index e0b73f69b8..ff5e8fc307 100644
+--- a/packages/client/ui-settings-account/src/client/OnboardingCreditStep.tsx
++++ b/packages/client/ui-settings-account/src/client/OnboardingCreditStep.tsx
+@@ -25,6 +25,7 @@ export function OnboardingCreditStep({ t, locale, heading, busy, funded, canRech
+     <div className={css.copy}>
+       <h1 id="desktop-onboarding-title" ref={heading} tabIndex={-1}>{t('onboardingCredit')}</h1>
+       <p className={css.heroDescription}>{t('onboardingCreditDescription')}</p>
++      {!canRecharge && <p className={css.creditHint} role="status">{t('accountPageUnavailableHint')}</p>}
+       <div className={css.creditActions}>
+         <Button className={css.action} variant="primary" disabled={busy || (!funded && !canRecharge)} onClick={funded ? onContinue : onRecharge}>{t(funded ? 'onboardingContinue' : 'onboardingTopUp')}</Button>
+         <Button variant="outline" className={`${css.action} ${css.laterAction}`} disabled={busy || (funded && !canRecharge)} onClick={funded ? onRecharge : onLater}>{t(funded ? 'onboardingFundedTopUp' : 'onboardingLater')}</Button>
 diff --git a/packages/client/ui-settings-account/src/client/assets/onboarding-recharge-dark.webp b/packages/client/ui-settings-account/src/client/assets/onboarding-recharge-dark.webp
 index f2c529005873648d7971c8382fd86f938c700b27..95ba4c01ab5e01393952cb9954ca1ba6422fb1fc 100644
 GIT binary patch
@@ -56195,7 +58009,7 @@ zzc6t+==GQ?+|WNFF23pN;ThknMDrBHJeFvmx}<+(tx|8sx3(w0m+qLI|Cwdoz4fQ3
 ePyg@s|MLGY_J93HsSz6l|K8hEo&x$y3m5@jW>h2q
 
 diff --git a/packages/client/ui-settings-account/src/client/locales.ts b/packages/client/ui-settings-account/src/client/locales.ts
-index b38e869eb9..6d4e6be310 100644
+index b38e869eb9..a90d102ed4 100644
 --- a/packages/client/ui-settings-account/src/client/locales.ts
 +++ b/packages/client/ui-settings-account/src/client/locales.ts
 @@ -7,15 +7,15 @@ export const en = {
@@ -56217,7 +58031,7 @@ index b38e869eb9..6d4e6be310 100644
    signIn: 'Sign in', signOut: 'Sign out',
    signOutUnknownDescription: 'Could not check running tasks. Signing out may interrupt tasks using this account. Sign out now?',
    signOutDescription: 'Signing out will not delete any data. You can sign in to this account again.',
-@@ -24,9 +24,9 @@ export const en = {
+@@ -24,14 +24,14 @@ export const en = {
    completing: 'Completing sign in…', expired: 'Sign in expired. Try again.',
    failed: 'Could not complete the operation. Try again.',
    noResponse: 'Something went wrong. Please check your network connection and try again.',
@@ -56228,8 +58042,16 @@ index b38e869eb9..6d4e6be310 100644
 +  settingsSignedOutDescription: 'Sign in to your PaiNuo ecosystem account to use 随身搭子',
 +  signInDescription: 'Use your PaiNuo ecosystem account to get started.',
    profileUnavailable: 'Account details are not available yet.',
-   balance: 'Topped-up balance', bonusBalance: 'Granted balance', balanceUnavailable: 'View on Platform', balanceSignedOut: 'Sign in to view',
-   accountInfo: 'More account information', more: 'More', usage: 'View usage', topUp: 'Top up',
+-  balance: 'Topped-up balance', bonusBalance: 'Granted balance', balanceUnavailable: 'View on Platform', balanceSignedOut: 'Sign in to view',
+-  accountInfo: 'More account information', more: 'More', usage: 'View usage', topUp: 'Top up',
++  balance: 'Topped-up balance', bonusBalance: 'Granted balance', balanceUnavailable: 'View in the workbench', balanceSignedOut: 'Sign in to view',
++  accountPageUnavailable: 'Not available in this build', accountPageUnavailableHint: 'This build has no recharge page configured; contact your administrator to add credits.', accountInfo: 'More account information', more: 'More', usage: 'Balance and ledger', topUp: 'Top up',
+   quotaTitle: 'No balance available',
+-  quotaDescription: 'DeepSeek Harness cannot start a new task with this account when no balance is available. Would you like to top up? You can also top up later in Settings → Account.',
++  quotaDescription: '随身搭子 cannot start a new task with this account when no balance is available. Would you like to top up? You can also top up later in Settings → Account.',
+   quotaTopUp: 'Top up',
+   bonusNoticeTitle: 'Bonus credited',
+ } as const
 @@ -43,15 +43,15 @@ export const zh: Record<AccountKey, string> = {
    sessionExpired: '登录信息已失效，请重新登录',
    ...onboardingCopy,
@@ -56249,7 +58071,7 @@ index b38e869eb9..6d4e6be310 100644
    signIn: '登录', signOut: '退出登录',
    signOutUnknownDescription: '暂时无法确认任务状态。退出登录可能会中断使用此账号的任务，是否继续？',
    signOutDescription: '退出登录不会丢失任何数据，你仍可以登录此账号。',
-@@ -60,9 +60,9 @@ export const zh: Record<AccountKey, string> = {
+@@ -60,14 +60,14 @@ export const zh: Record<AccountKey, string> = {
    completing: '正在完成登录…', expired: '登录已过期，请重试。',
    failed: '操作未完成，请重试。',
    noResponse: '操作未完成，可能是网络异常，请检查你的网络状况后重试',
@@ -56260,15 +58082,167 @@ index b38e869eb9..6d4e6be310 100644
 +  settingsSignedOutDescription: '登录派诺生态账号，使用随身搭子',
 +  signInDescription: '登录派诺生态账号以开始使用',
    profileUnavailable: '账号资料暂不可用',
-   balance: '充值余额', bonusBalance: '赠金余额', balanceUnavailable: '前往开放平台查看', balanceSignedOut: '登录后查看',
-   accountInfo: '更多账号信息', more: '更多', usage: '查询用量', topUp: '充值',
+-  balance: '充值余额', bonusBalance: '赠金余额', balanceUnavailable: '前往开放平台查看', balanceSignedOut: '登录后查看',
+-  accountInfo: '更多账号信息', more: '更多', usage: '查询用量', topUp: '充值',
++  balance: '充值余额', bonusBalance: '赠金余额', balanceUnavailable: '前往工作台查看', balanceSignedOut: '登录后查看',
++  accountPageUnavailable: '当前版本暂不可用', accountPageUnavailableHint: '当前版本未配置充值入口，请联系管理员开通。', accountInfo: '更多账号信息', more: '更多', usage: '余额与流水', topUp: '充值',
+   quotaTitle: '当前无可用余额',
+-  quotaDescription: '没有可用额度时，DeepSeek Harness 无法开始新的任务，是否前往充值？或者可以稍后前往 设置 → 账号与余额 进行充值。',
++  quotaDescription: '没有可用额度时，随身搭子无法开始新的任务，是否前往充值？或者可以稍后前往 设置 → 账号与余额 进行充值。',
+   quotaTopUp: '去充值',
+   bonusNoticeTitle: '赠金已到账',
+ }
+diff --git a/packages/client/ui-settings-account/src/client/locales/onboarding.ts b/packages/client/ui-settings-account/src/client/locales/onboarding.ts
+index 509986446e..1ab5b71523 100644
+--- a/packages/client/ui-settings-account/src/client/locales/onboarding.ts
++++ b/packages/client/ui-settings-account/src/client/locales/onboarding.ts
+@@ -2,11 +2,11 @@
+ export const onboardingCopy = {
+   onboardingArtworkLocale: 'zh',
+   onboardingWelcome: '欢迎使用',
+-  onboardingBrand: 'DeepSeek Harness',
+-  onboardingIntroduction: 'DeepSeek Harness 会以本地文件夹作为工作区，通过调用各种工具，读写本机文件，完成搜索整理资料、制作文档表格、编写代码、排查问题等各种任务。',
++  onboardingBrand: '随身搭子',
++  onboardingIntroduction: '随身搭子会以本地文件夹作为工作区，通过调用各种工具，读写本机文件，完成搜索整理资料、制作文档表格、编写代码、排查问题等各种任务。',
+   onboardingStart: '开始设置',
+   onboardingCredit: '准备可用额度',
+-  onboardingCreditDescription: 'DeepSeek Harness 执行任务时，会根据模型与工具使用的 token 量扣除额度。请提前添加额度，避免任务在执行过程中被迫中断。你的余额只会在 Agent 实际执行任务时消耗。',
++  onboardingCreditDescription: '随身搭子执行任务时，会根据模型与工具使用的 token 量扣除额度。请提前添加额度，避免任务在执行过程中被迫中断。你的余额只会在 Agent 实际执行任务时消耗。',
+   onboardingTopUp: '去充值',
+   onboardingLater: '下一步',
+   onboardingFundedTopUp: '去充值',
+@@ -19,7 +19,7 @@ export const onboardingCopy = {
+   onboardingDevelopmentDescription: '修改代码、调试问题、运行命令和管理项目文件等',
+   onboardingContinue: '继续',
+   onboardingProcess: '你希望看到多少工作过程？',
+-  onboardingProcessDescription: '这只会影响工作过程的展示方式，不会影响 DeepSeek Harness 的工作能力。',
++  onboardingProcessDescription: '这只会影响工作过程的展示方式，不会影响随身搭子的工作能力。',
+   onboardingCompact: '聚焦结果',
+   onboardingCompactDescription: '只看结果，保持界面简洁明了',
+   onboardingStandard: '关键细节',
+@@ -33,7 +33,7 @@ export const onboardingCopy = {
+   onboardingSkipDescription: '你可以随时前往 设置 → 通用设置 中调整工作过程、性能与用量展示方式或开启代码工作工具。',
+   onboardingKeepSetting: '继续设置',
+   onboardingNoCreditTitle: '暂时跳过充值？',
+-  onboardingNoCreditDescription: '没有可用额度时，DeepSeek Harness 将无法开始新的任务。你可以稍后前往 设置 → 账号与余额 进行充值。',
++  onboardingNoCreditDescription: '没有可用额度时，随身搭子将无法开始新的任务。你可以稍后前往 设置 → 账号与余额 进行充值。',
+   onboardingUnderstood: '我知道了',
+   onboardingGoTopUp: '前往充值',
+   onboardingSaveFailed: '未能保存设置，请重试。',
+@@ -45,11 +45,11 @@ export const onboardingCopy = {
+ export const onboardingEnglishCopy: Record<keyof typeof onboardingCopy, string> = {
+   onboardingArtworkLocale: 'en',
+   onboardingWelcome: 'Welcome to',
+-  onboardingBrand: 'DeepSeek Harness',
+-  onboardingIntroduction: 'DeepSeek Harness works in a local folder and uses tools to read and write files on your computer. It can help you research and organize information, create documents and spreadsheets, write code, troubleshoot issues, and more.',
++  onboardingBrand: '随身搭子',
++  onboardingIntroduction: '随身搭子 works in a local folder and uses tools to read and write files on your computer. It can help you research and organize information, create documents and spreadsheets, write code, troubleshoot issues, and more.',
+   onboardingStart: 'Get started',
+   onboardingCredit: 'Add credits',
+-  onboardingCreditDescription: 'DeepSeek Harness charges credits based on the tokens used by models and tools. Add credits in advance to keep your tasks running without interruption. Your balance is only used while the agent is working on a task.',
++  onboardingCreditDescription: '随身搭子 charges credits based on the tokens used by models and tools. Add credits in advance to keep your tasks running without interruption. Your balance is only used while the agent is working on a task.',
+   onboardingTopUp: 'Add credits',
+   onboardingLater: 'Next',
+   onboardingFundedTopUp: 'Add credits',
+@@ -62,7 +62,7 @@ export const onboardingEnglishCopy: Record<keyof typeof onboardingCopy, string>
+   onboardingDevelopmentDescription: 'Edit code, debug issues, run commands, manage project files, and more',
+   onboardingContinue: 'Continue',
+   onboardingProcess: 'How much detail would you like to see?',
+-  onboardingProcessDescription: 'This only changes how progress is shown, not what DeepSeek Harness can do.',
++  onboardingProcessDescription: 'This only changes how progress is shown, not what 随身搭子 can do.',
+   onboardingCompact: 'Results only',
+   onboardingCompactDescription: 'See just the results in a clean, simple interface',
+   onboardingStandard: 'Key details',
+@@ -76,7 +76,7 @@ export const onboardingEnglishCopy: Record<keyof typeof onboardingCopy, string>
+   onboardingSkipDescription: 'You can change how progress, performance, and usage are displayed, or enable Coding Tools, anytime in Settings → General.',
+   onboardingKeepSetting: 'Continue setup',
+   onboardingNoCreditTitle: 'Skip adding credits?',
+-  onboardingNoCreditDescription: 'DeepSeek Harness can’t start new tasks without credits. You can add them later in Settings → Account.',
++  onboardingNoCreditDescription: '随身搭子 can’t start new tasks without credits. You can add them later in Settings → Account.',
+   onboardingUnderstood: 'Got it',
+   onboardingGoTopUp: 'Add credits',
+   onboardingSaveFailed: 'Could not save settings. Try again.',
+diff --git a/packages/client/ui-settings-account/tests/account.client.spec.tsx b/packages/client/ui-settings-account/tests/account.client.spec.tsx
+index e6c72c0989..1e22f1378e 100644
+--- a/packages/client/ui-settings-account/tests/account.client.spec.tsx
++++ b/packages/client/ui-settings-account/tests/account.client.spec.tsx
+@@ -30,7 +30,7 @@ function operationsOf(state: Omit<AccountView, 'links'>, details?: Partial<Accou
+     ...pages === undefined ? {} : { openPlatformPage: pages.open },
+     hooks: {
+       account: {
+-        getSnapshot: () => ({ view: { ...state, links: { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up' } }, details, avatar, failed: false }),
++        getSnapshot: () => ({ view: { ...state, links: { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up', embedded: true } }, details, avatar, failed: false }),
+         subscribe: () => () => {},
+       },
+       theme: { getSnapshot: () => themeOf('light'), subscribe: () => () => {} },
+@@ -205,7 +205,7 @@ it('reports a failed start in the login dialog, not as a sidebar alert', async (
+   const operations = mount({ status: 'signed-out', attempt: null })
+   cleanup()
+   const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+-  const links = { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up' }
++  const links = { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up', embedded: true }
+   let snapshot: AccountSnapshot = { view: { status: 'signed-out', attempt: null, links }, details: undefined, avatar: undefined, failed: false }
+   // The plugin's start publishes the failure through the account snapshot, then rejects.
+   const start = vi.fn((): Promise<void> => {
+diff --git a/packages/client/ui-settings-account/tests/apply.client.spec.ts b/packages/client/ui-settings-account/tests/apply.client.spec.ts
+index 0146bbfa4a..d6736f1cab 100644
+--- a/packages/client/ui-settings-account/tests/apply.client.spec.ts
++++ b/packages/client/ui-settings-account/tests/apply.client.spec.ts
+@@ -26,7 +26,7 @@ const it = createClientTest({ roster: webApp })
+ const SELF = '@deepseek-ai/dsh-client-ui-settings-account'
+ const view: AccountView = {
+   status: 'signed-out', attempt: null,
+-  links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
++  links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true },
+ }
+ const stored: AccountView = { ...view, status: 'credential-stored' }
+ const profile: AccountDetails['profile'] = { status: 'ready', value: { id: 'account-user' as AccountUserId, name: 'User', contact: null } }
+diff --git a/packages/client/ui-settings-account/tests/browser-login.client.spec.ts b/packages/client/ui-settings-account/tests/browser-login.client.spec.ts
+index 7d27c3d33c..7718382049 100644
+--- a/packages/client/ui-settings-account/tests/browser-login.client.spec.ts
++++ b/packages/client/ui-settings-account/tests/browser-login.client.spec.ts
+@@ -6,7 +6,7 @@ import { BrowserLogin } from '../src/client/browser-login.ts'
+
+ afterEach(() => { vi.restoreAllMocks() })
+ function view(phase: NonNullable<AccountView['attempt']>['phase'], authorizeUrl?: string): AccountView {
+-  return { status: 'signed-out', links: { usageUrl: '', topUpUrl: '' },
++  return { status: 'signed-out', links: { usageUrl: '', topUpUrl: '', embedded: true },
+     attempt: { id: 'attempt' as SignInAttemptId, phase, ...(authorizeUrl ? { authorizeUrl } : {}) } }
+ }
+ function setup() {
+diff --git a/packages/client/ui-settings-account/tests/desktop-onboarding-entry.client.spec.tsx b/packages/client/ui-settings-account/tests/desktop-onboarding-entry.client.spec.tsx
+index bf8394a7ef..58be5f8597 100644
+--- a/packages/client/ui-settings-account/tests/desktop-onboarding-entry.client.spec.tsx
++++ b/packages/client/ui-settings-account/tests/desktop-onboarding-entry.client.spec.tsx
+@@ -47,7 +47,7 @@ function mount(initiallyDone = false, initiallyLoading = false) {
+       completion: initiallyDone ? 'completed' : null, usage: 'compact', developerTools: false },
+   }
+   let account: AccountSnapshot = {
+-    view: { status: 'credential-stored', attempt: null, links: { usageUrl: 'https://example.com/usage', topUpUrl: 'https://example.com/top_up' } },
++    view: { status: 'credential-stored', attempt: null, links: { usageUrl: 'https://example.com/usage', topUpUrl: 'https://example.com/top_up', embedded: true } },
+     failed: false, details: undefined, avatar: undefined,
+   }
+   // This entry consumes only its injected selectors; the shell owns the global hooks.
+diff --git a/packages/client/ui-settings-account/tests/desktop-onboarding.client.spec.tsx b/packages/client/ui-settings-account/tests/desktop-onboarding.client.spec.tsx
+index fb47dd4c22..6f8d54e204 100644
+--- a/packages/client/ui-settings-account/tests/desktop-onboarding.client.spec.tsx
++++ b/packages/client/ui-settings-account/tests/desktop-onboarding.client.spec.tsx
+@@ -35,7 +35,7 @@ function mount(step: DesktopOnboardingState['progress']['step'] = 'welcome', bal
+         setState(current => ({ ...current, status: 'ready', progress: saved ? { ...current.progress, ...change } : current.progress }))
+         return saved
+       }}
+-      account={{ view: { status: 'credential-stored', attempt: null, links: { usageUrl: 'https://example.com/usage', topUpUrl: 'https://example.com/top_up' } },
++      account={{ view: { status: 'credential-stored', attempt: null, links: { usageUrl: 'https://example.com/usage', topUpUrl: 'https://example.com/top_up', embedded: true } },
+         avatar: undefined, failed: false, details: balance === 'loading' ? {} : { balance: balance === 'failed' ? { status: 'failed' } : { status: 'ready', bonusWallets: balance === 'bonus' ? [{ currency: 'CNY', balance: '1' }] : [], value: [{ currency: 'CNY', balance: balance === 'zero' || balance === 'bonus' ? '0E-16' : '12.34' }] } } }}
+       openPlatformPage={openPlatformPage} />
+   }
 diff --git a/packages/client/ui-settings-account/tests/expected/account-en.txt b/packages/client/ui-settings-account/tests/expected/account-en.txt
-index ef6c13c1b2..c3780e44e5 100644
+index ef6c13c1b2..65d59d9dff 100644
 --- a/packages/client/ui-settings-account/tests/expected/account-en.txt
 +++ b/packages/client/ui-settings-account/tests/expected/account-en.txt
 @@ -1 +1 @@
 -Signed in to DeepSeekLoading…More account informationTopped-up balanceLoading…Granted balanceLoading…MoreView usageTop up
-+Signed in to PaiNuoLoading…More account informationTopped-up balanceLoading…Granted balanceLoading…MoreView usageTop up
++Signed in to PaiNuoLoading…More account informationTopped-up balanceLoading…Granted balanceLoading…MoreBalance and ledgerTop up
 diff --git a/packages/client/ui-settings-account/tests/expected/account-signed-out-en.txt b/packages/client/ui-settings-account/tests/expected/account-signed-out-en.txt
 index cd48fe8f41..cddad2efe5 100644
 --- a/packages/client/ui-settings-account/tests/expected/account-signed-out-en.txt
@@ -56284,26 +58258,40 @@ index 5b0aef479b..7b052c83f1 100644
 -当前未登录 DeepSeek Harness 账号登录 DeepSeek Harness 账号获取专属 API Key登录
 +当前未登录随身搭子账号登录派诺生态账号，使用随身搭子登录
 diff --git a/packages/client/ui-settings-account/tests/expected/account-zh.txt b/packages/client/ui-settings-account/tests/expected/account-zh.txt
-index 11ff67f2d5..67af0e0c3a 100644
+index 11ff67f2d5..f6183ebd55 100644
 --- a/packages/client/ui-settings-account/tests/expected/account-zh.txt
 +++ b/packages/client/ui-settings-account/tests/expected/account-zh.txt
 @@ -1 +1 @@
 -已登录 DeepSeek加载中…更多账号信息充值余额加载中…赠金余额加载中…更多查询用量充值
-+已登录派诺生态加载中…更多账号信息充值余额加载中…赠金余额加载中…更多查询用量充值
++已登录派诺生态加载中…更多账号信息充值余额加载中…赠金余额加载中…更多余额与流水充值
 diff --git a/packages/client/ui-settings-account/tests/expected/bonus-en.txt b/packages/client/ui-settings-account/tests/expected/bonus-en.txt
-index 5fad46a2db..7adbc483c0 100644
+index 5fad46a2db..301e435b6f 100644
 --- a/packages/client/ui-settings-account/tests/expected/bonus-en.txt
 +++ b/packages/client/ui-settings-account/tests/expected/bonus-en.txt
 @@ -1 +1 @@
 -Signed in to DeepSeekLoading…More account informationTopped-up balance¥209.00$20.07Granted balance¥5.00<$0.01MoreView usageTop up
-+Signed in to PaiNuoLoading…More account informationTopped-up balance¥209.00$20.07Granted balance¥5.00<$0.01MoreView usageTop up
++Signed in to PaiNuoLoading…More account informationTopped-up balance¥209.00$20.07Granted balance¥5.00<$0.01MoreBalance and ledgerTop up
 diff --git a/packages/client/ui-settings-account/tests/expected/bonus-zh.txt b/packages/client/ui-settings-account/tests/expected/bonus-zh.txt
-index 75b9abfeab..842dbec0f4 100644
+index 75b9abfeab..57cb659092 100644
 --- a/packages/client/ui-settings-account/tests/expected/bonus-zh.txt
 +++ b/packages/client/ui-settings-account/tests/expected/bonus-zh.txt
 @@ -1 +1 @@
 -已登录 DeepSeek加载中…更多账号信息充值余额¥209.00$20.07赠金余额¥5.00<$0.01更多查询用量充值
-+已登录派诺生态加载中…更多账号信息充值余额¥209.00$20.07赠金余额¥5.00<$0.01更多查询用量充值
++已登录派诺生态加载中…更多账号信息充值余额¥209.00$20.07赠金余额¥5.00<$0.01更多余额与流水充值
+diff --git a/packages/client/ui-settings-account/tests/expected/details-en.txt b/packages/client/ui-settings-account/tests/expected/details-en.txt
+index 08cdd9dbe9..5667564e3c 100644
+--- a/packages/client/ui-settings-account/tests/expected/details-en.txt
++++ b/packages/client/ui-settings-account/tests/expected/details-en.txt
+@@ -1 +1 @@
+-Harness Mock (TEST ONLY)138****0000More account informationTopped-up balance¥1,234.56<$0.01MoreView usageTop up
++Harness Mock (TEST ONLY)138****0000More account informationTopped-up balance¥1,234.56<$0.01MoreBalance and ledgerTop up
+diff --git a/packages/client/ui-settings-account/tests/expected/details-zh.txt b/packages/client/ui-settings-account/tests/expected/details-zh.txt
+index 725935948e..2b9cd48a8d 100644
+--- a/packages/client/ui-settings-account/tests/expected/details-zh.txt
++++ b/packages/client/ui-settings-account/tests/expected/details-zh.txt
+@@ -1 +1 @@
+-Harness Mock (TEST ONLY)138****0000更多账号信息充值余额¥1,234.56<$0.01更多查询用量充值
++Harness Mock (TEST ONLY)138****0000更多账号信息充值余额¥1,234.56<$0.01更多余额与流水充值
 diff --git a/packages/client/ui-settings-account/tests/expected/login-en.txt b/packages/client/ui-settings-account/tests/expected/login-en.txt
 index ce50b4cb46..68544fa033 100644
 --- a/packages/client/ui-settings-account/tests/expected/login-en.txt
@@ -56318,6 +58306,62 @@ index f06257b241..d401356264 100644
 @@ -1 +1 @@
 -开始使用登录 DeepSeek 账号，或添加 API Key，即可开始使用。你的项目和文件保存在本地。添加 API Key登录
 +开始使用登录派诺生态账号，即可开始使用随身搭子。你的项目和文件保存在本地。添加 API Key登录
+diff --git a/packages/client/ui-settings-account/tests/expected/onboarding-credit-en.txt b/packages/client/ui-settings-account/tests/expected/onboarding-credit-en.txt
+index 64b6e70d38..9deaabe5f7 100644
+--- a/packages/client/ui-settings-account/tests/expected/onboarding-credit-en.txt
++++ b/packages/client/ui-settings-account/tests/expected/onboarding-credit-en.txt
+@@ -1 +1 @@
+-Add creditsDeepSeek Harness charges credits based on the tokens used by models and tools. Add credits in advance to keep your tasks running without interruption. Your balance is only used while the agent is working on a task.Add creditsNextBackSkip
++Add credits随身搭子 charges credits based on the tokens used by models and tools. Add credits in advance to keep your tasks running without interruption. Your balance is only used while the agent is working on a task.Add creditsNextBackSkip
+diff --git a/packages/client/ui-settings-account/tests/expected/onboarding-credit.txt b/packages/client/ui-settings-account/tests/expected/onboarding-credit.txt
+index c54258b3a0..a70d291625 100644
+--- a/packages/client/ui-settings-account/tests/expected/onboarding-credit.txt
++++ b/packages/client/ui-settings-account/tests/expected/onboarding-credit.txt
+@@ -1 +1 @@
+-准备可用额度DeepSeek Harness 执行任务时，会根据模型与工具使用的 token 量扣除额度。请提前添加额度，避免任务在执行过程中被迫中断。你的余额只会在 Agent 实际执行任务时消耗。去充值下一步上一步跳过
++准备可用额度随身搭子执行任务时，会根据模型与工具使用的 token 量扣除额度。请提前添加额度，避免任务在执行过程中被迫中断。你的余额只会在 Agent 实际执行任务时消耗。去充值下一步上一步跳过
+diff --git a/packages/client/ui-settings-account/tests/expected/onboarding-process-en.txt b/packages/client/ui-settings-account/tests/expected/onboarding-process-en.txt
+index acbae343f3..1f096a447f 100644
+--- a/packages/client/ui-settings-account/tests/expected/onboarding-process-en.txt
++++ b/packages/client/ui-settings-account/tests/expected/onboarding-process-en.txt
+@@ -1 +1 @@
+-How much detail would you like to see?This only changes how progress is shown, not what DeepSeek Harness can do.Results onlySee just the results in a clean, simple interfaceKey detailsFocus on results, with only the most important steps and actions shownFull detailsSee the full process for easier debugging and troubleshootingBackSkip
++How much detail would you like to see?This only changes how progress is shown, not what 随身搭子 can do.Results onlySee just the results in a clean, simple interfaceKey detailsFocus on results, with only the most important steps and actions shownFull detailsSee the full process for easier debugging and troubleshootingBackSkip
+diff --git a/packages/client/ui-settings-account/tests/expected/onboarding-process.txt b/packages/client/ui-settings-account/tests/expected/onboarding-process.txt
+index ee8a304344..324fed32bd 100644
+--- a/packages/client/ui-settings-account/tests/expected/onboarding-process.txt
++++ b/packages/client/ui-settings-account/tests/expected/onboarding-process.txt
+@@ -1 +1 @@
+-你希望看到多少工作过程？这只会影响工作过程的展示方式，不会影响 DeepSeek Harness 的工作能力。聚焦结果只看结果，保持界面简洁明了关键细节结果优先，仅展示重要步骤和关键操作完整过程查看完整工作过程，方便调试和排查问题上一步跳过
++你希望看到多少工作过程？这只会影响工作过程的展示方式，不会影响随身搭子的工作能力。聚焦结果只看结果，保持界面简洁明了关键细节结果优先，仅展示重要步骤和关键操作完整过程查看完整工作过程，方便调试和排查问题上一步跳过
+diff --git a/packages/client/ui-settings-account/tests/expected/onboarding-purpose-en.txt b/packages/client/ui-settings-account/tests/expected/onboarding-purpose-en.txt
+index d14830b1f8..b0a929cd39 100644
+--- a/packages/client/ui-settings-account/tests/expected/onboarding-purpose-en.txt
++++ b/packages/client/ui-settings-account/tests/expected/onboarding-purpose-en.txt
+@@ -1 +1 @@
+-What would you like DeepSeek Harness to help with?We’ll tailor the interface and tools to fit the way you work.Office & creative workEdit documents, organize data, create presentations, and moreCoding & developmentEdit code, debug issues, run commands, manage project files, and moreBackSkip
++What would you like 随身搭子 to help with?We’ll tailor the interface and tools to fit the way you work.Office & creative workEdit documents, organize data, create presentations, and moreCoding & developmentEdit code, debug issues, run commands, manage project files, and moreBackSkip
+diff --git a/packages/client/ui-settings-account/tests/expected/onboarding-purpose.txt b/packages/client/ui-settings-account/tests/expected/onboarding-purpose.txt
+index 89c09d75f5..eb002197fc 100644
+--- a/packages/client/ui-settings-account/tests/expected/onboarding-purpose.txt
++++ b/packages/client/ui-settings-account/tests/expected/onboarding-purpose.txt
+@@ -1 +1 @@
+-你希望 DeepSeek Harness 帮你做什么？我们会根据你的选择调整界面和工具，以更适合你的工作方式。办公与创作编辑文档、整理数据和制作演示文稿等代码与开发修改代码、调试问题、运行命令和管理项目文件等上一步跳过
++你希望 随身搭子 帮你做什么？我们会根据你的选择调整界面和工具，以更适合你的工作方式。办公与创作编辑文档、整理数据和制作演示文稿等代码与开发修改代码、调试问题、运行命令和管理项目文件等上一步跳过
+diff --git a/packages/client/ui-settings-account/tests/expected/onboarding-welcome-en.txt b/packages/client/ui-settings-account/tests/expected/onboarding-welcome-en.txt
+index 727b3ab926..341b1b9907 100644
+--- a/packages/client/ui-settings-account/tests/expected/onboarding-welcome-en.txt
++++ b/packages/client/ui-settings-account/tests/expected/onboarding-welcome-en.txt
+@@ -1 +1 @@
+-Welcome to DeepSeek HarnessDeepSeek Harness works in a local folder and uses tools to read and write files on your computer. It can help you research and organize information, create documents and spreadsheets, write code, troubleshoot issues, and more.Get started
++Welcome to 随身搭子随身搭子 works in a local folder and uses tools to read and write files on your computer. It can help you research and organize information, create documents and spreadsheets, write code, troubleshoot issues, and more.Get started
+diff --git a/packages/client/ui-settings-account/tests/expected/onboarding-welcome.txt b/packages/client/ui-settings-account/tests/expected/onboarding-welcome.txt
+index b2958555ad..fd391fbebe 100644
+--- a/packages/client/ui-settings-account/tests/expected/onboarding-welcome.txt
++++ b/packages/client/ui-settings-account/tests/expected/onboarding-welcome.txt
+@@ -1 +1 @@
+-欢迎使用 DeepSeek HarnessDeepSeek Harness 会以本地文件夹作为工作区，通过调用各种工具，读写本机文件，完成搜索整理资料、制作文档表格、编写代码、排查问题等各种任务。开始设置
++欢迎使用 随身搭子随身搭子会以本地文件夹作为工作区，通过调用各种工具，读写本机文件，完成搜索整理资料、制作文档表格、编写代码、排查问题等各种任务。开始设置
 diff --git a/packages/client/ui-settings-account/tests/expected/platform-error-en.txt b/packages/client/ui-settings-account/tests/expected/platform-error-en.txt
 index 5be84a7a59..ff8a081c16 100644
 --- a/packages/client/ui-settings-account/tests/expected/platform-error-en.txt
@@ -56346,6 +58390,91 @@ index 9bcbb24b47..bf29d7d7f0 100644
 @@ -1 +1 @@
 -返回 DeepSeek Harness
 +返回随身搭子
+diff --git a/packages/client/ui-settings-account/tests/expected/profile-before-balance.txt b/packages/client/ui-settings-account/tests/expected/profile-before-balance.txt
+index 23020d84c3..767073a907 100644
+--- a/packages/client/ui-settings-account/tests/expected/profile-before-balance.txt
++++ b/packages/client/ui-settings-account/tests/expected/profile-before-balance.txt
+@@ -1 +1 @@
+-Ready User138****0000More account informationTopped-up balanceLoading…Granted balanceLoading…MoreView usageTop up
++Ready User138****0000More account informationTopped-up balanceLoading…Granted balanceLoading…MoreBalance and ledgerTop up
+diff --git a/packages/client/ui-settings-account/tests/initialization.client.spec.ts b/packages/client/ui-settings-account/tests/initialization.client.spec.ts
+index daa962d263..40628aa9c0 100644
+--- a/packages/client/ui-settings-account/tests/initialization.client.spec.ts
++++ b/packages/client/ui-settings-account/tests/initialization.client.spec.ts
+@@ -20,7 +20,7 @@ it.each(['accepted', 'refused', 'disconnected', 'pending'] as const)('initialize
+     if (outcome === 'disconnected') throw new Error('connection lost')
+     return { ok: outcome === 'accepted' || outcome === 'pending', value: undefined }
+   })
+-  const links = { usageUrl: 'https://example.test/usage', topUpUrl: 'https://example.test/top_up' }
++  const links = { usageUrl: 'https://example.test/usage', topUpUrl: 'https://example.test/top_up', embedded: true }
+   const signedIn: AccountView = {
+     status: 'credential-stored', links, attempt: { id: 'login' as SignInAttemptId, phase: 'succeeded' },
+   }
+diff --git a/packages/client/ui-settings-account/tests/onboarding-state.client.spec.ts b/packages/client/ui-settings-account/tests/onboarding-state.client.spec.ts
+index 8908c540bc..596c224c0c 100644
+--- a/packages/client/ui-settings-account/tests/onboarding-state.client.spec.ts
++++ b/packages/client/ui-settings-account/tests/onboarding-state.client.spec.ts
+@@ -16,7 +16,7 @@ afterEach(async () => { for (const dispose of cleanup.splice(0).reverse()) await
+
+ function accountState(status?: 'credential-stored' | 'signed-out'): AccountSnapshot {
+   return {
+-    view: status === undefined ? undefined : { status, attempt: null, links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up' } },
++    view: status === undefined ? undefined : { status, attempt: null, links: { usageUrl: 'https://platform.example/usage', topUpUrl: 'https://platform.example/top_up', embedded: true } },
+     details: undefined, avatar: undefined, failed: false,
+   }
+ }
+diff --git a/packages/client/ui-settings-account/tests/onboarding.client.spec.tsx b/packages/client/ui-settings-account/tests/onboarding.client.spec.tsx
+index a66e7f1d02..ae90d2ecc8 100644
+--- a/packages/client/ui-settings-account/tests/onboarding.client.spec.tsx
++++ b/packages/client/ui-settings-account/tests/onboarding.client.spec.tsx
+@@ -38,7 +38,7 @@ it('claims onboarding while loading, offers API key fallback, and completes afte
+   const view = render(<AccountOnboarding {...props} />)
+   expect(props.setOnboarding).toHaveBeenCalledExactlyOnceWith(true)
+   expect(screen.queryByRole('dialog')).toBeNull()
+-  account = { ...account, view: { status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' } } }
++  account = { ...account, view: { status: 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '', embedded: true } } }
+   view.rerender(<AccountOnboarding {...props} />)
+   fireEvent.click(screen.getByRole('button', { name: en.addApiKey }))
+   expect(props.showLogin).toHaveBeenLastCalledWith(false)
+diff --git a/packages/client/ui-settings-account/tests/quota-notice-hold.client.spec.tsx b/packages/client/ui-settings-account/tests/quota-notice-hold.client.spec.tsx
+index 11a42537fe..be1f5fdd62 100644
+--- a/packages/client/ui-settings-account/tests/quota-notice-hold.client.spec.tsx
++++ b/packages/client/ui-settings-account/tests/quota-notice-hold.client.spec.tsx
+@@ -49,7 +49,7 @@ const quotaEntry = (seq: number, code: string): SessionLiveEventEntry => ({
+
+ const storedView: AccountView = {
+   status: 'credential-stored', attempt: null,
+-  links: { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up' },
++  links: { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up', embedded: true },
+ }
+ const theme: ThemeSnapshot = {
+   preference: 'light', fontSizes: { text: 14, code: 11, terminal: 13 }, fontFamilies: { text: '', code: '', terminal: '' }, active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], revision: 0,
+diff --git a/packages/client/ui-settings-account/tests/quota-notice.client.spec.tsx b/packages/client/ui-settings-account/tests/quota-notice.client.spec.tsx
+index baab0c8003..8a15e4f776 100644
+--- a/packages/client/ui-settings-account/tests/quota-notice.client.spec.tsx
++++ b/packages/client/ui-settings-account/tests/quota-notice.client.spec.tsx
+@@ -25,7 +25,7 @@ afterEach(() => {
+ const noticeMessage = 'Request quota exhausted.'
+
+ function snapshot(status?: 'signed-out' | 'credential-stored'): AccountSnapshot {
+-  const view: AccountView = { status: status ?? 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' } }
++  const view: AccountView = { status: status ?? 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '', embedded: true } }
+   return { view: status === undefined ? undefined : view, details: undefined, avatar: undefined, failed: false }
+ }
+
+diff --git a/packages/client/ui-settings-account/tests/sign-in-dialog.client.spec.tsx b/packages/client/ui-settings-account/tests/sign-in-dialog.client.spec.tsx
+index 47e25c4de6..1bb0a57076 100644
+--- a/packages/client/ui-settings-account/tests/sign-in-dialog.client.spec.tsx
++++ b/packages/client/ui-settings-account/tests/sign-in-dialog.client.spec.tsx
+@@ -14,7 +14,7 @@ function dialogProps(attempt: AccountView['attempt'], copy: typeof en | typeof z
+   const close = vi.fn()
+   const useApiKey = vi.fn()
+   return { start, cancel, close, useApiKey, colorScheme, t: (key: keyof typeof en) => copy[key],
+-    account: { view: { status: 'signed-out' as const, attempt, links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' } }, details: undefined, avatar: undefined, failed: false } }
++    account: { view: { status: 'signed-out' as const, attempt, links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true } }, details: undefined, avatar: undefined, failed: false } }
+ }
+ function mount(attempt: AccountView['attempt'], copy: typeof en | typeof zh = en, colorScheme: 'light' | 'dark' = 'dark') {
+   const props = dialogProps(attempt, copy, colorScheme)
 diff --git a/packages/client/ui-settings-agent-loop/package.json b/packages/client/ui-settings-agent-loop/package.json
 index 81dd20ded1..4e9d3840fe 100644
 --- a/packages/client/ui-settings-agent-loop/package.json
@@ -57036,10 +59165,45 @@ index f033e54f58..a47095e7ec 100644
      "access": "public"
    },
 diff --git a/packages/credentials/deepseek-account-platform/src/index.ts b/packages/credentials/deepseek-account-platform/src/index.ts
-index 0319a553c3..b3e3a0868c 100644
+index 0319a553c3..fbc23d7d26 100644
 --- a/packages/credentials/deepseek-account-platform/src/index.ts
 +++ b/packages/credentials/deepseek-account-platform/src/index.ts
-@@ -50,10 +50,10 @@ export interface Config {
+@@ -7,12 +7,12 @@ import { promises as streamPromises } from 'node:stream'
+ import { Context, Service } from '@deepseek-ai/cordis'
+ import Schema from '@deepseek-ai/schemastery'
+ import { z } from 'zod'
+-import { DeepSeekAccount, installAccountTaskCancellation, mergePlatformCookies, platformClientHeaders, platformWireLocale, type AccountBonusBatch, type AccountBonusOrderId, type AccountClientMetadata, type AccountDetails, type AccountUserId, type AccountView, type PlatformSession, type SignInAttemptId, type SignInAttemptView } from '@deepseek-ai/dsh-deepseek-account'
++import { DeepSeekAccount, installAccountTaskCancellation, mergePlatformCookies, platformClientHeaders, platformWireLocale, type AccountBonusBatch, type AccountBonusOrderId, type AccountClientMetadata, type AccountDetails, type AccountLinks, type AccountUserId, type AccountView, type PlatformSession, type SignInAttemptId, type SignInAttemptView } from '@deepseek-ai/dsh-deepseek-account'
+ import { credentialKey } from '@deepseek-ai/dsh-credentials'
+ import type { AuthorizationSession } from '@deepseek-ai/dsh-authorization'
+ import { profile, readAccountDetail, readUnnotifiedBonuses, sendBonusNotified } from './details.ts'
+ import { revokeAccount, type LogoutRetryPolicy } from './logout.ts'
+-import { AccountUnauthorizedError, PlatformAuthError, platformHeaders, platformOrigin, browserUrl, requestPlatform, initialization, exchange, loginOrigin } from './protocol.ts'
++import { AccountUnauthorizedError, PlatformAuthError, accountLinks, accountPageUrl, platformHeaders, platformOrigin, browserUrl, requestPlatform, initialization, exchange, loginOrigin, type AccountSurface } from './protocol.ts'
+
+ const KEY = credentialKey('deepseek-account-platform', 'default')
+ const DEVICE = credentialKey('deepseek-account-platform', 'device')
+@@ -29,6 +29,19 @@ export interface Config {
+   embeddedPageDist?: string
+   /** Exact HTTP(S) origin allowed to receive account tokens for inference and files. */
+   inferenceOrigin?: string
++  /**
++   * Which service serves this deployment's account pages and wallet.
++   * `billing-center` (the branded deployment) sends Top up and ledger entries to
++   * `billingCenterUrl` and reads no wallet from the account summary; `platform-pages`
++   * keeps the platform's own `/usage` and `/top_up` pages and its summary wallets.
++   */
++  accountSurface?: AccountSurface
++  /**
++   * Brand billing center serving the recharge, balance and ledger pages. Empty
++   * removes both account entries instead of pointing them at a page this
++   * deployment does not serve.
++   */
++  billingCenterUrl?: string
+   /** Allow HTTP only on loopback for the development Mock. */
+   allowLoopbackHttp?: boolean
+   /** Map authorization and completion pages to platformOrigin for private development proxies. */
+@@ -50,10 +63,12 @@ export interface Config {
  }
  /** Validated deployment choices. */
  export const Config = Schema.object({
@@ -57049,10 +59213,34 @@ index 0319a553c3..b3e3a0868c 100644
    embeddedPageDist: Schema.string().default(''),
 -  inferenceOrigin: Schema.string().default('https://api.deepseek.com'),
 +  inferenceOrigin: Schema.string().default(process.env.DSH_INFERENCE_ORIGIN ?? 'https://auth.modelxing.com'),
++  accountSurface: Schema.union([Schema.const('billing-center'), Schema.const('platform-pages')]).default(process.env.DSH_ACCOUNT_SURFACE === 'billing-center' ? 'billing-center' : 'platform-pages'),
++  billingCenterUrl: Schema.string().default(process.env.DSH_BILLING_CENTER_URL ?? ''),
    allowLoopbackHttp: Schema.boolean().default(false),
    rewriteBrowserOrigin: Schema.boolean().default(false),
    requestHeaders: Schema.dict(Schema.string().role('secret')).default({}),
-@@ -136,7 +136,7 @@ export class PlatformAccount extends DeepSeekAccount {
+@@ -89,6 +104,8 @@ export class PlatformAccount extends DeepSeekAccount {
+   private readonly inferenceOrigin: string
+   private readonly rewriteBrowserOrigin: boolean
+   private readonly platform: 'darwin' | 'win32' | null
++  private readonly links: AccountLinks
++  private readonly summaryBalance: boolean
+   private readonly requestHeaders: Record<string, string>
+   private readonly accountRequestHeaders: Record<string, string>
+   private readonly requestTimeout: number
+@@ -123,6 +140,12 @@ export class PlatformAccount extends DeepSeekAccount {
+     this.inferenceOrigin = inference.origin
+     this.rewriteBrowserOrigin = resolved.rewriteBrowserOrigin
+     this.platform = resolved.desktopPlatform
++    const billingCenter = accountPageUrl(resolved.billingCenterUrl, 'billingCenterUrl', resolved.allowLoopbackHttp)
++    if (resolved.accountSurface === 'platform-pages' && billingCenter !== null) {
++      throw new Error('account: billingCenterUrl must be empty while accountSurface is platform-pages')
++    }
++    this.links = accountLinks(resolved.accountSurface, billingCenter, this.origin)
++    this.summaryBalance = resolved.accountSurface === 'platform-pages'
+     this.requestHeaders = platformHeaders(resolved.requestHeaders)
+     const accountHeaders = platformHeaders(resolved.accountRequestHeaders)
+     this.accountRequestHeaders = { ...this.requestHeaders, ...accountHeaders }
+@@ -136,7 +159,7 @@ export class PlatformAccount extends DeepSeekAccount {
        maxRetries: resolved.logoutMaxRetries, delayMs: resolved.logoutRetryDelayMs, requestTimeoutMs: this.requestTimeout,
      }
      ctx.authorization.registerFlow({
@@ -57061,7 +59249,42 @@ index 0319a553c3..b3e3a0868c 100644
        run: (session) => {
          const attempt = this.attempt
          if (attempt === undefined) return Promise.reject(new PlatformAuthError('protocol'))
-@@ -410,7 +410,6 @@ export class PlatformAccount extends DeepSeekAccount {
+@@ -184,7 +207,7 @@ export class PlatformAccount extends DeepSeekAccount {
+       status: record === undefined ? 'signed-out' : 'credential-stored',
+       // Credential removal can notify watchers before sign-out finishes clearing the attempt.
+       attempt: record === undefined && attempt?.phase === 'succeeded' ? null : attempt,
+-      links: { usageUrl: new URL('/usage', this.origin).href, topUpUrl: new URL('/top_up', this.origin).href },
++      links: this.links,
+     }
+   }
+
+@@ -201,8 +224,14 @@ export class PlatformAccount extends DeepSeekAccount {
+     return cached ?? result
+   }
+
+-  override getBalance(client: AccountClientMetadata): Promise<AccountDetails['balance'] | null> {
+-    return this.getDetail('balance', this.detailHeaders(client))
++  override async getBalance(client: AccountClientMetadata): Promise<AccountDetails['balance'] | null> {
++    if (this.summaryBalance) return this.getDetail('balance', this.detailHeaders(client))
++    // The billing center owns this deployment's wallet, and the account summary carries
++    // a placeholder that is not the user's spendable balance; publishing it would
++    // present a number this deployment cannot honour.
++    const lifetime = this.detailsLifetime
++    const stored = await this.readCurrentGrant(lifetime)
++    return stored === null || lifetime.signal.aborted || this.detailsLifetime !== lifetime ? null : { status: 'external' }
+   }
+
+   override async getUnnotifiedBonuses(client: AccountClientMetadata): Promise<AccountBonusBatch | null> {
+@@ -366,7 +395,7 @@ export class PlatformAccount extends DeepSeekAccount {
+     return { origin: this.origin, token: stored.token,
+       userId: this.lastProfile?.token === stored.token ? this.lastProfile.profile.value.id || null : null,
+       ...(this.embeddedPageDist ? { embeddedPageDist: this.embeddedPageDist } : {}),
+-      requestHeaders }
++      ...(this.links.embedded === undefined ? {} : { embeddedPages: this.links.embedded }), requestHeaders }
+   }
+
+   private async readCurrentGrant(lifetime: AbortController): Promise<z.infer<typeof grant> | null> {
+@@ -410,7 +439,6 @@ export class PlatformAccount extends DeepSeekAccount {
      if (previous !== undefined) {
        await previous.done
        // Disposal can close the provider while the previous attempt settles.
@@ -57069,6 +59292,107 @@ index 0319a553c3..b3e3a0868c 100644
        if (this.closed) throw new PlatformAuthError('protocol')
        if (this.attempt !== previous) return this.getState()
      }
+diff --git a/packages/credentials/deepseek-account-platform/src/protocol.ts b/packages/credentials/deepseek-account-platform/src/protocol.ts
+index 54d1afd9ad..cec58495f0 100644
+--- a/packages/credentials/deepseek-account-platform/src/protocol.ts
++++ b/packages/credentials/deepseek-account-platform/src/protocol.ts
+@@ -1,6 +1,6 @@
+ /** Validated platform HTTP messages and restricted browser destinations. */
+ import { z } from 'zod'
+-import type { AccountBonusOrderId, SignInErrorCode } from '@deepseek-ai/dsh-deepseek-account/types'
++import type { AccountLinks, AccountBonusOrderId, SignInErrorCode } from '@deepseek-ai/dsh-deepseek-account/types'
+
+ /** Protocol errors expose a stable code, never a response body or authorization URL. */
+ export class PlatformAuthError extends Error {
+@@ -29,6 +29,48 @@ export function platformOrigin(value: string, allowLoopbackHttp: boolean): strin
+   return url.origin
+ }
+
++/** Account pages and wallet ownership of one deployment. */
++export type AccountSurface = 'billing-center' | 'platform-pages'
++
++/**
++ * Validate one configured account page destination.
++ * @param value - configured absolute URL; the empty string means this deployment serves no such page.
++ * @param label - configuration field named in the failure.
++ * @param allowLoopbackHttp - development-only opt-in for loopback HTTP.
++ * @returns normalized absolute URL, or null when unconfigured.
++ */
++export function accountPageUrl(value: string, label: string, allowLoopbackHttp: boolean): string | null {
++  if (value === '') return null
++  let url: URL
++  try { url = new URL(value) } catch {
++    throw new Error(`account: ${label} must be an absolute URL or empty`)
++  }
++  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
++  if (url.username || url.password || url.hash
++    || !(url.protocol === 'https:' || (allowLoopbackHttp && loopback && url.protocol === 'http:'))) {
++    throw new Error(`account: ${label} must be an HTTPS URL without credentials or fragment, or explicitly enabled loopback HTTP`)
++  }
++  return url.href
++}
++
++/**
++ * Resolve the account destinations and how the Desktop opens them.
++ * `platform-pages` serves the pages from the account origin, where the embedded
++ * viewer can receive the stored grant; `billing-center` points both entries at the
++ * configured center, or removes them when this deployment has none, because the
++ * account origin serves no such page.
++ * @param surface - which service serves this deployment's account pages.
++ * @param billingCenterUrl - validated billing center, or null when unconfigured.
++ * @param origin - validated account origin serving `usage` and `top_up`.
++ * @returns destinations the account surfaces offer.
++ */
++export function accountLinks(surface: AccountSurface, billingCenterUrl: string | null, origin: string): AccountLinks {
++  if (surface === 'platform-pages') {
++    return { usageUrl: new URL('/usage', origin).href, topUpUrl: new URL('/top_up', origin).href, embedded: true }
++  }
++  return { usageUrl: billingCenterUrl, topUpUrl: billingCenterUrl, embedded: false }
++}
++
+ /**
+  * Validate platform-owned browser destinations without forwarding arbitrary URLs.
+  * @param value - returned browser URL.
+diff --git a/packages/credentials/deepseek-account-platform/tests/account.spec.ts b/packages/credentials/deepseek-account-platform/tests/account.spec.ts
+index 359126b30d..b34a4d2c94 100644
+--- a/packages/credentials/deepseek-account-platform/tests/account.spec.ts
++++ b/packages/credentials/deepseek-account-platform/tests/account.spec.ts
+@@ -265,7 +265,7 @@ it('stores a grant before redirecting, restores account presence, and signs out
+   expect(await readFile(join(f.home, 'credentials.yaml'), 'utf8')).toContain('dsh_mock_test')
+   // The Host publishes identity from a separate profile read; the snapshot only reuses it.
+   await f.account.getProfile(clientMetadata())
+-  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test',
++  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test', embeddedPages: true,
+     requestHeaders: {} })
+   expect(await f.account.resolveToken('https://api.deepseek.com')).toBeUndefined()
+   await f.account.signOut(clientMetadata())
+@@ -384,7 +384,7 @@ it('removes its callback route without closing the shared server on disposal', a
+
+ it('derives every portal link from the private platform origin', async () => {
+   const f = await fixture()
+-  expect((await f.account.getState()).links).toEqual({ usageUrl: `${f.origin}/usage`, topUpUrl: `${f.origin}/top_up` })
++  expect((await f.account.getState()).links).toEqual({ usageUrl: `${f.origin}/usage`, topUpUrl: `${f.origin}/top_up`, embedded: true })
+   await f.account.startSignIn(clientMetadata(), f.callbackOrigin, 'desktop')
+   expect((await f.wait('waiting-browser')).attempt?.authorizeUrl).toBe(`${f.origin}/dsh/authorize?authorize_id=test`)
+ })
+@@ -875,7 +875,7 @@ it('carries the configured embedded frontend selector in the private Platform se
+   await f.wait('waiting-browser')
+   await fetch(f.callback(), { redirect: 'manual' })
+   await f.account.getProfile(clientMetadata())
+-  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test', embeddedPageDist: 'feat/test',
++  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test', embeddedPageDist: 'feat/test', embeddedPages: true,
+     requestHeaders: {} })
+ })
+
+@@ -898,7 +898,7 @@ it.each([
+   await f.wait('waiting-browser')
+   await fetch(f.callback(), { redirect: 'manual' })
+   await readDetails(f.account)
+-  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test',
++  expect(await f.account.getPlatformSession()).toEqual({ origin: f.origin, userId: 'test-user', token: 'dsh_mock_test', embeddedPages: true,
+     requestHeaders: { cookie: 'test_gate=synthetic', ...overrides } })
+   await f.account.signOut(clientMetadata())
+   await expect.poll(f.logoutCount).toBe(1)
 diff --git a/packages/credentials/deepseek-account-platform/tests/brand-defaults.spec.ts b/packages/credentials/deepseek-account-platform/tests/brand-defaults.spec.ts
 new file mode 100644
 index 0000000000..c7a2996be4
@@ -57096,6 +59420,73 @@ index e3207d57d8..68e30f6fb1 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/credentials/deepseek-account/src/index.ts b/packages/credentials/deepseek-account/src/index.ts
+index 20b0a8b81d..6d83ebc4c7 100644
+--- a/packages/credentials/deepseek-account/src/index.ts
++++ b/packages/credentials/deepseek-account/src/index.ts
+@@ -26,6 +26,12 @@ export interface PlatformSession {
+   readonly embeddedPageDist?: string
+   /** Host-only deployment request headers; the consuming client adds its own dynamic identity, and neither reaches renderer bootstrap. */
+   readonly requestHeaders?: Readonly<Record<string, string>>
++  /**
++   * Whether the embedded viewer may load this account's usage and top-up pages from
++   * `origin`. False sends those destinations to the browser; the viewer never
++   * resolves a path on an origin that does not serve one.
++   */
++  readonly embeddedPages?: boolean
+ }
+
+ /** Account operations; only Host consumers can obtain a request credential. */
+@@ -48,7 +54,8 @@ export abstract class DeepSeekAccount extends Service {
+   /**
+    * Query Platform recharge and bonus wallet balances independently of profile data.
+    * @param client - identity of the requesting UI for this call.
+-   * @returns balance outcome, or null if signed out or the grant changed during the query.
++   * @returns balance outcome, `{ status: 'external' }` when this deployment serves the
++   * wallet on its own account page, or null if signed out or the grant changed during the query.
+    */
+   abstract getBalance(client: AccountClientMetadata): Promise<AccountDetails['balance'] | null>
+   /**
+diff --git a/packages/credentials/deepseek-account/src/types.ts b/packages/credentials/deepseek-account/src/types.ts
+index 39f1f086fb..4174cdb9e7 100644
+--- a/packages/credentials/deepseek-account/src/types.ts
++++ b/packages/credentials/deepseek-account/src/types.ts
+@@ -31,8 +31,16 @@ export interface SignInAttemptView {
+ }
+ /** Browser destinations derived from the Host's platform configuration; never carry tokens. */
+ export interface AccountLinks {
+-  readonly usageUrl: string
+-  readonly topUpUrl: string
++  /** Ledger and balance page, or null when this deployment serves none. */
++  readonly usageUrl: string | null
++  /** Top-up page, or null when this deployment serves no recharge page. */
++  readonly topUpUrl: string | null
++  /**
++   * Whether the Desktop shows these destinations in its embedded Platform view.
++   * True only while the account provider serves them on its own origin, where the
++   * viewer can receive the stored grant; absent keeps the legacy embedded behavior.
++   */
++  readonly embedded?: boolean
+ }
+ /** Stored-account presence is not a claim that the server has validated its token. */
+ export interface AccountView {
+@@ -59,7 +67,15 @@ export interface AccountWallet {
+ /** Independent query outcomes allow profile and balance failures to render separately. */
+ export interface AccountDetails {
+   readonly profile: { readonly status: 'ready'; readonly value: AccountProfile } | { readonly status: 'failed' }
+-  readonly balance: { readonly status: 'ready'; readonly value: readonly AccountWallet[]; readonly bonusWallets: readonly AccountWallet[] } | { readonly status: 'failed' }
++  /**
++   * `ready` values come from the account API; `failed` means the query itself failed;
++   * `external` means this deployment's wallet is served by its own account page
++   * (the account links), so no balance query exists to run here.
++   */
++  readonly balance:
++    | { readonly status: 'ready'; readonly value: readonly AccountWallet[]; readonly bonusWallets: readonly AccountWallet[] }
++    | { readonly status: 'failed' }
++    | { readonly status: 'external' }
+ }
+
+ /** Identity of one granted bonus order; stable across devices and sign-ins. */
 diff --git a/packages/deliverables/tool-present/package.json b/packages/deliverables/tool-present/package.json
 index a07552caa4..47189e468c 100644
 --- a/packages/deliverables/tool-present/package.json
@@ -59873,6 +62264,19 @@ index bbae33e7b8..cc84f3bde4 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/test-support/client-runtime/src/assembly/remote-default-responses.ts b/packages/test-support/client-runtime/src/assembly/remote-default-responses.ts
+index 0debc5a62a..c978712d06 100644
+--- a/packages/test-support/client-runtime/src/assembly/remote-default-responses.ts
++++ b/packages/test-support/client-runtime/src/assembly/remote-default-responses.ts
+@@ -50,7 +50,7 @@ export const remoteDefaultResponses: RemoteTable = {
+     // api-session-controller client `apply`: the control stream's opening baseline, then open.
+     'session/control': openStream([{ type: 'baseline', value: { projections: {} } }]),
+     // ui-settings-account shares the account snapshot across settings and the sidebar menu.
+-    'account/watch': openStream([{ status: 'signed-out', attempt: null, links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' } }]),
++    'account/watch': openStream([{ status: 'signed-out', attempt: null, links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up', embedded: true } }]),
+     // api-workspace-controller client `apply`: the follow stream's opening baseline, then open.
+     'workspace/follow': openStream([{ type: 'baseline', value: { items: [], archivedSessionIds: [], pinnedSessionIds: [] } }]),
+     // api-remote-access client `mountAccess`: the owner's access snapshot, then open.
 diff --git a/packages/test-support/llm-mock-server/package.json b/packages/test-support/llm-mock-server/package.json
 index 41615f490f..3a159a1006 100644
 --- a/packages/test-support/llm-mock-server/package.json
