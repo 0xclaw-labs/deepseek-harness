@@ -1,6 +1,5 @@
 /** User-authorized downloads and separate installation of one version-bound Desktop release. */
 
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
 import electronUpdater, { type AppUpdater, type ProgressInfo, type UpdateInfo } from 'electron-updater'
@@ -8,8 +7,25 @@ import { gt, valid } from 'semver'
 import type { DesktopUpdateState } from './ipc.ts'
 import { DesktopUpdateHttpExecutor } from './update-http-executor.ts'
 import { DesktopUpdatePreparationError } from './update-error.ts'
+import { resolveDesktopUpdateSource, type DesktopUpdateSource } from './update-source.ts'
 
 const { autoUpdater } = electronUpdater
+
+/**
+ * Resolve the feed sealed into this installation. A source launch, a dev run,
+ * or any process without a packaged resources directory ships no feed.
+ * @param channel - Channel sealed into the installed application manifest.
+ * @returns Validated source, or the absent source outside a packaged app.
+ */
+function packagedUpdateSource(channel: 'nightly' | 'latest'): DesktopUpdateSource {
+  const resources = process.resourcesPath
+  if (!app.isPackaged || resources === undefined) return { kind: 'absent' }
+  return resolveDesktopUpdateSource({
+    packaged: true,
+    configPath: join(resources, 'app-update.yml'),
+    expectedChannel: channel,
+  })
+}
 
 /** Owns one updater target until its download and installation settle. */
 export class DesktopUpdateCoordinator {
@@ -20,6 +36,7 @@ export class DesktopUpdateCoordinator {
   private checkOperation: Promise<DesktopUpdateState> | undefined
   private downloadOperation: Promise<DesktopUpdateState> | undefined
   private installOperation: Promise<DesktopUpdateState> | undefined
+  private readonly source: DesktopUpdateSource
 
   private readonly onProgress = (progress: ProgressInfo): void => {
     if (this.downloadOperation === undefined || this.downloaded) return
@@ -43,7 +60,8 @@ export class DesktopUpdateCoordinator {
    * @param publish - Receives observable states for every Desktop window.
    * @param beforeRestart - Completes task authorization, admission locking, and owned-process shutdown.
    * @param updater - Process-owned Electron updater, replaceable at the network/platform test boundary.
-   * @param enabled - Whether this process has a packaged update source.
+   * @param source - Resolves the packaged feed policy; omitted resolves from the installed
+   *   application, and a build without a feed performs no check at all.
    * @param currentVersion - Actual installed application version.
    * @param channel - Installed package channel; omitted test/local callers retain nightly.
    * @param downloadResult - Once per completed download attempt, including platform preparation failures.
@@ -52,11 +70,12 @@ export class DesktopUpdateCoordinator {
     private readonly publish: (state: DesktopUpdateState) => DesktopUpdateState,
     private readonly beforeRestart: () => Promise<boolean>,
     private readonly updater: AppUpdater = autoUpdater,
-    private readonly enabled: () => boolean = () => app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml')),
+    source: (() => DesktopUpdateSource) | undefined = undefined,
     private readonly currentVersion: () => string = () => app.getVersion(),
     private readonly downloadResult?: (success: boolean, reason?: string) => void,
     private readonly channel: 'nightly' | 'latest' = 'nightly',
   ) {
+    this.source = source?.() ?? packagedUpdateSource(channel)
     if (updater === autoUpdater) {
       // electron-updater omits this internal transport property from its public declarations.
       // Real-Electron qualification exercises the pinned dependency integration.
@@ -81,12 +100,21 @@ export class DesktopUpdateCoordinator {
   get state(): DesktopUpdateState { return this.current }
 
   /**
+   * Deployment of the packaged feed, resolved once for this process.
+   * @returns The validated feed, an absent build, or the rejection reason.
+   */
+  get availability(): DesktopUpdateSource { return this.source }
+
+  /**
    * Check metadata without downloading, joining any current check.
    * @param manual - Whether a failed check must remain visible in the status indicator.
    * @returns The check result, including a silent automatic failure when applicable.
    */
   async check(manual = false): Promise<DesktopUpdateState> {
     this.assertLive()
+    // A build with no usable feed has nothing to check: report the idle state the
+    // shell already shows instead of a failure the user cannot act on.
+    if (this.source.kind !== 'configured') return this.current
     if (this.downloadOperation !== undefined || this.installOperation !== undefined || this.downloaded) return this.current
     if (!manual && this.current.phase === 'error' && this.current.failedOperation === 'download') return this.current
     this.checkOperation ??= Promise.resolve().then(() => this.doCheck())
@@ -184,7 +212,9 @@ export class DesktopUpdateCoordinator {
   private async doCheck(): Promise<DesktopUpdateState> {
     try {
       this.assertLive()
-      if (!this.enabled()) throw new Error('desktop update: this application has no packaged update source')
+      // `check` refuses every non-configured source, so this only guards a future
+      // caller that reaches the transport directly.
+      if (this.source.kind !== 'configured') throw new Error('desktop update: no packaged update source is configured')
       const result = await this.updater.checkForUpdates()
       if (result === null) throw new Error('desktop update: no check result was returned')
       const version = result.updateInfo.version

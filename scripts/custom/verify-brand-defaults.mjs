@@ -149,12 +149,33 @@ if (!read('apps/desktop/scripts/desktop-publish-config.ts').includes('must not p
   fail('publish config must reject an upstream origin')
 }
 
+// Runtime update policy: the sealed feed is re-validated, and a build without
+// one reports that state instead of a fake check failure. "Automatic updates
+// are disabled" is never presented as "an update source is configured".
+const updateSource = read('apps/desktop/src/update-source.ts')
+if (!updateSource.includes('isUpstreamDeepSeekHost')) fail('the packaged feed must reject upstream DeepSeek hosts')
+if (!updateSource.includes("reason: 'upstream-host'")) fail('the packaged feed must name its upstream rejection')
+const coordinator = read('apps/desktop/src/update-coordinator.ts')
+if (!coordinator.includes("from './update-source.ts'")) fail('the update coordinator must consult the validated source')
+if (!coordinator.includes("this.source.kind !== 'configured'")) fail('the update coordinator must refuse a non-configured source')
+if (coordinator.includes('has no packaged update source')) {
+  fail('the update coordinator must not report a missing feed as a raw check failure')
+}
+const desktopShell = read('apps/desktop/src/main.ts')
+if (!desktopShell.includes('desktopUpdateUnavailableContent')) {
+  fail('the desktop shell must state an unusable update source instead of failing a check')
+}
+if (!updateSource.includes("kind: 'absent'") || !updateSource.includes("reason: 'channel-mismatch'")) {
+  fail('the packaged feed must distinguish an absent feed from a rejected one')
+}
+
 notes.push('auth/model proxy: auth.modelxing.com/pi/v1')
 notes.push('default model route: painuo (catalog-derived)')
 notes.push('official providers: disabled (llm-deepseek, llm-deepseek-account, session-log)')
 notes.push('web search: disabled until a PaiNuo service exists; fetch stays local')
 notes.push('telemetry: disabled; no upstream collector default')
 notes.push('update feed: none in unsigned builds; production requires DSH_DESKTOP_UPDATE_ORIGIN')
+notes.push('update runtime: sealed feed re-validated; no feed reports "no automatic updates", never a failed check')
 notes.push('plugin market: empty default (user must add an index)')
 
 if (failures.length > 0) {

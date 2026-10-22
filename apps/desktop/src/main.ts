@@ -50,7 +50,7 @@ import { parseDeepLink, resolveDeepLinkScheme } from './deep-link.ts'
 import { DesktopUpdateJournal } from './update-journal.ts'
 import { DesktopUpdatePreparationError } from './update-error.ts'
 import { DesktopUpdateSchedule, resolveDesktopUpdateScheduleConfig } from './update-schedule.ts'
-import { desktopUpdateErrorSummary, presentDesktopUpdate } from './update-presentation.ts'
+import { desktopUpdateErrorSummary, desktopUpdateUnavailableContent, presentDesktopUpdate } from './update-presentation.ts'
 import { desktopErrorState } from './startup-error.ts'
 import { readDesktopLoginShellEnvironment, resolveDesktopLoginShellConfig } from './login-shell-environment.ts'
 import { DesktopMandatoryUpdatePolicy, resolveDesktopPolicyConfig, type DesktopPolicyState } from './mandatory-update-policy.ts'
@@ -1061,6 +1061,15 @@ async function main(): Promise<void> {
       if (isMandatory()) {
         mandatoryUI?.focus()
         if (manual) await Promise.all([checkPolicyManually(), updateSchedule.check(true)])
+        return
+      }
+      // A build without a usable feed has no update to offer and no failure to
+      // report: state the deployment fact instead of running an impossible check.
+      const availability = updates.availability
+      if (availability.kind !== 'configured') {
+        updateJournal?.action(`update-source-${availability.kind}`)
+        const content = desktopUpdateUnavailableContent(availability, locale.messages)
+        await ordinaryMessageBox({ type: 'info', title: content.title, message: content.message, detail: content.detail })
         return
       }
       let controller: AbortController | undefined
