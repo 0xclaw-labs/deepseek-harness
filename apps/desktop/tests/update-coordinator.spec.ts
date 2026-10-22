@@ -4,6 +4,7 @@ import type { AppUpdater } from 'electron-updater'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import { parseDesktopRelease } from '../src/release.ts'
 import type { DesktopUpdateState } from '../src/ipc.ts'
+import type { DesktopUpdateSource } from '../src/update-source.ts'
 import { DesktopUpdatePreparationError } from '../src/update-error.ts'
 import { zh } from '../src/locale.ts'
 
@@ -66,10 +67,25 @@ function fixture(channel: 'nightly' | 'latest' = 'nightly', version = '1.1.0-alp
   const updater = Object.assign(events, { checkForUpdates, downloadUpdate, quitAndInstall }) as unknown as AppUpdater
   const coordinator = new DesktopUpdateCoordinator(
     (state) => { states.push(state); return state },
-    beforeRestart, updater, () => true, () => version, downloadResult, channel,
+    beforeRestart, updater,
+    () => ({ kind: 'configured', url: 'https://dl.modelxing.com/feeds/mac-arm64/', channel }),
+    () => version, downloadResult, channel,
   )
   coordinators.push(coordinator)
   return { coordinator, updater, events, states, checkForUpdates, downloadUpdate, quitAndInstall, beforeRestart, downloadResult }
+}
+
+function unavailableFixture(source: DesktopUpdateSource) {
+  const checkForUpdates = vi.fn()
+  const states: DesktopUpdateState[] = []
+  const coordinator = new DesktopUpdateCoordinator(
+    (state) => { states.push(state); return state },
+    async () => true,
+    Object.assign(new EventEmitter(), { checkForUpdates }) as unknown as AppUpdater,
+    () => source, () => '1.1.0-alpha.1',
+  )
+  coordinators.push(coordinator)
+  return { coordinator, checkForUpdates, states }
 }
 
 describe('desktop update coordinator', () => {
@@ -256,4 +272,31 @@ it('keeps a stable-version nightly installation on nightly and rejects prereleas
   expect(latest.updater.allowDowngrade).toBe(false)
   expect((await latest.coordinator.check()).phase).toBe('error')
   expect(latest.downloadUpdate).not.toHaveBeenCalled()
+})
+
+it.each([
+  { kind: 'absent' } as const,
+  { kind: 'rejected', reason: 'upstream-host' } as const,
+  { kind: 'rejected', reason: 'channel-mismatch' } as const,
+])('performs no check and publishes no failure for an unusable update source: $kind $reason', async (source) => {
+  const f = unavailableFixture(source)
+  expect(f.coordinator.availability).toEqual(source)
+  expect(await f.coordinator.check()).toEqual({ phase: 'idle' })
+  expect(await f.coordinator.check(true)).toEqual({ phase: 'idle' })
+  expect(f.coordinator.state).toEqual({ phase: 'idle' })
+  expect(f.checkForUpdates).not.toHaveBeenCalled()
+  expect(f.states).toEqual([])
+  await expect(f.coordinator.download('1.1.0-rc.2')).rejects.toThrow(/no checked update/u)
+})
+
+it('resolves the packaged source when the caller supplies none', async () => {
+  const coordinator = new DesktopUpdateCoordinator(
+    state => state, async () => true,
+    Object.assign(new EventEmitter(), {}) as unknown as AppUpdater,
+    undefined, () => '1.1.0-alpha.1',
+  )
+  coordinators.push(coordinator)
+  // The mocked Electron app reports isPackaged: false, which is an absent feed.
+  expect(coordinator.availability).toEqual({ kind: 'absent' })
+  expect(await coordinator.check(true)).toEqual({ phase: 'idle' })
 })

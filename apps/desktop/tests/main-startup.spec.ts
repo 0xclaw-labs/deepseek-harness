@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
 import { DESKTOP_IPC, type DesktopUpdateState } from '../src/ipc.ts'
+import type { DesktopUpdateSource } from '../src/update-source.ts'
 import { MANDATORY_IPC } from '../src/mandatory-update-ipc.ts'
 import { DesktopHostFatalError, DesktopHostUncleanExitError } from '../src/host-process.ts'
 import { en, zh } from '../src/locale.ts'
@@ -51,6 +52,9 @@ const harness = await vi.hoisted(async () => {
   let embeddedPolicy: unknown
   let closeWindowsOnQuit = false
   let updateState: DesktopUpdateState = { phase: 'idle' }
+  let updateAvailability: DesktopUpdateSource = {
+    kind: 'configured', url: 'https://dl.modelxing.com/suishendazi-desk/feeds/mac-arm64/', channel: 'nightly',
+  }
   let platformDisposeDeferred: ReturnType<typeof deferred> | undefined
   // The native Platform view owns persistent browser storage; Desktop startup tests replace it so
   // each quit can control when that cleanup settles.
@@ -211,6 +215,8 @@ const harness = await vi.hoisted(async () => {
     ipcOn: vi.fn<(channel: string, listener: (event: { sender: unknown; senderFrame: unknown }, ...args: unknown[]) => void) => void>(),
     get updateState() { return updateState },
     set updateState(value: DesktopUpdateState) { updateState = value },
+    get updateAvailability() { return updateAvailability },
+    set updateAvailability(value: DesktopUpdateSource) { updateAvailability = value },
     get prepareUpdate() { return prepareUpdate! },
     set prepareUpdate(value: () => Promise<boolean>) { prepareUpdate = value },
     get publishUpdate() { return publishUpdate! },
@@ -250,6 +256,9 @@ const harness = await vi.hoisted(async () => {
       prepareUpdate = undefined
       publishUpdate = undefined
       updateState = { phase: 'idle' }
+      updateAvailability = {
+        kind: 'configured', url: 'https://dl.modelxing.com/suishendazi-desk/feeds/mac-arm64/', channel: 'nightly',
+      }
       updateCheck.mockReset().mockImplementation(async () => updateState)
       loginShell.mockReset().mockImplementation(base => readLoginShell(base))
       updateDownload.mockReset().mockImplementation(async () => updateState)
@@ -344,6 +353,7 @@ vi.mock('../src/update-coordinator.ts', () => ({ DesktopUpdateCoordinator: class
     harness.publishUpdate = publish
   }
   get state() { return harness.updateState }
+  get availability() { return harness.updateAvailability }
   readonly check = harness.updateCheck
   readonly download = harness.updateDownload
   readonly install = harness.updateInstall
@@ -614,6 +624,23 @@ describe('desktop main startup', () => {
     expect(testAuth.login).not.toHaveBeenCalled()
     expect(harness.dialog.showMessageBox.mock.calls.map(call => (call.at(-1) as { message: string }).message))
       .not.toContain(en.policyLoginRequired)
+  })
+
+  it.each([
+    [{ kind: 'absent' } as const, en.updateUnavailableAbsent, en.updateUnavailableAbsentDetail],
+    [{ kind: 'rejected', reason: 'upstream-host' } as const, en.updateUnavailableRejected, en.updateUnavailableRejectedDetail],
+  ])('states an unusable update source instead of running a check: $kind $reason', async (availability, message, detail) => {
+    await readyForUpdate()
+    await vi.advanceTimersByTimeAsync(0)
+    harness.updateCheck.mockClear()
+    harness.updateAvailability = availability
+    const checkUpdates = applicationMenuItems().find(item => item.label === en.checkUpdatesMenu)!.click as () => void
+    checkUpdates()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(harness.updateCheck).not.toHaveBeenCalled()
+    expect(harness.updateDownload).not.toHaveBeenCalled()
+    expect(harness.dialog.showMessageBox.mock.calls.map(call => (call.at(-1) as { message: string; detail: string })))
+      .toContainEqual(expect.objectContaining({ message, detail }))
   })
 
   it.each([false, true])('retains anonymous production checks with popup permission %s', async (allow) => {

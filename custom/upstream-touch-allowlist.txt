@@ -122,3 +122,18 @@ packages/terminal/terminal-bash/README.md
 packages/terminal/terminal-bash/README.zh.md
 packages/terminal/terminal-bash/src/index.ts
 packages/terminal/terminal-bash/tests/local.spec.ts
+
+# 2026-10-22: the branded Desktop must not report an intentionally absent update
+# feed as a failed check. The coordinator now resolves a validated packaged
+# source (new focused module) and stays idle without one; the shell states the
+# deployment fact in its own locale copy. Pinned by the coordinator, source,
+# presentation, schedule, and startup specs.
+apps/desktop/src/update-source.ts
+apps/desktop/src/update-coordinator.ts
+apps/desktop/src/update-presentation.ts
+apps/desktop/src/locale.ts
+apps/desktop/tests/update-source.spec.ts
+apps/desktop/tests/update-coordinator.spec.ts
+apps/desktop/tests/update-presentation.spec.ts
+apps/desktop/tests/update-schedule.spec.ts
+apps/desktop/tests/main-startup.spec.ts

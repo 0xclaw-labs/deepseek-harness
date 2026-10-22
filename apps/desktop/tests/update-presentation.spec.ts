@@ -1,12 +1,31 @@
 import { expect, it } from 'vitest'
-import { desktopUpdateErrorSummary, presentDesktopUpdate } from '../src/update-presentation.ts'
+import { desktopUpdateErrorSummary, desktopUpdateUnavailableContent, presentDesktopUpdate } from '../src/update-presentation.ts'
 import { en, zh } from '../src/locale.ts'
 import type { DesktopUpdateState, DshDesktopProductApi } from '../src/ipc.ts'
+import type { DesktopUpdateSource } from '../src/update-source.ts'
 import type { DesktopUpdateBridge } from '@deepseek-ai/dsh-client-ui-settings-general/types'
 
 it('keeps the Electron preload assignable to the product consumer', () => {
   const assign = (bridge: DshDesktopProductApi['updates']): DesktopUpdateBridge => bridge
   expect(assign).toBeTypeOf('function')
+})
+
+it('states the update deployment honestly instead of reporting a check failure', () => {
+  const absent: DesktopUpdateSource = { kind: 'absent' }
+  const rejected: DesktopUpdateSource = { kind: 'rejected', reason: 'upstream-host' }
+  for (const messages of [en, zh]) {
+    const none = desktopUpdateUnavailableContent(absent, messages)
+    expect(none.message).toBe(messages.updateUnavailableAbsent)
+    expect(none.detail).toBe(messages.updateUnavailableAbsentDetail)
+    const blocked = desktopUpdateUnavailableContent(rejected, messages)
+    expect(blocked.message).toBe(messages.updateUnavailableRejected)
+    expect(blocked.detail).toBe(messages.updateUnavailableRejectedDetail)
+    // The raw transport diagnostic must never reach the user.
+    expect(JSON.stringify([none, blocked])).not.toContain('no packaged update source')
+    expect(JSON.stringify([none, blocked])).not.toContain('updateCheckFailed')
+  }
+  expect(desktopUpdateUnavailableContent(absent, en).message).not.toBe(en.updateCheckFailed)
+  expect(desktopUpdateUnavailableContent(rejected, zh).message).not.toBe(zh.updateCheckFailed)
 })
 
 it('records visible ordinary-update states without authorizing downloads or installation', async () => {
