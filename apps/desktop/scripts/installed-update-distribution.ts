@@ -1,3 +1,4 @@
+import { resolveArtifactPrefix } from './artifact-prefix.ts'
 /** Validate local qualification payload bytes and prepare separate binary and fixed-feed operations. */
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
@@ -52,7 +53,7 @@ export async function planInstalledUpdateDistribution(manifest: string, version:
     throw new Error('installed update: feed must describe exactly the selected version and installer')
   }
   const info = record(metadata.files[0])
-  const filename = `deepseek-harness-${version}-win-x64.exe`
+  const filename = `${resolveArtifactPrefix()}-${version}-win-x64.exe`
   if (info.url !== filename || (metadata.path !== undefined && metadata.path !== filename)) {
     throw new Error('installed update: feed filename must identify the selected local Windows installer')
   }

@@ -63,7 +63,7 @@ describe('branded profile defaults', () => {
   it('does not pin upstream web search or ship upstream telemetry endpoints', () => {
     const block = brandDefaultsBlock()
     expect(block).not.toContain('searchProvider: deepseek-official')
-    expect(block).not.toContain('deepseek-harness-desktop')
+    expect(block).not.toContain('suishendazi-harness-desktop')
     expect(block).not.toContain('dsh-otel-collector.deepseeksvc.com')
     expect(block).toContain('- id: desktop-product-telemetry\n  disabled: true')
     expect(block).toContain('- id: product-analytics\n  disabled: true')

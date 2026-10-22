@@ -1,3 +1,4 @@
+import { resolveArtifactPrefix } from './artifact-prefix.ts'
 /** Build the ZIP and DMG from separate signed application copies with overlapping notarization. */
 
 import { execFile } from 'node:child_process'
@@ -110,7 +111,7 @@ export async function packageMacOSArtifacts(
     await verifyMacOSAppUpdateConfig(dmgApp, update)
     apple.verifySignature(zipApp, expected)
     apple.verifySignature(dmgApp, expected)
-    const base = `deepseek-harness-${version}-mac-${arch}`
+    const base = `${resolveArtifactPrefix()}-${version}-mac-${arch}`
     const artifacts = [
       [dmgOutput, `${base}.dmg`],
       [zipOutput, `${base}.zip`],

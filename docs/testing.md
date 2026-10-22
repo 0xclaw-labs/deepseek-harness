@@ -53,3 +53,12 @@ An e2e assertion re-runs the command or re-reads the file externally; a keyword 
 ## When a snapshot test is required
 
 Every non-trivial model-, protocol-, or human-visible change adds or updates a keyless recorded-session scenario in the same PR; package, e2e, mock-only, and rationale evidence does not replace the assembled transcript. Headless, SDK, ACP, and Web recordings live under `snapshots/session/`, `snapshots/sdk/`, `snapshots/acp/`, and `snapshots/web/`; a Web rendering may explicitly borrow another scenario's canonical session. Expected output that is not driven by a recorded session stays with its owning app, package, or script under `tests/expected/` and does not use the `*.snapshot.ts` suffix. [`dsh-session-snapshot`](../packages/test-support/session-snapshot/README.md) owns the shared storage rules and profile adapters. Agent-loop, session-lifecycle, and `SessionEventMap` changes update both SDK projections: `snapshots/sdk/` owns TypeScript, while [Python-runtime CI](../.github/workflows/ci-master.yml) owns `scripts/snapshots/python-sdk-single-exe/`. New capability seams and lifecycle or transcript variants name every required tier at plan time.
+
+
+## Local test runtime
+
+The desktop suite spawns children that import erasable TypeScript directly, which
+relies on Node's built-in type stripping. Use Node 24.14+ (or 26.x) for local
+runs; `.nvmrc`/`.node-version` pin it. Node 22.17 passes most tests but fails
+`flock-entry`, `macos-signature-cache` and `macos-notarization-proxy` with
+`ERR_UNKNOWN_FILE_EXTENSION ".ts"`; the repository `engines` floor is 22.19.

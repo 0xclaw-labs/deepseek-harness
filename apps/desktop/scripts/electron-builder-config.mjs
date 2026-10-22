@@ -114,7 +114,7 @@ export function createElectronBuilderConfig(
   // profile directory derived from the bundle id; upstream builds keep their manifest untouched.
   const branded = productName !== 'DeepSeek Harness'
   const brandScheme = (env.DSH_DESKTOP_PROTOCOL_SCHEME ?? '').trim() || 'dsh'
-  const artifactPrefix = (env.DSH_DESKTOP_ARTIFACT_PREFIX ?? '').trim() || 'deepseek-harness'
+  const artifactPrefix = (env.DSH_DESKTOP_ARTIFACT_PREFIX ?? '').trim() || 'suishendazi-harness'
   const brandResourcesDir =
     (env.DSH_DESKTOP_BRAND_RESOURCES_DIR ?? '').trim() ||
     fileURLToPath(new URL('../resources', import.meta.url))
