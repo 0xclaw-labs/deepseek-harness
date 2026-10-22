@@ -122,3 +122,15 @@ packages/terminal/terminal-bash/README.md
 packages/terminal/terminal-bash/README.zh.md
 packages/terminal/terminal-bash/src/index.ts
 packages/terminal/terminal-bash/tests/local.spec.ts
+
+# 2026-10-22: the onboarding illustrations were upstream DeepSeek screenshots
+# (deepseek HARNESS logo, DeepSeek account and CNY balance). Replace them with
+# brand artwork so a first-run user never sees the upstream product.
+packages/client/ui-settings-account/src/client/assets/onboarding-recharge.webp
+packages/client/ui-settings-account/src/client/assets/onboarding-recharge-dark.webp
+packages/client/ui-settings-account/src/client/assets/onboarding-recharge-zh.webp
+packages/client/ui-settings-account/src/client/assets/onboarding-recharge-zh-dark.webp
+packages/client/ui-settings-account/src/client/assets/onboarding-welcome.webp
+packages/client/ui-settings-account/src/client/assets/onboarding-welcome-dark.webp
+packages/client/ui-settings-account/src/client/assets/onboarding-welcome-zh.webp
+packages/client/ui-settings-account/src/client/assets/onboarding-welcome-zh-dark.webp
