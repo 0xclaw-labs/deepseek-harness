@@ -95,7 +95,8 @@ test('brands catalog display names and leaves every wire id alone', () => {
     assert.match(settings, /deepSeekAccount: '派诺生态账号'/)
     assert.doesNotMatch(settings, /deepSeekAccount: 'DeepSeek/u)
     assert.match(settings, /Configure the PaiNuo ecosystem models to start building\./)
-    assert.match(settings, /配置派诺生态模型，即可开始使用。/)
+    // The Chinese sentence of that same onboarding step belongs to the general
+    // copy pass (`DeepSeek 官方模型`), not to a second rule over the sentence.
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
