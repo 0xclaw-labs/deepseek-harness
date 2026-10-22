@@ -14,8 +14,14 @@ const brand = JSON.parse(readFileSync(new URL('../../custom/branding/brand.json'
 const desktop = join(worktree, 'apps', 'desktop')
 const artifactsRoot = process.argv[3] ?? join(desktop, '.desktop-build', 'targets', 'mac-arm64', 'unsigned-artifacts')
 const appName = `${brand.productName}.app`
-const appPath = join(artifactsRoot, appName)
-if (!existsSync(appPath)) { console.error(`verify-brand-manifest: app not found: ${appPath}`); process.exit(1) }
+// electron-builder places the app either directly under unsigned-artifacts or
+// under its arch directory, depending on the target layout. Accept both.
+const appPath = [join(artifactsRoot, appName), join(artifactsRoot, 'mac-arm64', appName)]
+  .find(candidate => existsSync(candidate))
+if (appPath === undefined) {
+  console.error(`verify-brand-manifest: app not found under ${artifactsRoot}`)
+  process.exit(1)
+}
 const asarPath = join(appPath, 'Contents', 'Resources', 'app.asar')
 
 /** Read one file out of an asar archive without extra dependencies. */
