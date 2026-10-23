@@ -74,7 +74,7 @@
   position: absolute;
   top: 50%;
   left: clamp(64px, calc(41.667vw - 300px), 200px);
-  width: 520px;
+  width: min(520px, calc(58vw - 140px));
   transform: translateY(-50%);
   z-index: 1;
 }
@@ -87,10 +87,11 @@
 
 .welcomeIllustration {
   position: absolute;
-  left: min(calc(41.667vw + 112.5px), 712.5px);
-  top: clamp(32px, calc(31.608vh - 157.65px), 133.145px);
-  width: 1247px;
-  height: 822px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: clamp(340px, 42vw, 620px);
+  height: 100%;
   pointer-events: none;
 }
 

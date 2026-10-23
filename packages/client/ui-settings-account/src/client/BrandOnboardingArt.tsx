@@ -6,19 +6,15 @@ const ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ct
 /** @param props - which page's composition to render. @returns an aria-hidden brand illustration. */
 export function BrandOnboardingArt({ variant }: { variant: 'welcome' | 'credit' }) {
   const welcome = variant === 'welcome'
-  const viewBox = welcome ? '0 0 1247 822' : '0 0 594 509'
-  const icon = welcome ? 150 : 118
-  const iconX = welcome ? 150 : (594 - icon) / 2
-  const iconY = welcome ? 300 : 120
-  const nameX = welcome ? 340 : 297
-  const nameY = welcome ? 392 : 300
-  const nameSize = welcome ? 64 : 40
-  const subX = welcome ? 344 : 297
-  const subY = welcome ? 430 : 332
-  const subSize = welcome ? 18 : 13
-  const nameAnchor = welcome ? 'start' : 'middle'
-  const subAnchor = welcome ? 'start' : 'middle'
-  return <svg className={css.brandOnboardingArt} viewBox={viewBox} role="img" aria-label="随身搭子">
+  const viewBox = welcome ? '0 0 800 1000' : '0 0 594 509'
+  const icon = welcome ? 200 : 118
+  const iconX = welcome ? 300 : (594 - icon) / 2
+  const iconY = welcome ? 310 : 120
+  const nameY = welcome ? 620 : 300
+  const nameSize = welcome ? 72 : 40
+  const subY = welcome ? 688 : 332
+  const subSize = welcome ? 22 : 13
+  return <svg className={css.brandOnboardingArt} viewBox={viewBox} role="img" aria-label="随身搭子" preserveAspectRatio="xMidYMid meet">
     <defs>
       <radialGradient id="brand-onboarding-glow" cx="50%" cy="48%" r="52%">
         <stop offset="0%" stopColor="#FF4D2E" stopOpacity="0.22" />
@@ -26,9 +22,9 @@ export function BrandOnboardingArt({ variant }: { variant: 'welcome' | 'credit' 
         <stop offset="100%" stopColor="#FF4D2E" stopOpacity="0" />
       </radialGradient>
     </defs>
-    <ellipse cx={welcome ? 620 : 297} cy={welcome ? 420 : 255} rx={welcome ? 520 : 290} ry={welcome ? 400 : 250} fill="url(#brand-onboarding-glow)" />
+    <ellipse cx={welcome ? 400 : 297} cy={welcome ? 500 : 255} rx={welcome ? 380 : 290} ry={welcome ? 480 : 250} fill="url(#brand-onboarding-glow)" />
     <image href={ICON} x={iconX} y={iconY} width={icon} height={icon} preserveAspectRatio="xMidYMid meet" />
-    <text x={nameX} y={nameY} textAnchor={nameAnchor} fill="currentColor" fontFamily="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" fontSize={nameSize} fontWeight="700" letterSpacing="2">随身搭子</text>
-    <text x={subX} y={subY} textAnchor={subAnchor} fill="#FF4D2E" fontFamily="-apple-system, BlinkMacSystemFont, sans-serif" fontSize={subSize} fontWeight="600" letterSpacing={welcome ? 4 : 3}>PAINUO ECOSYSTEM</text>
+    <text x={welcome ? 400 : 297} y={nameY} textAnchor="middle" fill="currentColor" fontFamily="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif" fontSize={nameSize} fontWeight="700" letterSpacing="2">随身搭子</text>
+    <text x={welcome ? 400 : 297} y={subY} textAnchor="middle" fill="#FF4D2E" fontFamily="-apple-system, BlinkMacSystemFont, sans-serif" fontSize={subSize} fontWeight="600" letterSpacing={welcome ? 5 : 3}>PAINUO ECOSYSTEM</text>
   </svg>
 }
