@@ -11,6 +11,8 @@ import { completeResponsesEvents } from './responses-fixture.ts'
 // 故指向网关时派生 OpenAI 根 `${base}/v1`；未设 env 时行为不变。
 const E2E_BASE_URL = process.env.DEEPSEEK_E2E_BASE_URL
 const OFFICIAL_DEEPSEEK_BASE_URL = E2E_BASE_URL === undefined ? 'https://api.deepseek.com' : `${E2E_BASE_URL}/v1`
+// dsh-e2e-modelxing: 星模模型映射：桥上游 /chat/completions 的模型名；env 未设（空串）时回落官方字面量。
+const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
 const MAX_REQUEST_BYTES = 1_048_576
 
 /** One running test-only Responses-to-DeepSeek bridge. */
@@ -68,7 +70,7 @@ async function completeWithDeepSeek(
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'deepseek-v4-flash',
+      model: E2E_MODEL,
       messages: [
         {
           role: 'system',

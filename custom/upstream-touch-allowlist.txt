@@ -230,3 +230,31 @@ packages/llm/llm-deepseek/tests/runtime.e2e.ts
 packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts
 packages/subagent/subagent-codex/tests/deepseek-responses-bridge.ts
 packages/llm/llm-pi-ai/tests/adapter.e2e.ts
+
+# 2026-11-10: dsh-e2e-modelxing: model name env 兜底，未设 env 时行为不变。
+# e2e 测试里硬编码的 deepseek-flash / deepseek-v4-flash（探针证实均不在星模网关在册目录）改为读
+# DEEPSEEK_E2E_MODEL（由 e2e.yml 从 repo Variable DSH_E2E_MODEL 注入；变量未设时注入空串，故用
+# `||` 而非 `??` 回落原官方字面量）；deepseek-v4-pro 与 vision-exp 在册/网关外，保留不动。
+packages/context/agent-instructions/tests/agent-instructions.e2e.ts
+packages/core/agent-loop/tests/request-cache.e2e.ts
+packages/experimental/auto-review/tests/auto-review.e2e.ts
+packages/fs/tool-fs/tests/fs-tools.e2e.ts
+packages/llm/llm-deepseek/tests/helpers.ts
+packages/llm/llm-pi-ai/tests/provider-apis.e2e.ts
+packages/session/session-title-first-prompt-llm/tests/provider.e2e.ts
+packages/subagent/subagent-codex/tests/real-deepseek.e2e.ts
+packages/subagent/subagent-spawn-in-process/tests/spawn-in-process.e2e.ts
+packages/workflow/workflow-ptc/tests/workflow-ptc.e2e.ts
+apps/cli/tests/built-bin.e2e.ts
+apps/cli/tests/profiles/headless/tests/compaction.e2e.ts
+apps/cli/tests/profiles/headless/tests/coding-task.e2e.ts
+apps/cli/tests/profiles/headless/tests/credentials.e2e.ts
+apps/cli/tests/profiles/headless/tests/full-loop.e2e.ts
+apps/cli/tests/profiles/headless/tests/harness.ts
+apps/cli/tests/profiles/headless/tests/ptc.e2e.ts
+apps/cli/tests/profiles/headless/tests/resume.e2e.ts
+apps/cli/tests/profiles/headless/tests/todo-write.e2e.ts
+apps/cli/tests/profiles/sdk/dynamic-tool-cache.e2e.ts
+apps/cli/tests/profiles/sdk/keyless-smoke.e2e.ts
+apps/cli/tests/profiles/sdk/office-cli.e2e.ts
+apps/cli/tests/web-agent-presets.e2e.ts

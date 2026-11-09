@@ -71,6 +71,9 @@ function registryChanges(previous: ObservedRequest, request: ObservedRequest): {
   ]
 }
 
+// dsh-e2e-modelxing: 星模模型映射：deepseek-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-flash'
+
 describe.skipIf(!process.env.DEEPSEEK_API_KEY)('SDK native tool updates with real DeepSeek', () => {
   it.each([false, true])('keeps the preceding conversation cached after a tool addition (prompt update: %s)', async (updatePrompt) => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-sdk-tool-cache-'))
@@ -83,7 +86,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('SDK native tool updates with rea
       { id: 'llm-deepseek', config: {
         apiKeyEnv: 'DEEPSEEK_API_KEY', thinking: 'disabled', maxTokens: 1024,
         retryPolicy: { mode: 'normal', maxRetries: 0 } satisfies RetryPolicyConfig,
-        models: [{ id: 'deepseek-flash', systemPromptUpdate: 'in-history', toolUpdate: 'addition-only' }],
+        models: [{ id: E2E_MODEL, systemPromptUpdate: 'in-history', toolUpdate: 'addition-only' }],
       } },
       { id: 'tools', config: { mode: 'native' } },
       { id: 'session-log-deepseek', disabled: true },
@@ -92,7 +95,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('SDK native tool updates with rea
     ]))
     const harness = new DeepSeekHarness({
       dshBin, profile: 'sdk', patches: [patch], dshHome: join(root, 'home'),
-      cwd: root, processCwd: root, provider: 'deepseek-official', model: 'deepseek-flash',
+      cwd: root, processCwd: root, provider: 'deepseek-official', model: E2E_MODEL,
       env: { ...process.env, DSH_TELEMETRY_DISABLED: '1', DSH_PERMISSION_MODE: 'danger-full-access' },
       initializeTimeoutMs: 30_000,
     })

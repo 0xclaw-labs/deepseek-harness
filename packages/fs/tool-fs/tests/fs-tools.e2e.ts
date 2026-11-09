@@ -9,6 +9,9 @@ import { fsHarness, waitForIdle } from './harness.ts'
 
 /** Key-gated smoke for a real model driving the local read/write/edit tools. */
 
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+
 let ctx: Context | undefined
 let workdir: string | undefined
 
@@ -28,7 +31,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('fs tools with-key smoke', () => 
     ctx = await fsHarness(workdir, SYSTEM)
     // agentLoop.create prepares a session with no cwd, so the provider default
     // (config.cwd = workdir) is the workspace.
-    const agent = await ctx.agentLoop.create(SessionId('fs-e2e'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
+    const agent = await ctx.agentLoop.create(SessionId('fs-e2e'), { provider: 'deepseek-official', model: E2E_MODEL })
 
     agent.followup(createUserMessage({
       content: [{ type: 'text', text:
@@ -61,7 +64,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('fs tools with-key smoke', () => 
       const handle = await ctx.agents.create({
         sessionId: SessionId(`fs-e2e-cwd-${Date.now()}`),
         meta: { cwd: sessionDir },
-        agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
       })
       handle.agent.followup(createUserMessage({
         content: [{ type: 'text', text:

@@ -13,7 +13,8 @@ import { assemble, type AssembledResult } from './assemble.ts'
  * and exercises a replayed tool follow-up. Key-gated.
  */
 
-const FLASH = 'deepseek-flash'
+// dsh-e2e-modelxing: 星模模型映射：deepseek-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const FLASH = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-flash'
 const contexts: Context[] = []
 // dsh-e2e-modelxing: pi-ai 的 deepseek 档是 OpenAI 风格（OpenAI SDK 在 base 后拼 /chat/completions，
 // 官方默认根 https://api.deepseek.com），而 DEEPSEEK_E2E_BASE_URL 是网关的 Anthropic 语义根，
@@ -29,6 +30,9 @@ async function harness(_model: string, config: Partial<PiAiProviderProfile> = {}
       deepseek: {
         ...process.env.DEEPSEEK_API_KEY === undefined ? {} : { apiKey: process.env.DEEPSEEK_API_KEY },
         ...E2E_BASE_URL === undefined ? {} : { baseURL: `${E2E_BASE_URL}/v1` },
+        // dsh-e2e-modelxing: pi-ai 对不在目录的模型 id 抛 UNKNOWN_MODEL，指向网关时需显式声明
+        // 目录条目（形状同 office-cli.e2e.ts 先例）；官方字面量走内置目录，行为不变。
+        ...FLASH === 'deepseek-flash' ? {} : { models: [{ id: FLASH, contextWindow: 128_000, maxTokens: 8_000 }] },
         ...config,
       },
     },
@@ -43,7 +47,8 @@ afterEach(async () => {
 function ask(text: string): Message[] {
   return [createUserMessage({
     content: [{ type: 'text', text }],
-    source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    // dsh-e2e-modelxing: 星模模型映射（历史来源元数据，不上行）；env 未设时回落官方字面量。
+    source: { kind: 'model', provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' },
   })]
 }
 

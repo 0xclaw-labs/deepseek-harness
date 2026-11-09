@@ -10,6 +10,9 @@ import * as FirstMessageTitleProvider from '@deepseek-ai/dsh-session-title-first
 
 const contexts: Context[] = []
 
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+
 afterEach(async () => {
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
 })
@@ -34,7 +37,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('first-prompt title provider with
       maxOutputTokens: 64,
       timeoutMs: 60_000,
       provider: 'deepseek-official',
-      model: 'deepseek-v4-flash',
+      model: E2E_MODEL,
     })
     const session = ctx.sessions.create(SessionId('real-title-provider'))
     session.append('turn/start', {
@@ -52,7 +55,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('first-prompt title provider with
       source: {
         kind: 'provider',
         provider: 'session-title-first-prompt-llm',
-        model: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+        model: { provider: 'deepseek-official', model: E2E_MODEL },
       },
     })
     expect(title?.title.length).toBeGreaterThan(0)

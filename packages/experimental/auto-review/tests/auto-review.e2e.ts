@@ -29,7 +29,8 @@ import { expect, it, vi } from 'vitest'
 import * as AutoReview from '@deepseek-ai/dsh-experimental-auto-review'
 
 const PROVIDER = 'deepseek-official'
-const FLASH = 'deepseek-v4-flash'
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const FLASH = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
 const PRO = 'deepseek-v4-pro'
 const VISION = 'deepseek-v4-flash-vision-exp'
 const REAL = process.env.DSH_AUTO_REVIEW_CERTIFICATION === '1'

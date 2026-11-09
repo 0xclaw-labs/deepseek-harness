@@ -23,11 +23,13 @@ import * as SessionLogDeepSeek from '@deepseek-ai/dsh-session-log-deepseek'
 import * as Messages from '@deepseek-ai/dsh-llm-deepseek-api-key'
 import { DeepSeekFilesClient } from '../src/files-api.ts'
 import { MESSAGES_FILES_BETA } from '../src/messages-api.ts'
-import { assemble, options, user, sourceModuleLoader } from './helpers.ts'
+import { assemble, MODEL, options, user, sourceModuleLoader } from './helpers.ts'
 
 const IN_HISTORY_MODEL = process.env.DEEPSEEK_IN_HISTORY_MODEL
 // dsh-e2e-modelxing: env 兜底端点，未设 env 时行为不变（官方 Anthropic 根 Protocol.PUBLIC_BASE_URL）。
 const E2E_BASE_URL = process.env.DEEPSEEK_E2E_BASE_URL ?? Protocol.PUBLIC_BASE_URL
+// dsh-e2e-modelxing: 星模模型映射：deepseek-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const E2E_FLASH_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-flash'
 const cleanups: (() => Promise<unknown>)[] = []
 afterEach(async () => {
   while (cleanups.length) await cleanups.pop()!()
@@ -73,7 +75,9 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', () 
   })
 
   it('uploads, lists, retrieves, reuses, and replaces a deleted Files image across Messages requests', async () => {
-    const ctx = await boot()
+    // dsh-e2e-modelxing: 网关模型 id 不在内置目录时会被安全降级为纯文本，图像链路需显式声明
+    // 图像模态；官方字面量时走默认目录，行为不变。
+    const ctx = await boot(E2E_FLASH_MODEL === 'deepseek-flash' ? undefined : [{ id: E2E_FLASH_MODEL, inputModalities: ['text', 'image'] }])
     await ctx.plugin(LocalAttachments)
     const fetchImpl = globalThis.fetch
     const uploads: string[] = []
@@ -103,7 +107,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', () 
     const attachment = await ctx.attachments.saveImage({ data: await readFile(new URL('fixtures/red.png', import.meta.url)), mediaType: 'image/png' })
     const message = user('What is the dominant color of this image? Reply with one English color word.')
     const request = options({
-      model: 'deepseek-flash', reasoningEffort: ReasoningEffortId('off'),
+      model: E2E_FLASH_MODEL, reasoningEffort: ReasoningEffortId('off'),
       messages: [{ ...message, content: [...message.content, { type: 'image', attachment }] }],
     })
     for (let run = 0; run < 2; run++) {
@@ -253,7 +257,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', () 
       user('Do not call tools. Reply with exactly EMPTY_TEXT_RECOVERED_731.'),
     ]
     const saved = JSON.stringify(history)
-    const response = await assemble(ctx.llm.stream(options({ model: 'deepseek-flash', messages: history, tools: [tool], reasoningEffort: ReasoningEffortId('off') })))
+    const response = await assemble(ctx.llm.stream(options({ model: E2E_FLASH_MODEL, messages: history, tools: [tool], reasoningEffort: ReasoningEffortId('off') })))
     expect(response.assembler.finish.kind).toBe('stop')
     expect(response.message.content.filter(block => block.type === 'text').map(block => block.text).join('')).toContain('EMPTY_TEXT_RECOVERED_731')
     expect(JSON.stringify(history)).toBe(saved)
@@ -264,7 +268,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', () 
     const callId = ToolCallId('historical_lookup')
     const history = [
       user('Look up the secret value.'),
-      createAssistantMessage({ source: { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, content: [
+      createAssistantMessage({ source: { provider: 'deepseek-official', model: MODEL }, content: [
         { type: 'tool-call', id: callId, name: 'lookup_value', arguments: '{"key":"the "secret""}' },
       ] }),
       createToolResultMessage({ callId, content: [{ type: 'text', text: 'Invalid arguments: expected an object' }], isError: true }),

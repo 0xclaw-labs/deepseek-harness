@@ -123,6 +123,8 @@ jobs:
           # 星模 ModelXing 接线：baseURL 指向网关根（适配器自拼 /v1/messages）；Variable 未设时回落官方
           DEEPSEEK_BASE_URL: ${{ vars.DSH_E2E_BASE_URL || 'https://api.deepseek.com/anthropic' }}
           DEEPSEEK_E2E_BASE_URL: ${{ vars.DSH_E2E_BASE_URL || 'https://api.deepseek.com/anthropic' }}
+          # 星模模型映射：变量未设时空串→测试回落官方字面量（deepseek-flash/v4-flash 不在星模在册）
+          DEEPSEEK_E2E_MODEL: ${{ vars.DSH_E2E_MODEL || '' }}
           DSH_PRIMARY_RUNTIME: ${{ github.workspace }}/.cache/e2e-office/primary-runtime
           DSH_E2E_MAX_WORKERS: 4
           DSH_EXAMPLE_MODE: lib

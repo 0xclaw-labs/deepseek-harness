@@ -18,6 +18,8 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 const PROBE = 'banana-271828'
 const NESTED_PROBE = 'papaya-314159'
 const UPDATED_PROBE = 'guava-161803'
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
 
 let ctx: Context | undefined
 let workdir: string | undefined
@@ -46,11 +48,11 @@ async function harness(): Promise<{ ctx: Context; agent: Agent }> {
   vi.stubEnv('DSH_AGENTS_HOME', join(workdir, 'absent-agents'))
   await ctx.plugin(AgentInstructions, { maxBytes: 65536 })
   await ctx.plugin(AgentLoop, { agents: [] })
-  await ctx.plugin(LlmDeepSeek, { models: [{ id: 'deepseek-v4-flash' }] })
+  await ctx.plugin(LlmDeepSeek, { models: [{ id: E2E_MODEL }] })
   const handle = await ctx.agents.create({
     sessionId: SessionId('workspace-context-e2e-session'),
     meta: { cwd: workdir },
-    agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
   })
   return { ctx, agent: handle.agent }
 }

@@ -23,7 +23,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('spawn backend with-key smoke', (
   it('a parent delegates to a child that writes a file on disk', async () => {
     workdir = await mkdtemp(join(tmpdir(), 'dsh-subagent-spawn-e2e-'))
     ctx = await spawnHarness(workdir)
-    const parent = await ctx.agentLoop.create(SessionId('e2e-parent'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, { cwd: workdir })
+    // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
+    const parent = await ctx.agentLoop.create(SessionId('e2e-parent'), { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' }, { cwd: workdir })
 
     parent.followup(createUserMessage({
       content: [{ type: 'text', text:

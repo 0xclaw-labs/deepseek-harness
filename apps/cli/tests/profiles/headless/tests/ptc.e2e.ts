@@ -39,6 +39,8 @@ import * as CordisInspectProviders from '@deepseek-ai/dsh-tool-cordis/host'
 const PERSONA = 'You are a coding agent. You work by writing TypeScript programs for run_code: '
   + 'batch related tool work into one program and print or return ONLY the findings that matter.'
 const WORKSPACE_PROBE = 'dragonfruit-8675309'
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
 
 let ctx: Context | undefined
 let workdir: string | undefined
@@ -81,7 +83,7 @@ async function workspacePtcModeHarness(): Promise<Context> {
   await harness.plugin(ToolFs)
   await harness.plugin(AgentInstructions, { maxBytes: 65536 })
   await harness.plugin(AgentLoop, { agents: [] })
-  await harness.plugin(LlmDeepSeek, { models: [{ id: 'deepseek-v4-flash' }] })
+  await harness.plugin(LlmDeepSeek, { models: [{ id: E2E_MODEL }] })
   await mountRuntime(harness)
   return harness
 }
@@ -327,7 +329,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('PTC mode: real model writes a pr
   it('collapses the wire tool list to [run_code], bridges sub-calls, and returns curated output', async () => {
     workdir = await mkdtemp(join(tmpdir(), 'dsh-ptc-e2e-'))
     ctx = await ptcModeHarness(workdir)
-    const agent = await ctx.agentLoop.create(SessionId('e2e-ptc'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, { cwd: workdir })
+    const agent = await ctx.agentLoop.create(SessionId('e2e-ptc'), { provider: 'deepseek-official', model: E2E_MODEL }, { cwd: workdir })
 
     agent.followup(createUserMessage({
       content: [{
@@ -379,7 +381,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('PTC mode: real model writes a pr
     const handle = await ctx.agents.create({
       sessionId: SessionId('e2e-ptc-workspace-session'),
       meta: { cwd: workdir },
-      agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
     })
 
     handle.agent.followup(createUserMessage({

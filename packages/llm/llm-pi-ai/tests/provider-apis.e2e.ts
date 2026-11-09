@@ -53,6 +53,9 @@ const providerCases: ProviderCase[] = [
 
 const contexts: Context[] = []
 
+// dsh-e2e-modelxing: 星模模型映射：历史来源元数据里的官方字面量（不上行）；env 未设（空串）时回落。
+const HISTORY_SOURCE_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+
 async function harness(image?: StoredImageAttachment): Promise<Context> {
   const ctx = new Context()
   contexts.push(ctx)
@@ -121,7 +124,7 @@ afterEach(async () => {
 function ask(text: string): Message[] {
   return [createUserMessage({
     content: [{ type: 'text', text }],
-    source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    source: { kind: 'model', provider: 'deepseek-official', model: HISTORY_SOURCE_MODEL },
   })]
 }
 
@@ -249,7 +252,7 @@ for (const profile of providerCases) {
                 },
                 { type: 'image', attachment: ref },
               ],
-              source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+              source: { kind: 'model', provider: 'deepseek-official', model: HISTORY_SOURCE_MODEL },
             })],
             maxTokens: 256,
           })

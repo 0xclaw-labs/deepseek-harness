@@ -38,7 +38,8 @@ import { assemble, type AssembledResult } from './assemble.ts'
  * requires $DEEPSEEK_FLASH_E2E=1.
  */
 
-const FLASH = 'deepseek-v4-flash'
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const FLASH = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
 const VISION = 'deepseek-v4-flash-vision-exp'
 const VISION_E2E_ENABLED = process.env.DEEPSEEK_VISION_E2E === '1'
 /** A model whose endpoint reads the latest `system` message at any position; unset skips the in-history smoke. */
@@ -337,7 +338,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
           ...ask('What is the weather in Paris right now? Use the get_weather tool.'),
           createMessage({
             role: 'assistant', content: first.message.content,
-            source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+            source: { kind: 'model', provider: 'deepseek-official', model: FLASH },
           }),
           createToolResultMessage({
             callId: ToolCallId(call!.id),

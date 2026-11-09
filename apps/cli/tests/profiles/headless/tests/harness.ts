@@ -34,6 +34,9 @@ export const TODO_SYSTEM_PROMPT = 'You are a coding agent. For multi-step work, 
   + 'work runs in parallel, at least one while work remains), and mark a task '
   + 'completed as soon as it is done.'
 
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+export const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+
 /** Options for {@link codingHarness}. */
 export interface CodingHarnessOptions {
   /**
@@ -73,7 +76,7 @@ export async function codingHarness(workdir: string, options: CodingHarnessOptio
   await ctx.plugin(LlmDeepSeek, {
     ...options.modelContextWindow === undefined && options.modelMaxTokens === undefined ? {} : {
       models: [{
-        id: 'deepseek-v4-flash',
+        id: E2E_MODEL,
         ...options.modelContextWindow === undefined ? {} : { contextWindow: options.modelContextWindow },
         ...options.modelMaxTokens === undefined ? {} : { maxTokens: options.modelMaxTokens },
       }],

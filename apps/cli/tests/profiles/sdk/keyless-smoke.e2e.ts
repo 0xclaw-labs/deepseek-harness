@@ -307,7 +307,8 @@ describe('Python SDK dsh profile keyless smoke', () => {
         jsonrpc: '2.0',
         id: 1,
         method: 'initialize',
-        params: { cwd: root, provider: 'deepseek-official', model: imageEnabled ? 'deepseek-flash' : 'deepseek-v4-pro' },
+        // dsh-e2e-modelxing: 星模模型映射：仅 flash 臂回落 env（本套件走本地 mock，v4-pro 臂保持原样）。
+        params: { cwd: root, provider: 'deepseek-official', model: imageEnabled ? (process.env.DEEPSEEK_E2E_MODEL || 'deepseek-flash') : 'deepseek-v4-pro' },
       })}\n`)
       await waitForLine(lines, value => value.id === 1, () => stderr)
       child.stdin.write(`${JSON.stringify({

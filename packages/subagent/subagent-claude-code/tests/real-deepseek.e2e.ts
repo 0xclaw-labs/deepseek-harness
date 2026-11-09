@@ -24,7 +24,8 @@ import * as claudeCode from '../src/index.ts'
 const execFileAsync = promisify(execFile)
 // dsh-e2e-modelxing: env 兜底端点，未设 env 时行为不变（官方 Anthropic 根，注入 claude CLI 的 ANTHROPIC_BASE_URL）。
 const OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL = process.env.DEEPSEEK_E2E_BASE_URL ?? 'https://api.deepseek.com/anthropic'
-const DEEPSEEK_MODEL = 'deepseek-v4-flash'
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
 const sdkRoot = dirname(fileURLToPath(
   import.meta.resolve('@anthropic-ai/claude-agent-sdk'),
 ))

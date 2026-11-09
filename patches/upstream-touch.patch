@@ -25,6 +25,301 @@ index cd8c213149..fe39521ab0 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/apps/cli/tests/built-bin.e2e.ts b/apps/cli/tests/built-bin.e2e.ts
+index 5174026bc4..ddc613ce65 100644
+--- a/apps/cli/tests/built-bin.e2e.ts
++++ b/apps/cli/tests/built-bin.e2e.ts
+@@ -31,6 +31,8 @@ const cliVersion = (JSON.parse(readFileSync(new URL('../package.json', import.me
+ const dshBin = join(repoRoot, 'apps/cli/lib/bin.js')
+ const invalidProvider = fileURLToPath(new URL('./fixtures/invalid-provider.cordis.yml', import.meta.url))
+ const webReadyExitHook = new URL('./fixtures/web-browser-open/register.mjs', import.meta.url).href
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+
+ async function runBuiltBin(
+   args: readonly string[] = [],
+@@ -193,7 +195,7 @@ function createEnvironmentProbeProfile(home: string, project: string): void {
+     "    let text = ''",
+     '    for await (const chunk of ctx.llm.stream({',
+     "      provider: 'deepseek-official',",
+-    "      model: 'deepseek-v4-flash',",
++    `      model: '${E2E_MODEL}',`,
+     '      messages: [],',
+     '      maxTokens: 32,',
+     '    })) {',
+@@ -489,7 +491,7 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)',
+         jsonrpc: '2.0',
+         id: 1,
+         method: 'initialize',
+-        params: { cwd: home, provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++        params: { cwd: home, provider: 'deepseek-official', model: E2E_MODEL },
+       })}\n`)
+       const initialized = await response(1)
+       expect(initialized, `${JSON.stringify(initialized)}\n${stderr}`).toMatchObject({
+diff --git a/apps/cli/tests/profiles/headless/tests/coding-task.e2e.ts b/apps/cli/tests/profiles/headless/tests/coding-task.e2e.ts
+index 531510393e..06975381da 100644
+--- a/apps/cli/tests/profiles/headless/tests/coding-task.e2e.ts
++++ b/apps/cli/tests/profiles/headless/tests/coding-task.e2e.ts
+@@ -55,7 +55,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('coding task: fix a failing test
+     expect(before.status).not.toBe(0)
+
+     ctx = await codingHarness(workdir, { personaPrefix: SYSTEM_PROMPT })
+-    const agent = await ctx.agentLoop.create(SessionId('e2e-task'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, { cwd: workdir })
++    // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
++    const agent = await ctx.agentLoop.create(SessionId('e2e-task'), { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' }, { cwd: workdir })
+
+     agent.followup(createUserMessage({
+       content: [{
+diff --git a/apps/cli/tests/profiles/headless/tests/compaction.e2e.ts b/apps/cli/tests/profiles/headless/tests/compaction.e2e.ts
+index b3e5cdb79e..fc34e10b1a 100644
+--- a/apps/cli/tests/profiles/headless/tests/compaction.e2e.ts
++++ b/apps/cli/tests/profiles/headless/tests/compaction.e2e.ts
+@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
+ import { join } from 'node:path'
+ import { afterEach, describe, expect, it } from 'vitest'
+ import type { Context } from '@deepseek-ai/cordis'
+-import { codingHarness, finalText, SYSTEM_PROMPT, waitForIdle } from './harness.ts'
++import { codingHarness, E2E_MODEL, finalText, SYSTEM_PROMPT, waitForIdle } from './harness.ts'
+ import { SessionId } from '@deepseek-ai/dsh-session'
+
+ /**
+@@ -49,7 +49,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('compaction: a long session compa
+       },
+       persistenceRoot: join(workdir, '.sessions'),
+     })
+-    const agent = await ctx.agentLoop.create(SessionId('e2e-compaction'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, { cwd: workdir })
++    // dsh-e2e-modelxing: 与 codingHarness 的目录声明共用同一 E2E_MODEL 常量，保证 id 一致。
++    const agent = await ctx.agentLoop.create(SessionId('e2e-compaction'), { provider: 'deepseek-official', model: E2E_MODEL }, { cwd: workdir })
+
+     // Completed read turns cannot collapse into one retained parallel tool group.
+     for (let i = 1; i <= 4; i++) {
+diff --git a/apps/cli/tests/profiles/headless/tests/credentials.e2e.ts b/apps/cli/tests/profiles/headless/tests/credentials.e2e.ts
+index f1323add9e..e9dcfd4413 100644
+--- a/apps/cli/tests/profiles/headless/tests/credentials.e2e.ts
++++ b/apps/cli/tests/profiles/headless/tests/credentials.e2e.ts
+@@ -173,7 +173,8 @@ describe('headless credential policy', { retry: 0 }, () => {
+   }, processTimeoutMs + 15_000)
+
+   it.each([
+-    { provider: 'deepseek-account', model: 'deepseek-v4-flash', code: 'ACCOUNT_SIGN_IN_REQUIRED' },
++    // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量（此用例在鉴权处即失败，模型不上行）。
++    { provider: 'deepseek-account', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash', code: 'ACCOUNT_SIGN_IN_REQUIRED' },
+     { provider: 'openai-codex', model: 'gpt-5.4', code: 'PI_AI_ERROR: Provider is not configured: openai-codex' },
+   ])('fails without saved sign-in for $provider', async ({ provider, model, code }) => {
+     const result = await runLoaderSmoke({
+diff --git a/apps/cli/tests/profiles/headless/tests/full-loop.e2e.ts b/apps/cli/tests/profiles/headless/tests/full-loop.e2e.ts
+index c8051b05ea..8583c864e0 100644
+--- a/apps/cli/tests/profiles/headless/tests/full-loop.e2e.ts
++++ b/apps/cli/tests/profiles/headless/tests/full-loop.e2e.ts
+@@ -29,7 +29,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('full loop: real model + real bas
+   it('runs a bash command on request and reports its output', async () => {
+     workdir = await mkdtemp(join(tmpdir(), 'dsh-full-loop-e2e-'))
+     ctx = await codingHarness(workdir, { personaPrefix: SYSTEM_PROMPT })
+-    const agent = await ctx.agentLoop.create(SessionId('e2e-loop'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, { cwd: workdir })
++    // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
++    const agent = await ctx.agentLoop.create(SessionId('e2e-loop'), { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' }, { cwd: workdir })
+
+     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Run `echo e2e-ok` with the bash tool and tell me its exact output.' }], source: { kind: 'user' } }))
+     await waitForIdle(ctx, agent)
+diff --git a/apps/cli/tests/profiles/headless/tests/harness.ts b/apps/cli/tests/profiles/headless/tests/harness.ts
+index 43164c9d7b..ac5ac0f9c9 100644
+--- a/apps/cli/tests/profiles/headless/tests/harness.ts
++++ b/apps/cli/tests/profiles/headless/tests/harness.ts
+@@ -34,6 +34,9 @@ export const TODO_SYSTEM_PROMPT = 'You are a coding agent. For multi-step work,
+   + 'work runs in parallel, at least one while work remains), and mark a task '
+   + 'completed as soon as it is done.'
+
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++export const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
++
+ /** Options for {@link codingHarness}. */
+ export interface CodingHarnessOptions {
+   /**
+@@ -73,7 +76,7 @@ export async function codingHarness(workdir: string, options: CodingHarnessOptio
+   await ctx.plugin(LlmDeepSeek, {
+     ...options.modelContextWindow === undefined && options.modelMaxTokens === undefined ? {} : {
+       models: [{
+-        id: 'deepseek-v4-flash',
++        id: E2E_MODEL,
+         ...options.modelContextWindow === undefined ? {} : { contextWindow: options.modelContextWindow },
+         ...options.modelMaxTokens === undefined ? {} : { maxTokens: options.modelMaxTokens },
+       }],
+diff --git a/apps/cli/tests/profiles/headless/tests/ptc.e2e.ts b/apps/cli/tests/profiles/headless/tests/ptc.e2e.ts
+index cce567d62e..46975a027a 100644
+--- a/apps/cli/tests/profiles/headless/tests/ptc.e2e.ts
++++ b/apps/cli/tests/profiles/headless/tests/ptc.e2e.ts
+@@ -39,6 +39,8 @@ import * as CordisInspectProviders from '@deepseek-ai/dsh-tool-cordis/host'
+ const PERSONA = 'You are a coding agent. You work by writing TypeScript programs for run_code: '
+   + 'batch related tool work into one program and print or return ONLY the findings that matter.'
+ const WORKSPACE_PROBE = 'dragonfruit-8675309'
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+
+ let ctx: Context | undefined
+ let workdir: string | undefined
+@@ -81,7 +83,7 @@ async function workspacePtcModeHarness(): Promise<Context> {
+   await harness.plugin(ToolFs)
+   await harness.plugin(AgentInstructions, { maxBytes: 65536 })
+   await harness.plugin(AgentLoop, { agents: [] })
+-  await harness.plugin(LlmDeepSeek, { models: [{ id: 'deepseek-v4-flash' }] })
++  await harness.plugin(LlmDeepSeek, { models: [{ id: E2E_MODEL }] })
+   await mountRuntime(harness)
+   return harness
+ }
+@@ -327,7 +329,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('PTC mode: real model writes a pr
+   it('collapses the wire tool list to [run_code], bridges sub-calls, and returns curated output', async () => {
+     workdir = await mkdtemp(join(tmpdir(), 'dsh-ptc-e2e-'))
+     ctx = await ptcModeHarness(workdir)
+-    const agent = await ctx.agentLoop.create(SessionId('e2e-ptc'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, { cwd: workdir })
++    const agent = await ctx.agentLoop.create(SessionId('e2e-ptc'), { provider: 'deepseek-official', model: E2E_MODEL }, { cwd: workdir })
+
+     agent.followup(createUserMessage({
+       content: [{
+@@ -379,7 +381,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('PTC mode: real model writes a pr
+     const handle = await ctx.agents.create({
+       sessionId: SessionId('e2e-ptc-workspace-session'),
+       meta: { cwd: workdir },
+-      agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++      agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
+     })
+
+     handle.agent.followup(createUserMessage({
+diff --git a/apps/cli/tests/profiles/headless/tests/resume.e2e.ts b/apps/cli/tests/profiles/headless/tests/resume.e2e.ts
+index 579b082906..fba7f4be94 100644
+--- a/apps/cli/tests/profiles/headless/tests/resume.e2e.ts
++++ b/apps/cli/tests/profiles/headless/tests/resume.e2e.ts
+@@ -17,6 +17,8 @@ import { codingHarness, finalText, SYSTEM_PROMPT, waitForIdle } from './harness.
+
+ const SECRET = 'plum-galaxy-1791'
+ const SESSION_ID = SessionId('resume-e2e-session')
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+
+ let ctx: Context | undefined
+ let root: string | undefined
+@@ -40,7 +42,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('resume: continue a persisted ses
+     ctx = await codingHarness(process.cwd(), { personaPrefix: SYSTEM_PROMPT, persistenceRoot: root })
+     const first = (await ctx.agents.create({
+       sessionId: SESSION_ID,
+-      agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++      agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
+     })).agent
+     first.followup(createUserMessage({ content: [{ type: 'text', text: `Remember this code for later: ${SECRET}. Just acknowledge it.` }], source: { kind: 'user' } }))
+     await waitForIdle(ctx, first)
+@@ -53,7 +55,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('resume: continue a persisted ses
+     ctx = await codingHarness(process.cwd(), { personaPrefix: SYSTEM_PROMPT, persistenceRoot: root })
+     const resumed = (await ctx.agents.resume({
+       resumeSessionId: SESSION_ID,
+-      agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++      agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
+     })).agent
+     expect(resumed.session.id).toBe(SESSION_ID)
+     // The prior user turn is in the rehydrated log before the model is asked.
+diff --git a/apps/cli/tests/profiles/headless/tests/todo-write.e2e.ts b/apps/cli/tests/profiles/headless/tests/todo-write.e2e.ts
+index ce688b60bd..1df9ea6e30 100644
+--- a/apps/cli/tests/profiles/headless/tests/todo-write.e2e.ts
++++ b/apps/cli/tests/profiles/headless/tests/todo-write.e2e.ts
+@@ -27,7 +27,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('todo_write: real model records a
+   it('appends a todo/write event with the model-produced task list', async () => {
+     workdir = await mkdtemp(join(tmpdir(), 'dsh-todo-write-e2e-'))
+     ctx = await codingHarness(workdir, { personaPrefix: TODO_SYSTEM_PROMPT })
+-    const agent = await ctx.agentLoop.create(SessionId('e2e-todo'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, { cwd: workdir })
++    // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
++    const agent = await ctx.agentLoop.create(SessionId('e2e-todo'), { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' }, { cwd: workdir })
+
+     agent.followup(createUserMessage({
+       content: [{ type: 'text', text:
+diff --git a/apps/cli/tests/profiles/sdk/dynamic-tool-cache.e2e.ts b/apps/cli/tests/profiles/sdk/dynamic-tool-cache.e2e.ts
+index b1b2c88128..48b5aa5477 100644
+--- a/apps/cli/tests/profiles/sdk/dynamic-tool-cache.e2e.ts
++++ b/apps/cli/tests/profiles/sdk/dynamic-tool-cache.e2e.ts
+@@ -71,6 +71,9 @@ function registryChanges(previous: ObservedRequest, request: ObservedRequest): {
+   ]
+ }
+
++// dsh-e2e-modelxing: 星模模型映射：deepseek-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-flash'
++
+ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('SDK native tool updates with real DeepSeek', () => {
+   it.each([false, true])('keeps the preceding conversation cached after a tool addition (prompt update: %s)', async (updatePrompt) => {
+     const root = await mkdtemp(join(tmpdir(), 'dsh-sdk-tool-cache-'))
+@@ -83,7 +86,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('SDK native tool updates with rea
+       { id: 'llm-deepseek', config: {
+         apiKeyEnv: 'DEEPSEEK_API_KEY', thinking: 'disabled', maxTokens: 1024,
+         retryPolicy: { mode: 'normal', maxRetries: 0 } satisfies RetryPolicyConfig,
+-        models: [{ id: 'deepseek-flash', systemPromptUpdate: 'in-history', toolUpdate: 'addition-only' }],
++        models: [{ id: E2E_MODEL, systemPromptUpdate: 'in-history', toolUpdate: 'addition-only' }],
+       } },
+       { id: 'tools', config: { mode: 'native' } },
+       { id: 'session-log-deepseek', disabled: true },
+@@ -92,7 +95,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('SDK native tool updates with rea
+     ]))
+     const harness = new DeepSeekHarness({
+       dshBin, profile: 'sdk', patches: [patch], dshHome: join(root, 'home'),
+-      cwd: root, processCwd: root, provider: 'deepseek-official', model: 'deepseek-flash',
++      cwd: root, processCwd: root, provider: 'deepseek-official', model: E2E_MODEL,
+       env: { ...process.env, DSH_TELEMETRY_DISABLED: '1', DSH_PERMISSION_MODE: 'danger-full-access' },
+       initializeTimeoutMs: 30_000,
+     })
+diff --git a/apps/cli/tests/profiles/sdk/keyless-smoke.e2e.ts b/apps/cli/tests/profiles/sdk/keyless-smoke.e2e.ts
+index 5c51bd36ae..446f84f859 100644
+--- a/apps/cli/tests/profiles/sdk/keyless-smoke.e2e.ts
++++ b/apps/cli/tests/profiles/sdk/keyless-smoke.e2e.ts
+@@ -307,7 +307,8 @@ describe('Python SDK dsh profile keyless smoke', () => {
+         jsonrpc: '2.0',
+         id: 1,
+         method: 'initialize',
+-        params: { cwd: root, provider: 'deepseek-official', model: imageEnabled ? 'deepseek-flash' : 'deepseek-v4-pro' },
++        // dsh-e2e-modelxing: 星模模型映射：仅 flash 臂回落 env（本套件走本地 mock，v4-pro 臂保持原样）。
++        params: { cwd: root, provider: 'deepseek-official', model: imageEnabled ? (process.env.DEEPSEEK_E2E_MODEL || 'deepseek-flash') : 'deepseek-v4-pro' },
+       })}\n`)
+       await waitForLine(lines, value => value.id === 1, () => stderr)
+       child.stdin.write(`${JSON.stringify({
+diff --git a/apps/cli/tests/profiles/sdk/office-cli.e2e.ts b/apps/cli/tests/profiles/sdk/office-cli.e2e.ts
+index 2c90e5fc6e..145d36c16c 100644
+--- a/apps/cli/tests/profiles/sdk/office-cli.e2e.ts
++++ b/apps/cli/tests/profiles/sdk/office-cli.e2e.ts
+@@ -19,6 +19,8 @@ const repo = fileURLToPath(new URL('../../../../../', import.meta.url))
+ const carrier = process.env.DSH_OFFICE_TEST_CARRIER ?? 'npm'
+ const executable = process.env.DSH_OFFICE_TEST_EXECUTABLE ?? process.execPath
+ const entry = process.env.DSH_OFFICE_TEST_ENTRY ?? join(repo, 'apps/cli/lib/bin.js')
++// dsh-e2e-modelxing: 星模模型映射：网关变量优先，兼容既有 MODEL_NAME 旋钮；两者皆未设时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || process.env.MODEL_NAME || 'deepseek-v4-flash'
+
+ it.skipIf(!process.env.DEEPSEEK_API_KEY || process.platform === 'win32')(`agent discovers and executes the ${carrier} Office CLI without Node on PATH`, async () => {
+   const root = await mkdtemp(join(tmpdir(), 'dsh office discovery '))
+@@ -32,7 +34,7 @@ it.skipIf(!process.env.DEEPSEEK_API_KEY || process.platform === 'win32')(`agent
+     const node = process.env.DSH_OFFICE_TEST_NODE, cli = process.env.DSH_OFFICE_TEST_CLI
+     const assetRoot = process.env.DSH_OFFICE_TEST_ASSETS
+     await writeFile(patch, JSON.stringify([
+-      ...(process.env.DSH_OFFICE_TEST_API === 'openai-completions' ? [{ id: 'llm-deepseek', disabled: true }, { id: 'llm-pi-ai', config: { providers: { 'office-test': { api: 'openai-completions', apiKeyEnv: 'DEEPSEEK_API_KEY', baseURL: process.env.DEEPSEEK_BASE_URL, compat: { thinkingFormat: 'deepseek' }, models: [{ id: process.env.MODEL_NAME ?? 'deepseek-v4-flash', contextWindow: 128000, maxTokens: 8000 }] } } } }] : []),
++      ...(process.env.DSH_OFFICE_TEST_API === 'openai-completions' ? [{ id: 'llm-deepseek', disabled: true }, { id: 'llm-pi-ai', config: { providers: { 'office-test': { api: 'openai-completions', apiKeyEnv: 'DEEPSEEK_API_KEY', baseURL: process.env.DEEPSEEK_BASE_URL, compat: { thinkingFormat: 'deepseek' }, models: [{ id: E2E_MODEL, contextWindow: 128000, maxTokens: 8000 }] } } } }] : []),
+       { id: 'session-persistence-jsonl', config: { root: join(root, 'sessions'), compression: 'none' } },
+       { id: 'skill-office', disabled: false },
+       { id: 'skill-office', config: { ...assetRoot === undefined ? {} : { assetRoot }, ...node === undefined ? {} : { node }, ...cli === undefined ? {} : { cli } } },
+@@ -84,7 +86,7 @@ it.skipIf(!process.env.DEEPSEEK_API_KEY || process.platform === 'win32')(`agent
+       }
+     })
+     try {
+-      send(1, 'initialize', { cwd: root, provider: process.env.DSH_OFFICE_TEST_API === 'openai-completions' ? 'office-test' : 'deepseek-official', model: process.env.MODEL_NAME ?? 'deepseek-v4-flash', maxTokens: 8000 })
++      send(1, 'initialize', { cwd: root, provider: process.env.DSH_OFFICE_TEST_API === 'openai-completions' ? 'office-test' : 'deepseek-official', model: E2E_MODEL, maxTokens: 8000 })
+       const result = await child
+       const diagnostic = `${result.stderr}\n${result.stdout}`
+       expect(protocolError, diagnostic).toBeUndefined()
+diff --git a/apps/cli/tests/web-agent-presets.e2e.ts b/apps/cli/tests/web-agent-presets.e2e.ts
+index 4d1f9210a2..1859b433f9 100644
+--- a/apps/cli/tests/web-agent-presets.e2e.ts
++++ b/apps/cli/tests/web-agent-presets.e2e.ts
+@@ -321,7 +321,8 @@ describe('the shipped Web composition', () => {
+     })
+     await ctx.settings.update(SUBAGENT_MODEL_SELECTION_SETTINGS_NAMESPACE, {
+       enabled: true,
+-      allowedModels: [{ provider: 'deepseek-official', model: 'deepseek-v4-flash' }],
++      // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
++      allowedModels: [{ provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' }],
+     })
+     const enabled = await ctx.agents.create({
+       sessionId: SessionId('preset-model-selection-enabled'),
 diff --git a/apps/desktop-host/package.json b/apps/desktop-host/package.json
 index e79792f570..17a2ac0b63 100644
 --- a/apps/desktop-host/package.json
@@ -53484,6 +53779,33 @@ index 3288e906b5..9d041a0e48 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/context/agent-instructions/tests/agent-instructions.e2e.ts b/packages/context/agent-instructions/tests/agent-instructions.e2e.ts
+index 589fc7e071..ac780a5693 100644
+--- a/packages/context/agent-instructions/tests/agent-instructions.e2e.ts
++++ b/packages/context/agent-instructions/tests/agent-instructions.e2e.ts
+@@ -18,6 +18,8 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
+ const PROBE = 'banana-271828'
+ const NESTED_PROBE = 'papaya-314159'
+ const UPDATED_PROBE = 'guava-161803'
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+
+ let ctx: Context | undefined
+ let workdir: string | undefined
+@@ -46,11 +48,11 @@ async function harness(): Promise<{ ctx: Context; agent: Agent }> {
+   vi.stubEnv('DSH_AGENTS_HOME', join(workdir, 'absent-agents'))
+   await ctx.plugin(AgentInstructions, { maxBytes: 65536 })
+   await ctx.plugin(AgentLoop, { agents: [] })
+-  await ctx.plugin(LlmDeepSeek, { models: [{ id: 'deepseek-v4-flash' }] })
++  await ctx.plugin(LlmDeepSeek, { models: [{ id: E2E_MODEL }] })
+   const handle = await ctx.agents.create({
+     sessionId: SessionId('workspace-context-e2e-session'),
+     meta: { cwd: workdir },
+-    agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++    agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
+   })
+   return { ctx, agent: handle.agent }
+ }
 diff --git a/packages/context/file-reference-local/package.json b/packages/context/file-reference-local/package.json
 index e8d4497f0f..d6efb7997d 100644
 --- a/packages/context/file-reference-local/package.json
@@ -53588,6 +53910,20 @@ index 6792353436..f11664d797 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/core/agent-loop/tests/request-cache.e2e.ts b/packages/core/agent-loop/tests/request-cache.e2e.ts
+index e36281607d..3a2f6db42f 100644
+--- a/packages/core/agent-loop/tests/request-cache.e2e.ts
++++ b/packages/core/agent-loop/tests/request-cache.e2e.ts
+@@ -73,7 +73,8 @@ function waitForIdle(context: Context, agent: Agent): Promise<void> {
+ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('log-derived request cache hits (real API)', () => {
+   it('every request after the first hits the provider prefix cache', async () => {
+     ctx = await loopHarness()
+-    const agent = await ctx.agentLoop.create(SessionId('cache-e2e'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
++    // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
++    const agent = await ctx.agentLoop.create(SessionId('cache-e2e'), { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' })
+
+     // Turn 1: forces a tool call → at least two steps (two model requests).
+     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Look up the key "deploy-color" with the lookup tool and tell me the value.' }], source: { kind: 'user' } }))
 diff --git a/packages/core/agent-tool-presentation/package.json b/packages/core/agent-tool-presentation/package.json
 index 513fb3e527..a9e1a252d9 100644
 --- a/packages/core/agent-tool-presentation/package.json
@@ -54165,6 +54501,20 @@ index d320b10946..e29ae7b9aa 100644
    "icon": "./icon.svg",
    "repository": {
      "type": "git",
+diff --git a/packages/experimental/auto-review/tests/auto-review.e2e.ts b/packages/experimental/auto-review/tests/auto-review.e2e.ts
+index 04f9c613db..e37bfd9f9b 100644
+--- a/packages/experimental/auto-review/tests/auto-review.e2e.ts
++++ b/packages/experimental/auto-review/tests/auto-review.e2e.ts
+@@ -29,7 +29,8 @@ import { expect, it, vi } from 'vitest'
+ import * as AutoReview from '@deepseek-ai/dsh-experimental-auto-review'
+
+ const PROVIDER = 'deepseek-official'
+-const FLASH = 'deepseek-v4-flash'
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const FLASH = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+ const PRO = 'deepseek-v4-pro'
+ const VISION = 'deepseek-v4-flash-vision-exp'
+ const REAL = process.env.DSH_AUTO_REVIEW_CERTIFICATION === '1'
 diff --git a/packages/experimental/badge-skill-bundle/package.json b/packages/experimental/badge-skill-bundle/package.json
 index e13100d921..c628776072 100644
 --- a/packages/experimental/badge-skill-bundle/package.json
@@ -54895,6 +55245,38 @@ index 7dfcfe8724..d9124274c2 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/fs/tool-fs/tests/fs-tools.e2e.ts b/packages/fs/tool-fs/tests/fs-tools.e2e.ts
+index 9e15589025..a2b7584fd7 100644
+--- a/packages/fs/tool-fs/tests/fs-tools.e2e.ts
++++ b/packages/fs/tool-fs/tests/fs-tools.e2e.ts
+@@ -9,6 +9,9 @@ import { fsHarness, waitForIdle } from './harness.ts'
+
+ /** Key-gated smoke for a real model driving the local read/write/edit tools. */
+
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
++
+ let ctx: Context | undefined
+ let workdir: string | undefined
+
+@@ -28,7 +31,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('fs tools with-key smoke', () =>
+     ctx = await fsHarness(workdir, SYSTEM)
+     // agentLoop.create prepares a session with no cwd, so the provider default
+     // (config.cwd = workdir) is the workspace.
+-    const agent = await ctx.agentLoop.create(SessionId('fs-e2e'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
++    const agent = await ctx.agentLoop.create(SessionId('fs-e2e'), { provider: 'deepseek-official', model: E2E_MODEL })
+
+     agent.followup(createUserMessage({
+       content: [{ type: 'text', text:
+@@ -61,7 +64,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('fs tools with-key smoke', () =>
+       const handle = await ctx.agents.create({
+         sessionId: SessionId(`fs-e2e-cwd-${Date.now()}`),
+         meta: { cwd: sessionDir },
+-        agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++        agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
+       })
+       handle.agent.followup(createUserMessage({
+         content: [{ type: 'text', text:
 diff --git a/packages/fs/tool-str-replace-editor/package.json b/packages/fs/tool-str-replace-editor/package.json
 index 7c9c660bc0..6d7832d226 100644
 --- a/packages/fs/tool-str-replace-editor/package.json
@@ -55301,19 +55683,25 @@ index 8a7ab027f0..31a3db5b60 100644
      "access": "public"
    },
 diff --git a/packages/llm/llm-deepseek/tests/adapter.e2e.ts b/packages/llm/llm-deepseek/tests/adapter.e2e.ts
-index 698065e66e..a5e4df1dd9 100644
+index 698065e66e..e7e15864d6 100644
 --- a/packages/llm/llm-deepseek/tests/adapter.e2e.ts
 +++ b/packages/llm/llm-deepseek/tests/adapter.e2e.ts
-@@ -26,6 +26,8 @@ import { MESSAGES_FILES_BETA } from '../src/messages-api.ts'
- import { assemble, options, user, sourceModuleLoader } from './helpers.ts'
+@@ -23,9 +23,13 @@ import * as SessionLogDeepSeek from '@deepseek-ai/dsh-session-log-deepseek'
+ import * as Messages from '@deepseek-ai/dsh-llm-deepseek-api-key'
+ import { DeepSeekFilesClient } from '../src/files-api.ts'
+ import { MESSAGES_FILES_BETA } from '../src/messages-api.ts'
+-import { assemble, options, user, sourceModuleLoader } from './helpers.ts'
++import { assemble, MODEL, options, user, sourceModuleLoader } from './helpers.ts'
 
  const IN_HISTORY_MODEL = process.env.DEEPSEEK_IN_HISTORY_MODEL
 +// dsh-e2e-modelxing: env 兜底端点，未设 env 时行为不变（官方 Anthropic 根 Protocol.PUBLIC_BASE_URL）。
 +const E2E_BASE_URL = process.env.DEEPSEEK_E2E_BASE_URL ?? Protocol.PUBLIC_BASE_URL
++// dsh-e2e-modelxing: 星模模型映射：deepseek-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const E2E_FLASH_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-flash'
  const cleanups: (() => Promise<unknown>)[] = []
  afterEach(async () => {
    while (cleanups.length) await cleanups.pop()!()
-@@ -40,7 +42,7 @@ async function boot(models?: Messages.Options['models']) {
+@@ -40,7 +44,7 @@ async function boot(models?: Messages.Options['models']) {
    cleanups.push(() => ctx.fiber.dispose())
    await ctx.plugin(LlmRuntime)
    await ctx.plugin(Messages, {
@@ -55322,7 +55710,16 @@ index 698065e66e..a5e4df1dd9 100644
      maxTokens: 4096,
      ...models === undefined ? {} : { models },
    })
-@@ -77,7 +79,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', ()
+@@ -71,13 +75,15 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', ()
+   })
+
+   it('uploads, lists, retrieves, reuses, and replaces a deleted Files image across Messages requests', async () => {
+-    const ctx = await boot()
++    // dsh-e2e-modelxing: 网关模型 id 不在内置目录时会被安全降级为纯文本，图像链路需显式声明
++    // 图像模态；官方字面量时走默认目录，行为不变。
++    const ctx = await boot(E2E_FLASH_MODEL === 'deepseek-flash' ? undefined : [{ id: E2E_FLASH_MODEL, inputModalities: ['text', 'image'] }])
+     await ctx.plugin(LocalAttachments)
+     const fetchImpl = globalThis.fetch
      const uploads: string[] = []
      const bodies: string[] = []
      const files = new DeepSeekFilesClient({
@@ -55331,7 +55728,7 @@ index 698065e66e..a5e4df1dd9 100644
      })
      const ownedFiles = new Set<ReturnType<typeof Protocol.DeepSeekFileId>>()
      cleanups.push(async () => {
-@@ -86,12 +88,12 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', ()
+@@ -86,12 +92,12 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', ()
      vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
        const response = await fetchImpl(input, init)
@@ -55346,7 +55743,16 @@ index 698065e66e..a5e4df1dd9 100644
          expect(new Headers(init?.headers).get('anthropic-beta')).toBe(MESSAGES_FILES_BETA)
          if (typeof init?.body !== 'string') throw new Error('expected a JSON Messages request')
          bodies.push(init.body)
-@@ -172,7 +174,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', ()
+@@ -101,7 +107,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', ()
+     const attachment = await ctx.attachments.saveImage({ data: await readFile(new URL('fixtures/red.png', import.meta.url)), mediaType: 'image/png' })
+     const message = user('What is the dominant color of this image? Reply with one English color word.')
+     const request = options({
+-      model: 'deepseek-flash', reasoningEffort: ReasoningEffortId('off'),
++      model: E2E_FLASH_MODEL, reasoningEffort: ReasoningEffortId('off'),
+       messages: [{ ...message, content: [...message.content, { type: 'image', attachment }] }],
+     })
+     for (let run = 0; run < 2; run++) {
+@@ -172,7 +178,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', ()
      let requests = 0
      vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
@@ -55355,11 +55761,50 @@ index 698065e66e..a5e4df1dd9 100644
        if (typeof init?.body !== 'string') throw new Error('expected a JSON Messages request')
        const body = JSON.parse(init.body) as Record<string, unknown>
        expect(body.dsh_plugin_packages).toStrictEqual({
+@@ -251,7 +257,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', ()
+       user('Do not call tools. Reply with exactly EMPTY_TEXT_RECOVERED_731.'),
+     ]
+     const saved = JSON.stringify(history)
+-    const response = await assemble(ctx.llm.stream(options({ model: 'deepseek-flash', messages: history, tools: [tool], reasoningEffort: ReasoningEffortId('off') })))
++    const response = await assemble(ctx.llm.stream(options({ model: E2E_FLASH_MODEL, messages: history, tools: [tool], reasoningEffort: ReasoningEffortId('off') })))
+     expect(response.assembler.finish.kind).toBe('stop')
+     expect(response.message.content.filter(block => block.type === 'text').map(block => block.text).join('')).toContain('EMPTY_TEXT_RECOVERED_731')
+     expect(JSON.stringify(history)).toBe(saved)
+@@ -262,7 +268,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('DeepSeek Messages real API', ()
+     const callId = ToolCallId('historical_lookup')
+     const history = [
+       user('Look up the secret value.'),
+-      createAssistantMessage({ source: { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, content: [
++      createAssistantMessage({ source: { provider: 'deepseek-official', model: MODEL }, content: [
+         { type: 'tool-call', id: callId, name: 'lookup_value', arguments: '{"key":"the "secret""}' },
+       ] }),
+       createToolResultMessage({ callId, content: [{ type: 'text', text: 'Invalid arguments: expected an object' }], isError: true }),
+diff --git a/packages/llm/llm-deepseek/tests/helpers.ts b/packages/llm/llm-deepseek/tests/helpers.ts
+index 77beea8f04..bce55b138b 100644
+--- a/packages/llm/llm-deepseek/tests/helpers.ts
++++ b/packages/llm/llm-deepseek/tests/helpers.ts
+@@ -17,7 +17,8 @@ import { DeepSeekFileStore } from '../src/file-store.ts'
+
+ export const prepareExtensions = async () => ({ fields: {}, accept: async () => {} })
+
+-export const MODEL = 'deepseek-v4-flash'
++// dsh-e2e-modelxing: 星模模型映射：变量未设时空串→回落官方字面量（`||` 而非 `??`：workflow 会注入空串）。
++export const MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+ export const user = (text = 'hello') => createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text }] })
+ export const options = (overrides: Partial<GenerateOptions> = {}): GenerateOptions => ({ provider: 'deepseek-official', model: MODEL, messages: [user()], ...overrides })
+ export const start = { type: 'message_start', message: { id: 'msg_1', model: MODEL, usage: { input_tokens: 12, output_tokens: 1 } } }
 diff --git a/packages/llm/llm-deepseek/tests/runtime.e2e.ts b/packages/llm/llm-deepseek/tests/runtime.e2e.ts
-index 4738fe9b6a..909dad7d1a 100644
+index 4738fe9b6a..d1553e92f8 100644
 --- a/packages/llm/llm-deepseek/tests/runtime.e2e.ts
 +++ b/packages/llm/llm-deepseek/tests/runtime.e2e.ts
-@@ -43,6 +43,8 @@ const VISION = 'deepseek-v4-flash-vision-exp'
+@@ -38,11 +38,14 @@ import { assemble, type AssembledResult } from './assemble.ts'
+  * requires $DEEPSEEK_FLASH_E2E=1.
+  */
+
+-const FLASH = 'deepseek-v4-flash'
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const FLASH = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+ const VISION = 'deepseek-v4-flash-vision-exp'
  const VISION_E2E_ENABLED = process.env.DEEPSEEK_VISION_E2E === '1'
  /** A model whose endpoint reads the latest `system` message at any position; unset skips the in-history smoke. */
  const IN_HISTORY_MODEL = process.env.DEEPSEEK_IN_HISTORY_MODEL
@@ -55368,7 +55813,7 @@ index 4738fe9b6a..909dad7d1a 100644
  const TEST_PNG = Uint8Array.from(readFileSync(
    new URL('../../llm-pi-ai/tests/fixtures/qr-code.png', import.meta.url),
  ))
-@@ -111,7 +113,7 @@ async function harness(model: string, config: Partial<Config> = {}) {
+@@ -111,7 +114,7 @@ async function harness(model: string, config: Partial<Config> = {}) {
    await ctx.plugin(LlmRuntime)
    await ctx.plugin(E2eAttachmentStore)
    await ctx.plugin(LlmDeepSeek, {
@@ -55377,7 +55822,7 @@ index 4738fe9b6a..909dad7d1a 100644
      ...model === VISION ? { models: [{ id: VISION, inputModalities: ['text', 'image'] }] } : {},
      ...config,
    })
-@@ -155,7 +157,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
+@@ -155,7 +158,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
      contexts.push(ctx)
      await ctx.plugin(LlmRuntime)
      await ctx.plugin(LocalAttachments)
@@ -55386,7 +55831,7 @@ index 4738fe9b6a..909dad7d1a 100644
      const model = 'deepseek-flash'
      await expect(ctx.llm.resolveModelInfo('deepseek-official', model)).resolves.toMatchObject({
        inputModalities: ['text', 'image'], systemPromptUpdate: 'in-history',
-@@ -182,7 +184,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
+@@ -182,7 +185,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
    it.skipIf(!VISION_E2E_ENABLED)('uses the built-in official route to upload, reference, and delete one image', async () => {
      const key = process.env.DEEPSEEK_API_KEY
      if (key === undefined) throw new Error('e2e ran without DEEPSEEK_API_KEY')
@@ -55395,7 +55840,7 @@ index 4738fe9b6a..909dad7d1a 100644
      const ctx = await harness(VISION, { baseURL })
      await ctx.plugin(E2eAttachmentStore)
      const attachments = ctx.attachments as E2eAttachmentStore
-@@ -234,7 +236,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
+@@ -234,7 +237,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
      await ctx.plugin(DeepSeekLlmApiExtensionRegistry)
      await ctx.plugin(SessionLogDeepSeek, { enabled: true })
      await ctx.plugin(PluginPackageInventoryDeepSeek)
@@ -55404,7 +55849,7 @@ index 4738fe9b6a..909dad7d1a 100644
      const session = ctx.sessions.create(SessionId('real-extension-fields'))
      session.append('turn/start', { turn: 1 })
 
-@@ -264,7 +266,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
+@@ -264,7 +267,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
        contexts.push(ctx)
        await ctx.plugin(LlmRuntime)
        await ctx.plugin(LocalCredentialProvider, { path: join(dir, '.credentials.yaml'), watch: false })
@@ -55413,6 +55858,15 @@ index 4738fe9b6a..909dad7d1a 100644
 
        const result = await assemble(ctx, {
          model: FLASH,
+@@ -335,7 +338,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
+           ...ask('What is the weather in Paris right now? Use the get_weather tool.'),
+           createMessage({
+             role: 'assistant', content: first.message.content,
+-            source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++            source: { kind: 'model', provider: 'deepseek-official', model: FLASH },
+           }),
+           createToolResultMessage({
+             callId: ToolCallId(call!.id),
 diff --git a/packages/llm/llm-pi-ai/package.json b/packages/llm/llm-pi-ai/package.json
 index df62e71425..e094ec9a04 100644
 --- a/packages/llm/llm-pi-ai/package.json
@@ -55427,12 +55881,16 @@ index df62e71425..e094ec9a04 100644
      "access": "public"
    },
 diff --git a/packages/llm/llm-pi-ai/tests/adapter.e2e.ts b/packages/llm/llm-pi-ai/tests/adapter.e2e.ts
-index edb9a13165..c9e1fca0e9 100644
+index edb9a13165..5757dc47fd 100644
 --- a/packages/llm/llm-pi-ai/tests/adapter.e2e.ts
 +++ b/packages/llm/llm-pi-ai/tests/adapter.e2e.ts
-@@ -15,6 +15,10 @@ import { assemble, type AssembledResult } from './assemble.ts'
+@@ -13,8 +13,13 @@ import { assemble, type AssembledResult } from './assemble.ts'
+  * and exercises a replayed tool follow-up. Key-gated.
+  */
 
- const FLASH = 'deepseek-flash'
+-const FLASH = 'deepseek-flash'
++// dsh-e2e-modelxing: 星模模型映射：deepseek-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const FLASH = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-flash'
  const contexts: Context[] = []
 +// dsh-e2e-modelxing: pi-ai 的 deepseek 档是 OpenAI 风格（OpenAI SDK 在 base 后拼 /chat/completions，
 +// 官方默认根 https://api.deepseek.com），而 DEEPSEEK_E2E_BASE_URL 是网关的 Anthropic 语义根，
@@ -55441,14 +55899,59 @@ index edb9a13165..c9e1fca0e9 100644
 
  async function harness(_model: string, config: Partial<PiAiProviderProfile> = {}) {
    const ctx = new Context()
-@@ -24,6 +28,7 @@ async function harness(_model: string, config: Partial<PiAiProviderProfile> = {}
+@@ -24,6 +29,10 @@ async function harness(_model: string, config: Partial<PiAiProviderProfile> = {}
      providers: {
        deepseek: {
          ...process.env.DEEPSEEK_API_KEY === undefined ? {} : { apiKey: process.env.DEEPSEEK_API_KEY },
 +        ...E2E_BASE_URL === undefined ? {} : { baseURL: `${E2E_BASE_URL}/v1` },
++        // dsh-e2e-modelxing: pi-ai 对不在目录的模型 id 抛 UNKNOWN_MODEL，指向网关时需显式声明
++        // 目录条目（形状同 office-cli.e2e.ts 先例）；官方字面量走内置目录，行为不变。
++        ...FLASH === 'deepseek-flash' ? {} : { models: [{ id: FLASH, contextWindow: 128_000, maxTokens: 8_000 }] },
          ...config,
        },
      },
+@@ -38,7 +47,8 @@ afterEach(async () => {
+ function ask(text: string): Message[] {
+   return [createUserMessage({
+     content: [{ type: 'text', text }],
+-    source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++    // dsh-e2e-modelxing: 星模模型映射（历史来源元数据，不上行）；env 未设时回落官方字面量。
++    source: { kind: 'model', provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' },
+   })]
+ }
+
+diff --git a/packages/llm/llm-pi-ai/tests/provider-apis.e2e.ts b/packages/llm/llm-pi-ai/tests/provider-apis.e2e.ts
+index 21aacab18f..de8f5176a2 100644
+--- a/packages/llm/llm-pi-ai/tests/provider-apis.e2e.ts
++++ b/packages/llm/llm-pi-ai/tests/provider-apis.e2e.ts
+@@ -53,6 +53,9 @@ const providerCases: ProviderCase[] = [
+
+ const contexts: Context[] = []
+
++// dsh-e2e-modelxing: 星模模型映射：历史来源元数据里的官方字面量（不上行）；env 未设（空串）时回落。
++const HISTORY_SOURCE_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
++
+ async function harness(image?: StoredImageAttachment): Promise<Context> {
+   const ctx = new Context()
+   contexts.push(ctx)
+@@ -121,7 +124,7 @@ afterEach(async () => {
+ function ask(text: string): Message[] {
+   return [createUserMessage({
+     content: [{ type: 'text', text }],
+-    source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++    source: { kind: 'model', provider: 'deepseek-official', model: HISTORY_SOURCE_MODEL },
+   })]
+ }
+
+@@ -249,7 +252,7 @@ for (const profile of providerCases) {
+                 },
+                 { type: 'image', attachment: ref },
+               ],
+-              source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++              source: { kind: 'model', provider: 'deepseek-official', model: HISTORY_SOURCE_MODEL },
+             })],
+             maxTokens: 256,
+           })
 diff --git a/packages/llm/llm-retry/package.json b/packages/llm/llm-retry/package.json
 index a1a6b8df8a..a9ab08bf96 100644
 --- a/packages/llm/llm-retry/package.json
@@ -56011,6 +56514,38 @@ index 9bb94d6e05..7d9aac28f7 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/session/session-title-first-prompt-llm/tests/provider.e2e.ts b/packages/session/session-title-first-prompt-llm/tests/provider.e2e.ts
+index b76e25a67a..dd56cedfde 100644
+--- a/packages/session/session-title-first-prompt-llm/tests/provider.e2e.ts
++++ b/packages/session/session-title-first-prompt-llm/tests/provider.e2e.ts
+@@ -10,6 +10,9 @@ import * as FirstMessageTitleProvider from '@deepseek-ai/dsh-session-title-first
+
+ const contexts: Context[] = []
+
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
++
+ afterEach(async () => {
+   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
+ })
+@@ -34,7 +37,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('first-prompt title provider with
+       maxOutputTokens: 64,
+       timeoutMs: 60_000,
+       provider: 'deepseek-official',
+-      model: 'deepseek-v4-flash',
++      model: E2E_MODEL,
+     })
+     const session = ctx.sessions.create(SessionId('real-title-provider'))
+     session.append('turn/start', {
+@@ -52,7 +55,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('first-prompt title provider with
+       source: {
+         kind: 'provider',
+         provider: 'session-title-first-prompt-llm',
+-        model: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++        model: { provider: 'deepseek-official', model: E2E_MODEL },
+       },
+     })
+     expect(title?.title.length).toBeGreaterThan(0)
 diff --git a/packages/session/session-title-llm/package.json b/packages/session/session-title-llm/package.json
 index ab1284c852..9534f6a5a9 100644
 --- a/packages/session/session-title-llm/package.json
@@ -56655,19 +57190,22 @@ index 4b31498846..ad4e8d3c73 100644
      "access": "public"
    },
 diff --git a/packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts b/packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts
-index ca6403b7a8..7bf4f1a4ed 100644
+index ca6403b7a8..4679b2d576 100644
 --- a/packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts
 +++ b/packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts
-@@ -22,7 +22,8 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
+@@ -22,8 +22,10 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
  import * as claudeCode from '../src/index.ts'
 
  const execFileAsync = promisify(execFile)
 -const OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL = 'https://api.deepseek.com/anthropic'
+-const DEEPSEEK_MODEL = 'deepseek-v4-flash'
 +// dsh-e2e-modelxing: env 兜底端点，未设 env 时行为不变（官方 Anthropic 根，注入 claude CLI 的 ANTHROPIC_BASE_URL）。
 +const OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL = process.env.DEEPSEEK_E2E_BASE_URL ?? 'https://api.deepseek.com/anthropic'
- const DEEPSEEK_MODEL = 'deepseek-v4-flash'
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const DEEPSEEK_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
  const sdkRoot = dirname(fileURLToPath(
    import.meta.resolve('@anthropic-ai/claude-agent-sdk'),
+ ))
 diff --git a/packages/subagent/subagent-codex/package.json b/packages/subagent/subagent-codex/package.json
 index 2b50a48cdc..f02226eb27 100644
 --- a/packages/subagent/subagent-codex/package.json
@@ -56682,10 +57220,10 @@ index 2b50a48cdc..f02226eb27 100644
      "access": "public"
    },
 diff --git a/packages/subagent/subagent-codex/tests/deepseek-responses-bridge.ts b/packages/subagent/subagent-codex/tests/deepseek-responses-bridge.ts
-index 2ff5c17d03..4cec43a200 100644
+index 2ff5c17d03..dbc511ed64 100644
 --- a/packages/subagent/subagent-codex/tests/deepseek-responses-bridge.ts
 +++ b/packages/subagent/subagent-codex/tests/deepseek-responses-bridge.ts
-@@ -6,7 +6,11 @@ import type {
+@@ -6,7 +6,13 @@ import type {
  } from 'node:http'
  import { completeResponsesEvents } from './responses-fixture.ts'
 
@@ -56695,9 +57233,42 @@ index 2ff5c17d03..4cec43a200 100644
 +// 故指向网关时派生 OpenAI 根 `${base}/v1`；未设 env 时行为不变。
 +const E2E_BASE_URL = process.env.DEEPSEEK_E2E_BASE_URL
 +const OFFICIAL_DEEPSEEK_BASE_URL = E2E_BASE_URL === undefined ? 'https://api.deepseek.com' : `${E2E_BASE_URL}/v1`
++// dsh-e2e-modelxing: 星模模型映射：桥上游 /chat/completions 的模型名；env 未设（空串）时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
  const MAX_REQUEST_BYTES = 1_048_576
 
  /** One running test-only Responses-to-DeepSeek bridge. */
+@@ -64,7 +70,7 @@ async function completeWithDeepSeek(
+       'content-type': 'application/json',
+     },
+     body: JSON.stringify({
+-      model: 'deepseek-v4-flash',
++      model: E2E_MODEL,
+       messages: [
+         {
+           role: 'system',
+diff --git a/packages/subagent/subagent-codex/tests/real-deepseek.e2e.ts b/packages/subagent/subagent-codex/tests/real-deepseek.e2e.ts
+index 499fb6c7cf..3fbbec23b6 100644
+--- a/packages/subagent/subagent-codex/tests/real-deepseek.e2e.ts
++++ b/packages/subagent/subagent-codex/tests/real-deepseek.e2e.ts
+@@ -33,6 +33,8 @@ const codexPackage = JSON.parse(readFileSync(
+   'utf8',
+ )) as { version: string; bin: { codex: string } }
+ const codexEntry = resolve(dirname(codexPackageJson), codexPackage.bin.codex)
++// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
++const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
+
+ const roots: string[] = []
+ const contexts: Context[] = []
+@@ -68,7 +70,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
+       const bridge = await startDeepSeekResponsesBridge(nonce)
+       bridges.push(bridge)
+       writeFileSync(join(codexHome, 'config.toml'), [
+-        'model = "deepseek-v4-flash"',
++        `model = "${E2E_MODEL}"`,
+         'model_provider = "deepseek-e2e"',
+         'approval_policy = "never"',
+         'sandbox_mode = "read-only"',
 diff --git a/packages/subagent/subagent-dsh-sdk/package.json b/packages/subagent/subagent-dsh-sdk/package.json
 index 0c2773415e..36103ef774 100644
 --- a/packages/subagent/subagent-dsh-sdk/package.json
@@ -56737,6 +57308,20 @@ index dbed9bfec1..7c10050e39 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/subagent/subagent-spawn-in-process/tests/spawn-in-process.e2e.ts b/packages/subagent/subagent-spawn-in-process/tests/spawn-in-process.e2e.ts
+index 1ff111c89f..a2eafb1c70 100644
+--- a/packages/subagent/subagent-spawn-in-process/tests/spawn-in-process.e2e.ts
++++ b/packages/subagent/subagent-spawn-in-process/tests/spawn-in-process.e2e.ts
+@@ -23,7 +23,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('spawn backend with-key smoke', (
+   it('a parent delegates to a child that writes a file on disk', async () => {
+     workdir = await mkdtemp(join(tmpdir(), 'dsh-subagent-spawn-e2e-'))
+     ctx = await spawnHarness(workdir)
+-    const parent = await ctx.agentLoop.create(SessionId('e2e-parent'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, { cwd: workdir })
++    // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
++    const parent = await ctx.agentLoop.create(SessionId('e2e-parent'), { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' }, { cwd: workdir })
+
+     parent.followup(createUserMessage({
+       content: [{ type: 'text', text:
 diff --git a/packages/subagent/subagent/package.json b/packages/subagent/subagent/package.json
 index 47f1908787..4211280087 100644
 --- a/packages/subagent/subagent/package.json
@@ -57513,6 +58098,20 @@ index c0b68feb1b..d45af0e022 100644
    "publishConfig": {
      "access": "public"
    },
+diff --git a/packages/workflow/workflow-ptc/tests/workflow-ptc.e2e.ts b/packages/workflow/workflow-ptc/tests/workflow-ptc.e2e.ts
+index 3d84d5aa48..5c2576f243 100644
+--- a/packages/workflow/workflow-ptc/tests/workflow-ptc.e2e.ts
++++ b/packages/workflow/workflow-ptc/tests/workflow-ptc.e2e.ts
+@@ -50,7 +50,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('PTC workflow engine with-key e2e
+     ctx = await harness()
+     const parentHandle = await ctx.agents.create({
+       sessionId: 'wf-ptc-e2e-session' as never,
+-      agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
++      // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
++      agentOptions: { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' },
+     })
+
+     const events: string[] = []
 diff --git a/packages/workflow/workflow/package.json b/packages/workflow/workflow/package.json
 index 7faf2ed205..e5de30d173 100644
 --- a/packages/workflow/workflow/package.json

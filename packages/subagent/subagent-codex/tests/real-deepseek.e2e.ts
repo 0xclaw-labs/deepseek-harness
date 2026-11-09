@@ -33,6 +33,8 @@ const codexPackage = JSON.parse(readFileSync(
   'utf8',
 )) as { version: string; bin: { codex: string } }
 const codexEntry = resolve(dirname(codexPackageJson), codexPackage.bin.codex)
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
 
 const roots: string[] = []
 const contexts: Context[] = []
@@ -68,7 +70,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
       const bridge = await startDeepSeekResponsesBridge(nonce)
       bridges.push(bridge)
       writeFileSync(join(codexHome, 'config.toml'), [
-        'model = "deepseek-v4-flash"',
+        `model = "${E2E_MODEL}"`,
         'model_provider = "deepseek-e2e"',
         'approval_policy = "never"',
         'sandbox_mode = "read-only"',

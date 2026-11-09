@@ -17,6 +17,8 @@ import { codingHarness, finalText, SYSTEM_PROMPT, waitForIdle } from './harness.
 
 const SECRET = 'plum-galaxy-1791'
 const SESSION_ID = SessionId('resume-e2e-session')
+// dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+const E2E_MODEL = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'
 
 let ctx: Context | undefined
 let root: string | undefined
@@ -40,7 +42,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('resume: continue a persisted ses
     ctx = await codingHarness(process.cwd(), { personaPrefix: SYSTEM_PROMPT, persistenceRoot: root })
     const first = (await ctx.agents.create({
       sessionId: SESSION_ID,
-      agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
     })).agent
     first.followup(createUserMessage({ content: [{ type: 'text', text: `Remember this code for later: ${SECRET}. Just acknowledge it.` }], source: { kind: 'user' } }))
     await waitForIdle(ctx, first)
@@ -53,7 +55,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('resume: continue a persisted ses
     ctx = await codingHarness(process.cwd(), { personaPrefix: SYSTEM_PROMPT, persistenceRoot: root })
     const resumed = (await ctx.agents.resume({
       resumeSessionId: SESSION_ID,
-      agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      agentOptions: { provider: 'deepseek-official', model: E2E_MODEL },
     })).agent
     expect(resumed.session.id).toBe(SESSION_ID)
     // The prior user turn is in the rehydrated log before the model is asked.

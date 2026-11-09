@@ -55,7 +55,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('coding task: fix a failing test 
     expect(before.status).not.toBe(0)
 
     ctx = await codingHarness(workdir, { personaPrefix: SYSTEM_PROMPT })
-    const agent = await ctx.agentLoop.create(SessionId('e2e-task'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' }, { cwd: workdir })
+    // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
+    const agent = await ctx.agentLoop.create(SessionId('e2e-task'), { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' }, { cwd: workdir })
 
     agent.followup(createUserMessage({
       content: [{

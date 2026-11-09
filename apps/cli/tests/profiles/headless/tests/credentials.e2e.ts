@@ -173,7 +173,8 @@ describe('headless credential policy', { retry: 0 }, () => {
   }, processTimeoutMs + 15_000)
 
   it.each([
-    { provider: 'deepseek-account', model: 'deepseek-v4-flash', code: 'ACCOUNT_SIGN_IN_REQUIRED' },
+    // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量（此用例在鉴权处即失败，模型不上行）。
+    { provider: 'deepseek-account', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash', code: 'ACCOUNT_SIGN_IN_REQUIRED' },
     { provider: 'openai-codex', model: 'gpt-5.4', code: 'PI_AI_ERROR: Provider is not configured: openai-codex' },
   ])('fails without saved sign-in for $provider', async ({ provider, model, code }) => {
     const result = await runLoaderSmoke({

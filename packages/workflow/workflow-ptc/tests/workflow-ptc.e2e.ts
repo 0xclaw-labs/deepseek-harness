@@ -50,7 +50,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('PTC workflow engine with-key e2e
     ctx = await harness()
     const parentHandle = await ctx.agents.create({
       sessionId: 'wf-ptc-e2e-session' as never,
-      agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      // dsh-e2e-modelxing: 星模模型映射：env 未设（空串）时回落官方字面量。
+      agentOptions: { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' },
     })
 
     const events: string[] = []
