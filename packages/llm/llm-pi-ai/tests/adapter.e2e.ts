@@ -15,6 +15,10 @@ import { assemble, type AssembledResult } from './assemble.ts'
 
 const FLASH = 'deepseek-flash'
 const contexts: Context[] = []
+// dsh-e2e-modelxing: pi-ai 的 deepseek 档是 OpenAI 风格（OpenAI SDK 在 base 后拼 /chat/completions，
+// 官方默认根 https://api.deepseek.com），而 DEEPSEEK_E2E_BASE_URL 是网关的 Anthropic 语义根，
+// 故指向网关时派生 OpenAI 根 `${base}/v1`；未设 env 时不注入 baseURL，行为不变。
+const E2E_BASE_URL = process.env.DEEPSEEK_E2E_BASE_URL
 
 async function harness(_model: string, config: Partial<PiAiProviderProfile> = {}) {
   const ctx = new Context()
@@ -24,6 +28,7 @@ async function harness(_model: string, config: Partial<PiAiProviderProfile> = {}
     providers: {
       deepseek: {
         ...process.env.DEEPSEEK_API_KEY === undefined ? {} : { apiKey: process.env.DEEPSEEK_API_KEY },
+        ...E2E_BASE_URL === undefined ? {} : { baseURL: `${E2E_BASE_URL}/v1` },
         ...config,
       },
     },

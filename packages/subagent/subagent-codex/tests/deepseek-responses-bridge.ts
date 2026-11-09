@@ -6,7 +6,11 @@ import type {
 } from 'node:http'
 import { completeResponsesEvents } from './responses-fixture.ts'
 
-const OFFICIAL_DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
+// dsh-e2e-modelxing: DEEPSEEK_E2E_BASE_URL 是网关的 Anthropic 语义根（适配器自拼 /v1/messages），
+// 而本桥在 base 后直拼 OpenAI 风格 /chat/completions（官方根 https://api.deepseek.com），
+// 故指向网关时派生 OpenAI 根 `${base}/v1`；未设 env 时行为不变。
+const E2E_BASE_URL = process.env.DEEPSEEK_E2E_BASE_URL
+const OFFICIAL_DEEPSEEK_BASE_URL = E2E_BASE_URL === undefined ? 'https://api.deepseek.com' : `${E2E_BASE_URL}/v1`
 const MAX_REQUEST_BYTES = 1_048_576
 
 /** One running test-only Responses-to-DeepSeek bridge. */

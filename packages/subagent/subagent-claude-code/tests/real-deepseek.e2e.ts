@@ -22,7 +22,8 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as claudeCode from '../src/index.ts'
 
 const execFileAsync = promisify(execFile)
-const OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL = 'https://api.deepseek.com/anthropic'
+// dsh-e2e-modelxing: env 兜底端点，未设 env 时行为不变（官方 Anthropic 根，注入 claude CLI 的 ANTHROPIC_BASE_URL）。
+const OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL = process.env.DEEPSEEK_E2E_BASE_URL ?? 'https://api.deepseek.com/anthropic'
 const DEEPSEEK_MODEL = 'deepseek-v4-flash'
 const sdkRoot = dirname(fileURLToPath(
   import.meta.resolve('@anthropic-ai/claude-agent-sdk'),

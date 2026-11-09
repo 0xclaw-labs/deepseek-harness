@@ -220,3 +220,13 @@ apps/desktop/tests/fixtures/installed-update-packaging.mjs
 # 2026-10-22: the branded desktop client aggregate now includes its endpoint,
 # model-display and cloud-screen modules so tsc -p tsconfig.client.json sees ipc imports.
 tsconfig.client.json
+
+# 2026-11-10: dsh-e2e-modelxing: env 兜底端点，未设 env 时行为不变。
+# e2e 测试里硬编码的官方 DeepSeek 端点改为读 DEEPSEEK_E2E_BASE_URL（星模 ModelXing 网关根，
+# 由 e2e.yml 从 repo Variable DSH_E2E_BASE_URL 注入）并回落原官方字面量；OpenAI 风格的两处
+# 按各自路径拼接规则派生 `${base}/v1`。
+packages/llm/llm-deepseek/tests/adapter.e2e.ts
+packages/llm/llm-deepseek/tests/runtime.e2e.ts
+packages/subagent/subagent-claude-code/tests/real-deepseek.e2e.ts
+packages/subagent/subagent-codex/tests/deepseek-responses-bridge.ts
+packages/llm/llm-pi-ai/tests/adapter.e2e.ts
