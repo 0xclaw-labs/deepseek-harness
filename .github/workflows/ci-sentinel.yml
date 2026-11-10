@@ -1,0 +1,122 @@
+# CI Sentinel（决策 D4 / CI 卫生战役，2026-11-10）——监视 E2E（真实 API）失败并分类处置：
+#   1) infra 死亡（runner 中途消失：失败 job 的所有 step 从未跑出结论）
+#      → attempt==1 时自动 --failed 重跑一次；重跑（attempt>1）仍死 → 走告警。
+#   2) 代码红（job 真跑过并有 step 失败）→ 走告警。
+#   告警 = 默认分支（本仓为 custom/main）上开/评固定标题 issue「🔴 CI red on main: <workflow name>」；
+#   非 custom/main（PR、其他分支）红不建 issue（作者自己看得到）。
+#   纯 bash + gh，不依赖第三方 action。只监听 E2E 一个 workflow（与 e2e.yml 的
+#   name: E2E (real DeepSeek API) 精确对应）；sync-upstream 自带 issue 兜底，不在此监听，
+#   Custom guards 同样不监听。
+name: CI Sentinel
+
+on:
+  workflow_run:
+    workflows: ["E2E (real DeepSeek API)"] # 与 e2e.yml 的 name: 精确对应
+    types: [completed]
+
+permissions:
+  actions: write
+  issues: write
+  contents: read
+
+jobs:
+  react:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'failure'
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Detect infra-death / code red, rerun once, alert on default branch
+        shell: bash
+        env:
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          WF_NAME: ${{ github.event.workflow_run.name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+
+          echo "sentinel: E2E run $RUN_ID (attempt $ATTEMPT) on branch '$HEAD_BRANCH' concluded failure"
+
+          # ---- 1. 拉全部 job（跨页），找 conclusion==failure 的 ----
+          JOBS_JSON="$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" --paginate)"
+          FAILED_JOBS="$(printf '%s' "$JOBS_JSON" | jq -s 'map(.jobs[]) | map(select(.conclusion == "failure"))')"
+
+          INFRA_DEATH=false
+          CODE_RED=false
+          FAILED_SUMMARY=""
+
+          N_FAILED="$(printf '%s' "$FAILED_JOBS" | jq 'length')"
+          if [ "$N_FAILED" -eq 0 ]; then
+            # 结论 failure 却没有任何 failure job（疑似启动失败 / runner 未接单）→ 按 infra 死亡处理
+            INFRA_DEATH=true
+            FAILED_SUMMARY+="- run 整体 failure 但无 failure 结论的 job（疑似启动失败 / runner 未接单）"$'\n'
+          fi
+
+          while IFS= read -r row; do
+            [ -z "$row" ] && continue
+            JOB="$(printf '%s' "$row" | base64 -d)"
+            JOB_NAME="$(printf '%s' "$JOB" | jq -r '.name')"
+            # 真跑过 = 任一 step 有 success/failure 结论；所有 step 都没结论 = runner 中途死亡签名
+            RAN_STEPS="$(printf '%s' "$JOB" | jq -r '[.steps[]? | select(.conclusion == "success" or .conclusion == "failure")] | length')"
+            TOTAL_STEPS="$(printf '%s' "$JOB" | jq -r '[.steps[]?] | length')"
+            if [ "$RAN_STEPS" -gt 0 ]; then
+              CODE_RED=true
+              STEPS_DESC="$(printf '%s' "$JOB" | jq -r '[.steps[]?] | map("\(.name):\(.conclusion)") | join("; ")')"
+              FAILED_SUMMARY+="- job '$JOB_NAME'（代码红，跑过 $RAN_STEPS/$TOTAL_STEPS 步）：$STEPS_DESC"$'\n'
+            else
+              INFRA_DEATH=true
+              FAILED_SUMMARY+="- job '$JOB_NAME'（infra 死亡签名：$TOTAL_STEPS 步全部无结论，runner 中途消失）"$'\n'
+            fi
+          done < <(printf '%s' "$FAILED_JOBS" | jq -r '.[] | @base64')
+
+          echo "sentinel: infra_death=$INFRA_DEATH code_red=$CODE_RED"
+
+          # ---- 2. infra 死亡且 attempt==1：自动重跑失败 job 一次，结束 ----
+          if [ "$INFRA_DEATH" = true ] && [ "$ATTEMPT" -eq 1 ]; then
+            gh run rerun "$RUN_ID" --repo "$REPO" --failed
+            echo "infra-death rerun triggered（run $RUN_ID，attempt 1 → 2）"
+            exit 0
+          fi
+
+          # ---- 3. 代码红 或 infra 死亡且重跑仍死（ATTEMPT>1）→ 告警分支 ----
+          if [ "$CODE_RED" != true ] && [ "$INFRA_DEATH" != true ]; then
+            echo "sentinel: 未能分类（无失败 job 且非空结果），结束"
+            exit 0
+          fi
+          if [ "$CODE_RED" = true ]; then
+            REASON="代码红（job 真跑过并失败）"
+          else
+            REASON="infra 死亡且重跑（attempt $ATTEMPT）仍死"
+          fi
+
+          # ---- 4. 仅默认分支建/评 issue（本仓默认分支 = custom/main）；其他分支红不建 ----
+          if [ "$HEAD_BRANCH" != "custom/main" ]; then
+            echo "sentinel: $REASON，但 head_branch='$HEAD_BRANCH' 非 custom/main，跳过 issue"
+            exit 0
+          fi
+
+          TITLE="🔴 CI red on main: $WF_NAME"
+          NOW="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          BODY="$(printf '%s\n\n- Run: %s\n- Head SHA: %s\n- Attempt: %s\n- 时间: %s\n\n失败 job / step 摘要：\n%s' \
+            "$REASON" "$RUN_URL" "$HEAD_SHA" "$ATTEMPT" "$NOW" "$FAILED_SUMMARY")"
+
+          # 兜底建标签（--force 幂等：已存在则更新定义不报错）
+          gh label create ci-red-main --repo "$REPO" --color d73a4a \
+            --description "custom/main 分支 CI 红" --force >/dev/null
+
+          EXISTING="$(gh issue list --repo "$REPO" --state open \
+            --search "in:title \"$TITLE\"" --json number --jq '.[0].number' || true)"
+
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --repo "$REPO" --body "$BODY"
+            echo "sentinel: 已评论既有红main issue #$EXISTING"
+          else
+            NEW_URL="$(gh issue create --repo "$REPO" --title "$TITLE" \
+              --label ci-red-main --body "$BODY")"
+            echo "sentinel: 已新建红main issue $NEW_URL"
+          fi
