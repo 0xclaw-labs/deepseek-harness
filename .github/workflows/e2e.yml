@@ -126,6 +126,8 @@ jobs:
           # 星模模型映射：变量未设时空串→测试回落官方字面量（deepseek-flash/v4-flash 不在星模在册）
           DEEPSEEK_E2E_MODEL: ${{ vars.DSH_E2E_MODEL || '' }}
           DSH_PRIMARY_RUNTIME: ${{ github.workspace }}/.cache/e2e-office/primary-runtime
+          # 网关模式哨兵：baseURL 指向星模时置位，vitest 配置按清单跳过依赖官方路线组合的套件
+          DSH_E2E_GATEWAY: ${{ vars.DSH_E2E_BASE_URL != '' && '1' || '' }}
           DSH_E2E_MAX_WORKERS: 4
           DSH_EXAMPLE_MODE: lib
         run: pnpm run test:e2e

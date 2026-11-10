@@ -12,6 +12,9 @@ export default defineConfig({
     include: [
       'apps/cli/tests/**/*.expected.e2e.ts',
     ],
+    exclude: process.env.DSH_E2E_GATEWAY ? [
+      '**/*.e2e.ts',
+    ] : [],
     testTimeout: 120_000,
     hookTimeout: 30_000,
     maxWorkers: Math.min(5, availableParallelism()),
