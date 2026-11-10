@@ -32,9 +32,10 @@ on:
   push:
     branches: [main, master]
   pull_request:
-  schedule:
-    # 00:17 UTC nightly = 08:17 Asia/Shanghai — off the top-of-hour cron stampede.
-    - cron: '17 0 * * *'
+  # 暂关 nightly：网关 dsh 扩展面落地前结构性红簇会夜夜烧 key（2026-11-10 决策 D3）；恢复=取消本行注释
+  # schedule:
+  #   # 00:17 UTC nightly = 08:17 Asia/Shanghai — off the top-of-hour cron stampede.
+  #   - cron: '17 0 * * *'
 
 # Keep only the newest validation in each workflow/ref, including master
 # pushes, nightly runs, and manual dispatches.
