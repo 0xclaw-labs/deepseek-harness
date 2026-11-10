@@ -258,3 +258,10 @@ apps/cli/tests/profiles/sdk/dynamic-tool-cache.e2e.ts
 apps/cli/tests/profiles/sdk/keyless-smoke.e2e.ts
 apps/cli/tests/profiles/sdk/office-cli.e2e.ts
 apps/cli/tests/web-agent-presets.e2e.ts
+
+# 2026-11-10: dsh-e2e-gateway: 网关模式跳过清单的宿主配置（a2be3823bd 漏登记补录）。
+# DSH_E2E_GATEWAY=1 时按 run 42675988522 尸检跳过依赖被品牌化 bundle 禁用的官方
+# deepseek-official 路线的 26 个 e2e 套件；expected 面同理。变量未设（官方环境）时
+# 两文件行为与上游一致，全量照跑。
+vitest.e2e.config.ts
+vitest.expected.config.ts
