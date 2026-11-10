@@ -39,6 +39,9 @@ const AGENT: AgentUnderTest = {
   profile: 'acp',
   tsconfigPath: fileURLToPath(new URL('../../../../../../tsconfig.json', import.meta.url)),
 }
+// dsh-e2e-modelxing: leaf patch restoring the official adapter the branded base
+// bundle disables and mapping the live model id to the gateway catalog.
+const OFFICIAL_ROUTE = fileURLToPath(new URL('./official-route.patch.yml', import.meta.url))
 
 // A usable confining runner, probed the same way the executor suites do:
 // bwrap on Linux, Seatbelt's sandbox-exec on macOS. Without one the strict
@@ -82,6 +85,7 @@ function launchExampleAcpAgent(
   const launched = launchAcpTestAgent({
     agent: AGENT,
     cwd,
+    configPath: OFFICIAL_ROUTE,
     // A dummy key lets the adapter boot keylessly; live tests carry the real key.
     env: {
       DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? 'sk-dummy-for-boot',

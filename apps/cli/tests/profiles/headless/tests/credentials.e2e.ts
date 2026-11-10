@@ -71,13 +71,19 @@ describe('headless credential policy', { retry: 0 }, () => {
       const result = await runLoaderSmoke({
         label: `headless credentials: ${scenario.name}`,
         tempDirPrefix: 'headless-credentials-', binScript, tsconfigPath, sourceImport: 'tsx/esm',
-        configPath: '', binArgs: ['headless', 'Reply briefly.'], processTimeoutMs,
+        // dsh-e2e-modelxing: 品牌 base bundle 关闭 llm-deepseek 并把默认模型行指到 painuo；
+        // 本用例走默认 deepseek-official 路由，需显式恢复 adapter 与默认模型行。
+        configPath: '', binArgs: ['headless', '--patch', './official-route.patch.json', 'Reply briefly.'], processTimeoutMs,
         env: {
           DEEPSEEK_API_KEY: scenario.launch, DEEPSEEK_BASE_URL: server.baseURL, DSH_TELEMETRY_DISABLED: '1',
         },
         prepare: async (cwd) => {
           await mkdir(join(cwd, '.dsh'), { recursive: true })
           await writeFile(join(cwd, '.dsh', '.credentials.yaml'), credentials, { mode: 0o600 })
+          await writeFile(join(cwd, 'official-route.patch.json'), JSON.stringify([
+            { id: 'llm-deepseek', disabled: false },
+            { id: 'agent-default-model', config: { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' } },
+          ]))
           if (scenario.project !== undefined) await writeFile(join(cwd, '.env'), `DEEPSEEK_API_KEY=${scenario.project}\n`)
           if (scenario.home !== undefined) await writeFile(join(cwd, '.dsh', '.env'), `DEEPSEEK_API_KEY=${scenario.home}\n`)
         },
@@ -143,12 +149,18 @@ describe('headless credential policy', { retry: 0 }, () => {
         label: `headless credential boundary: ${mode}`,
         tempDirPrefix: 'headless-credential-boundary-', binScript, tsconfigPath, sourceImport: 'tsx/esm',
         configPath: '',
-        binArgs: ['headless', ...restoring ? ['--patch', './auth.patch.json'] : [], 'Reply briefly.'],
+        // dsh-e2e-modelxing: 品牌 base bundle 关闭 llm-deepseek 并把默认模型行指到 painuo；
+        // 本用例走默认 deepseek-official 路由，需显式恢复 adapter 与默认模型行。
+        binArgs: ['headless', '--patch', './official-route.patch.json', ...restoring ? ['--patch', './auth.patch.json'] : [], 'Reply briefly.'],
         processTimeoutMs, expectedExitCode: missing ? 1 : 0,
         env: { DEEPSEEK_API_KEY: empty ? '' : missing ? undefined : launchKey, DEEPSEEK_BASE_URL: server.baseURL, DSH_TELEMETRY_DISABLED: '1' },
         prepare: async (cwd) => {
           await mkdir(join(cwd, '.dsh'), { recursive: true })
           await writeFile(join(cwd, '.dsh', '.credentials.yaml'), document, { mode: 0o600 })
+          await writeFile(join(cwd, 'official-route.patch.json'), JSON.stringify([
+            { id: 'llm-deepseek', disabled: false },
+            { id: 'agent-default-model', config: { provider: 'deepseek-official', model: process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash' } },
+          ]))
           if (empty) await writeFile(join(cwd, '.env'), `DEEPSEEK_API_KEY=${projectKey}\n`)
           if (restoring) await writeFile(join(cwd, 'auth.patch.json'), JSON.stringify(
             ['credentials', 'authorization', 'deepseek-account'].map(id => ({ id, disabled: false })),
@@ -188,6 +200,9 @@ describe('headless credential policy', { retry: 0 }, () => {
         await writeFile(join(cwd, '.dsh', '.credentials.yaml'), credentials, { mode: 0o600 })
         await writeFile(join(cwd, 'auth.patch.json'), JSON.stringify([
           { id: 'agent-default-model', config: { provider, model } },
+          // dsh-e2e-modelxing: 品牌 base bundle 关闭了 llm-deepseek-account 行；
+          // deepseek-account 用例需显式恢复该 provider 的 adapter 才能走到鉴权失败。
+          ...provider === 'deepseek-account' ? [{ id: 'llm-deepseek-account', disabled: false }] : [],
           ...provider === 'openai-codex' ? [{ id: 'llm-pi-ai', config: { providers: {
             [provider]: { models: [{ id: model, contextWindow: 32_768, maxTokens: 1024 }] },
           } } }] : [],

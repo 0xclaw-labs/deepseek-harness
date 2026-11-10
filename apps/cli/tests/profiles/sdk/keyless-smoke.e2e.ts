@@ -75,6 +75,14 @@ describe('Python SDK dsh profile keyless smoke', () => {
       "      name: '@deepseek-ai/dsh-tool-str-replace-editor'",
       '',
     ].join('\n'))
+    // dsh-e2e-modelxing: 品牌 base bundle 关闭了 llm-deepseek 行；sdk profile 组合需要
+    // 显式恢复官方 adapter（patch 行只写显式键，deepseek-official 路由才能解析）。
+    const officialRoutePatch = join(root, 'official-route.patch.yml')
+    await writeFile(officialRoutePatch, [
+      '- id: llm-deepseek',
+      '  disabled: false',
+      '',
+    ].join('\n'))
     const modelRequests: Record<string, unknown>[] = []
     const modelServer = createServer((request, response) => {
       let body = ''
@@ -95,6 +103,7 @@ describe('Python SDK dsh profile keyless smoke', () => {
       ...launch.args,
       '--profile',
       'sdk',
+      '--patch', officialRoutePatch,
       ...(editorEnabled ? ['--patch', editorPatch] : []),
     ], {
       cwd: repoRoot,
@@ -176,7 +185,10 @@ describe('Python SDK dsh profile keyless smoke', () => {
       const toolNames = tools.map(tool => tool.name)
       expect(modelRequests[0]?.output_config).toEqual({ effort: 'max' })
       expect(modelRequests[0]?.max_tokens).toBe(1234)
-      expect(toolNames).toEqual(expect.arrayContaining(['read', 'write', 'edit', 'web_fetch', 'web_search']))
+      // Brand composition: the branded base bundle disables the DeepSeek search rows,
+      // so web_search stays unloaded while local fetch remains available.
+      expect(toolNames).toEqual(expect.arrayContaining(['read', 'write', 'edit', 'web_fetch']))
+      expect(toolNames).not.toContain('web_search')
       expect(toolNames.includes('str_replace_editor')).toBe(editorEnabled)
       expect(toolNames).not.toContain('list_subagent_models')
 
@@ -518,7 +530,11 @@ it.each(['unset', 'empty', 'bundled', 'full', 'python-only', 'python-only-no-cli
   if (address === null || typeof address === 'string') throw new Error('model fixture did not bind')
   const home = join(root, 'home')
   const cliPatch = join(root, 'cli.patch.yml')
-  await writeFile(cliPatch, JSON.stringify(mode === 'python-only-no-cli' ? [{ id: 'skill-office', config: { assetRoot: join(root, 'resources', 'office-skills'), cli: false } }] : []))
+  // dsh-e2e-modelxing: sdk profile 组合需显式恢复被品牌 base 关闭的官方 adapter。
+  await writeFile(cliPatch, JSON.stringify([
+    { id: 'llm-deepseek', disabled: false },
+    ...mode === 'python-only-no-cli' ? [{ id: 'skill-office', config: { assetRoot: join(root, 'resources', 'office-skills'), cli: false } }] : [],
+  ]))
   const officeLaunch = resolveExampleLaunch({
     srcBin: fileURLToPath(new URL('../../../src/bin.ts', import.meta.url)), mode: 'lib',
     configArgs: ['--profile', 'sdk', '--patch', cliPatch],

@@ -7,6 +7,10 @@
   disabled: true
 
 - id: llm-deepseek
+  # dsh-e2e-modelxing: 品牌 base bundle 关闭了 llm-deepseek 行；patch 行只写显式键，
+  # 仅重述 config 不会清除 disabled（vendor/include applyEntryPatches 语义），
+  # 必须显式 disabled: false 才能在子进程组合中恢复官方 adapter。
+  disabled: false
   config:
     thinking: enabled
     reasoningEffort: max
@@ -23,7 +27,8 @@
     agents:
       - id: main
         provider: deepseek-official
-        model: deepseek-v4-flash
+        # dsh-e2e-modelxing: 星模模型映射：deepseek-v4-flash 不在网关在册目录；env 未设（空串）时回落官方字面量。
+        model: !!js "process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'"
         cwd: !!js process.cwd()
 
 - id: session-persistence-jsonl

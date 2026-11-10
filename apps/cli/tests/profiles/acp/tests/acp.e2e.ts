@@ -27,6 +27,9 @@ const AGENT: AgentUnderTest = {
   profile: 'acp',
   tsconfigPath: fileURLToPath(new URL('../../../../../../tsconfig.json', import.meta.url)),
 }
+// dsh-e2e-modelxing: leaf patch restoring the official adapter the branded base
+// bundle disables and mapping the live model id to the gateway catalog.
+const OFFICIAL_ROUTE = fileURLToPath(new URL('./official-route.patch.yml', import.meta.url))
 const DANGER_FULL_ACCESS_ENV = { DSH_PERMISSION_MODE: 'danger-full-access' }
 
 let spawned: LaunchedAcpTestAgent | undefined
@@ -50,6 +53,7 @@ describe('acp-agent over real stdio (no key required)', () => {
     spawned = launchAcpTestAgent({
       agent: AGENT,
       cwd: workdir,
+      configPath: OFFICIAL_ROUTE,
       env: {
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? 'sk-dummy-for-boot',
         ...DANGER_FULL_ACCESS_ENV,
@@ -84,6 +88,7 @@ describe('acp-agent over real stdio (no key required)', () => {
     spawned = launchAcpTestAgent({
       agent: AGENT,
       cwd: workdir,
+      configPath: OFFICIAL_ROUTE,
       env: {
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? 'sk-dummy-for-boot',
         ...DANGER_FULL_ACCESS_ENV,
@@ -101,7 +106,7 @@ describe('acp-agent over real stdio (no key required)', () => {
 describe.skipIf(!process.env.DEEPSEEK_API_KEY)('acp-agent e2e: real prompt over ACP', () => {
   it('runs a real turn and the agent writes the requested file (verified on disk)', async () => {
     workdir = await mkdtemp(join(tmpdir(), 'acp-e2e-'))
-    spawned = launchAcpTestAgent({ agent: AGENT, cwd: workdir, env: DANGER_FULL_ACCESS_ENV })
+    spawned = launchAcpTestAgent({ agent: AGENT, cwd: workdir, configPath: OFFICIAL_ROUTE, env: DANGER_FULL_ACCESS_ENV })
     const { client, updates } = spawned
 
     await client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })

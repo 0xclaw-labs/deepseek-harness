@@ -24,6 +24,9 @@ const AGENT: AgentUnderTest = {
   profile: 'acp',
   tsconfigPath: fileURLToPath(new URL('../../../../../../tsconfig.json', import.meta.url)),
 }
+// dsh-e2e-modelxing: leaf patch restoring the official adapter the branded base
+// bundle disables and mapping the live model id to the gateway catalog.
+const OFFICIAL_ROUTE = fileURLToPath(new URL('./official-route.patch.yml', import.meta.url))
 
 const STANDARD_EXECUTION_UPDATES = new Set([
   'agent_message_chunk',
@@ -56,6 +59,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('acp-agent e2e: a PreToolUse hook
     spawned = launchAcpTestAgent({
       agent: AGENT,
       cwd: workdir,
+      configPath: OFFICIAL_ROUTE,
       env: { DSH_PERMISSION_MODE: 'danger-full-access' },
     })
     const { client, updates } = spawned

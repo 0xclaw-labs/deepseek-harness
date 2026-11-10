@@ -217,6 +217,10 @@ function createEnvironmentProbeProfile(home: string, project: string): void {
     dsh: { profile: { bundles: ['@deepseek-ai/dsh-base'] } },
   }, undefined, 2))
   writeFileSync(join(profileDir, 'cordis.patch.yml'), [
+    // Brand composition: the branded base bundle disables the official adapter,
+    // which this probe streams through directly.
+    '- id: llm-deepseek',
+    '  disabled: false',
     '- insert:',
     '    - id: environment-probe',
     `      name: ${pathToFileURL(pluginFile).href}`,
@@ -522,7 +526,15 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
       successText: 'ACP BUILT PROFILE OK',
     })
     const home = mkdtempSync(join(tmpdir(), 'dsh-built-acp-'))
-    const child = execa(process.execPath, [dshBin, '--profile', 'acp'], {
+    // Brand composition: the branded base bundle disables the official adapter,
+    // so the acp profile's deepseek-official route needs the row re-enabled.
+    const officialRoutePatch = join(home, 'official-route.patch.yml')
+    writeFileSync(officialRoutePatch, [
+      '- id: llm-deepseek',
+      '  disabled: false',
+      '',
+    ].join('\n'))
+    const child = execa(process.execPath, [dshBin, '--profile', 'acp', '--patch', officialRoutePatch], {
       cwd: home,
       reject: false,
       timeout: SPAWN_TIMEOUT_MS,
@@ -608,7 +620,15 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
     })
     const home = mkdtempSync(join(tmpdir(), 'dsh-built-headless-'))
     try {
-      const result = await runBuiltBin(['--profile', 'headless', 'answer', 'from', 'the', 'published', 'entry'], {
+      // Brand composition: the branded base bundle disables the official adapter
+      // and points agent-default-model at painuo; this mock-backed run streams
+      // through the shipped deepseek-official route.
+      const officialRoutePatch = join(home, 'official-route.patch.yml')
+      writeFileSync(officialRoutePatch, JSON.stringify([
+        { id: 'llm-deepseek', disabled: false },
+        { id: 'agent-default-model', config: { provider: 'deepseek-official', model: E2E_MODEL } },
+      ]))
+      const result = await runBuiltBin(['--profile', 'headless', '--patch', officialRoutePatch, 'answer', 'from', 'the', 'published', 'entry'], {
         DSH_HOME: home,
         DSH_TELEMETRY_DISABLED: '1',
         DEEPSEEK_API_KEY: apiKey,

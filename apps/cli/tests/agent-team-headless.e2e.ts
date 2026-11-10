@@ -43,6 +43,13 @@ describe('dsh run with Agent Teams enabled', () => {
       await writeFile(join(profileDir, 'cordis.patch.yml'), [
         '- id: llm-deepseek',
         '  disabled: true',
+        // Brand composition: the branded base points agent-default-model at the
+        // painuo provider, which no test deployment carries; the fixture adapter
+        // registers on the shipped deepseek-official route.
+        '- id: agent-default-model',
+        '  config:',
+        '    provider: deepseek-official',
+        '    model: team-fixture',
         '- id: session-persistence-jsonl',
         '  config:',
         `    root: '${sessions}'`,

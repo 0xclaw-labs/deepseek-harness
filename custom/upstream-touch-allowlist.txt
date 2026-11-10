@@ -272,3 +272,24 @@ vitest.expected.config.ts
 # 给该 title 套件 Loader 组成测试补一条 painuo 形状路由的 wire 钉：断言 title 请求体带
 # thinking:{type:disabled} 且无 reasoning_effort（mock server SSE 拦截）。
 packages/session/session-title-first-prompt-llm/tests/loader-composition.spec.ts
+
+# 2026-11-10: dsh-e2e-cluster-a-root-cure: 簇 A composition 根治（治愈优先于隔离）。
+# 品牌 base bundle（428e8aa3ff）关闭 llm-deepseek 行后，patch 行只写显式键
+# （vendor/include applyEntryPatches 语义），这些 e2e 组合构造处仅重述 config 无法
+# 恢复官方 adapter，子进程 NO_ADAPTER 连锁红。以下文件在各自组合构造处显式
+# `disabled: false`（并把线上模型 id 映射到网关在册目录 DEEPSEEK_E2E_MODEL，
+# 未设 env 时回落官方字面量）；acp 三套件经 leaf patch（official-route.patch.yml，
+# 不触碰 snapshots 录制圣域），credentials 用例内联写 official-route.patch.json。
+# agent-team-headless/built-bin 另补 agent-default-model→deepseek-official（品牌默认
+# painuo 在测试部署无 provider）；两处 keyless-smoke 断言按品牌现实去掉 web_search
+# （品牌 base 关闭 DeepSeek 搜索行，本地 fetch 保留）。
+apps/cli/tests/fixtures/github-webhook/cordis.yml
+apps/cli/tests/agent-team-headless.e2e.ts
+apps/cli/tests/profiles/acp/tests/acp.e2e.ts
+apps/cli/tests/profiles/acp/tests/escalation.e2e.ts
+apps/cli/tests/profiles/acp/tests/hooks.e2e.ts
+apps/cli/tests/profiles/acp/tests/official-route.patch.yml
+apps/cli/tests/profiles/headless/real-model.patch.yml
+apps/cli/tests/profiles/headless/tests/keyless-smoke.e2e.ts
+packages/skill/skill-office/tests/fixtures/real-office.ts
+packages/subagent/subagent-acp/tests/fixtures/acp-transport.patch.yml

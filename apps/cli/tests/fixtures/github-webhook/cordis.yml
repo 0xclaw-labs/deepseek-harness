@@ -1,6 +1,17 @@
 # Real-product test overlay: the CLI, provider, Web servers, webhook runtime,
 # adapter, rule, Workspace, Session, and Agent all remain production modules.
 
+# dsh-e2e-modelxing: 品牌 base bundle 关闭了 llm-deepseek 行并把默认模型指到 painuo；
+# 本 overlay 的官方路由会话需要显式恢复 adapter 与默认模型行（模型 id 映射到网关
+# 在册目录，env 未设时回落官方字面量）。本地无 built CLI 未验证，待 CI 终验。
+- id: llm-deepseek
+  disabled: false
+
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: !!js "process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'"
+
 - insert:
     - id: webhook-runtime
       name: '@deepseek-ai/dsh-webhook'

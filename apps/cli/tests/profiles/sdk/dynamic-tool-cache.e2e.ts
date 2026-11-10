@@ -83,7 +83,12 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('SDK native tool updates with rea
     const callsPath = join(root, 'calls.txt')
     const patch = join(root, 'dynamic-tool-cache.patch.yml')
     await writeFile(patch, JSON.stringify([
-      { id: 'llm-deepseek', config: {
+      // dsh-e2e-modelxing: 品牌 base bundle 关闭了 llm-deepseek 行；patch 行只写显式键，
+      // 仅重述 config 不清除 disabled，必须显式 disabled: false 恢复官方 adapter。
+      // fixture 注入 deepseekLlmApiExtensions 服务，该服务提供行同样被品牌关闭，
+      // 不恢复则 fixture 永远 pending、工具不注册。
+      { id: 'deepseek-llm-api-extensions', disabled: false },
+      { id: 'llm-deepseek', disabled: false, config: {
         apiKeyEnv: 'DEEPSEEK_API_KEY', thinking: 'disabled', maxTokens: 1024,
         retryPolicy: { mode: 'normal', maxRetries: 0 } satisfies RetryPolicyConfig,
         models: [{ id: E2E_MODEL, systemPromptUpdate: 'in-history', toolUpdate: 'addition-only' }],

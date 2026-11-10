@@ -4,3 +4,14 @@
 
 - id: hooks-codex
   disabled: true
+
+# dsh-e2e-modelxing: 品牌 base bundle 关闭了 llm-deepseek 行；patch 行只写显式键，
+# acp 场景配置仅重述 config 无法清除 disabled，必须显式恢复官方 adapter，并把线上
+# 模型 id 映射到网关在册目录（DEEPSEEK_E2E_MODEL 未设时回落官方字面量）。
+- id: llm-deepseek
+  disabled: false
+
+- id: acp
+  config:
+    provider: deepseek-official
+    model: !!js "process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'"

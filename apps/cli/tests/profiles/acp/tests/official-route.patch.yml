@@ -1,0 +1,13 @@
+# dsh-e2e-modelxing: 网关模式 leaf patch，应用在 acp 场景配置（snapshots 链接的
+# cordis.yml）之后。品牌 base bundle 关闭了 llm-deepseek 行，而 patch 行只写显式键
+# （vendor/include applyEntryPatches 语义），场景配置仅重述 config 无法恢复官方
+# adapter，必须显式 disabled: false；同时把线上模型 id 映射到网关在册目录
+# （DEEPSEEK_E2E_MODEL 未设时回落官方字面量）。仅 e2e 真跑使用；录制/回放 lane
+# 不经过本文件。
+- id: llm-deepseek
+  disabled: false
+
+- id: acp
+  config:
+    provider: deepseek-official
+    model: !!js "process.env.DEEPSEEK_E2E_MODEL || 'deepseek-v4-flash'"
