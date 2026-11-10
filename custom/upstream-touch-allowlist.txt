@@ -265,3 +265,10 @@ apps/cli/tests/web-agent-presets.e2e.ts
 # 两文件行为与上游一致，全量照跑。
 vitest.e2e.config.ts
 vitest.expected.config.ts
+
+# 2026-11-10: 簇B真修——paiNuo 模型补 reasoning 元数据。paiNuoProviderPatch 手声明的模型条目
+# 无 reasoningEfforts → adapter 判 model.reasoning=false → title 路由取不到 efforts[0]=off，
+# 混合思考模型（deepseek-v4.1-flash）默认思考吃光 max_tokens → 空 content（网关探针实证）。
+# 给该 title 套件 Loader 组成测试补一条 painuo 形状路由的 wire 钉：断言 title 请求体带
+# thinking:{type:disabled} 且无 reasoning_effort（mock server SSE 拦截）。
+packages/session/session-title-first-prompt-llm/tests/loader-composition.spec.ts

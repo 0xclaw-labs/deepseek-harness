@@ -152,13 +152,38 @@ export function readPaiNuoGrant(text: string): string | undefined {
 }
 
 /**
+ * Reasoning efforts every PaiNuo catalog model declares. The proxy fronts
+ * DeepSeek hybrid-thinking models whose own default is to think, so the
+ * declared levels mirror the upstream catalog: `off` carries no wire value
+ * (the deepseek dialect spells "not thinking" as the thinking switch alone),
+ * and each thinking level names the `reasoning_effort` spelling dispatch
+ * sends. Declared here because the profile's hand-written entries inherit no
+ * installed catalog capability — without this the adapter reports the models
+ * as non-reasoning and no caller can reach the thinking switch.
+ */
+const PAINUO_REASONING_EFFORTS = { off: null, low: 'low', high: 'high', max: 'max' } as const
+
+/**
+ * The agent conversation's default effort, aligned with the upstream route's
+ * default balance. Without it a reasoning-capable declaration would leave the
+ * default unset, and selectors would surface no chosen effort for new sessions.
+ */
+const PAINUO_DEFAULT_REASONING = 'high'
+
+/**
  * Generate the profile patch that mounts the PaiNuo provider and selects its
  * default model. An empty catalog produces no patch, so a signed-out app keeps
  * the brand provider disabled rather than falling back to an upstream route.
  *
  * Each entry keeps the catalog's wire id and gains a branded display name
  * (`displayModelName`); the adapter resolves requests, the session log, and the
- * agent default by id, so a rename here never reaches the wire.
+ * agent default by id, so a rename here never reaches the wire. Every entry
+ * also declares the hybrid reasoning efforts and the route names the deepseek
+ * dialect: the proxy is URL-undetectable, and pi-ai guesses every dialect
+ * switch from the endpoint when no compat switch names one — the thinking
+ * format and the `max_tokens` output-cap spelling alike. The models stay
+ * valid YAML flow mappings — JSON's quoted keys keep `off` a string, which
+ * YAML 1.1 would otherwise read as a boolean.
  * @param models - live PaiNuo catalog entries.
  * @returns YAML patch block, or an empty string without a catalog.
  */
@@ -166,7 +191,11 @@ export function paiNuoProviderPatch(models: readonly BrandCatalogModel[]): strin
   const defaultModel = chooseDefaultModel(models)
   if (defaultModel === undefined) return ''
   const list = models
-    .map(model => JSON.stringify({ id: model.id, name: displayModelName(model.id, model.name) }))
+    .map(model => JSON.stringify({
+      id: model.id,
+      name: displayModelName(model.id, model.name),
+      reasoningEfforts: PAINUO_REASONING_EFFORTS,
+    }))
     .join(',')
   return '# paiNuo-model-provider: PaiNuo ecosystem model catalog (auth.modelxing.com proxy).\n'
     + '- id: llm-pi-ai\n'
@@ -179,6 +208,10 @@ export function paiNuoProviderPatch(models: readonly BrandCatalogModel[]): strin
     + `        baseURL: ${BRAND_INFERENCE_BASE_URL}\n`
     + '        defaultContextWindow: 131072\n'
     + '        defaultMaxTokens: 8192\n'
+    + `        reasoning: ${PAINUO_DEFAULT_REASONING}\n`
+    + '        compat:\n'
+    + '          thinkingFormat: deepseek\n'
+    + '          maxTokensField: max_tokens\n'
     + `        models: [${list}]\n`
     + '- id: agent-default-model\n'
     + '  config:\n'

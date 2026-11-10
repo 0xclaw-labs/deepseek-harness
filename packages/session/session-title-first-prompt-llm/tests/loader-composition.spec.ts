@@ -14,7 +14,7 @@ import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SessionTitleService from '@deepseek-ai/dsh-session-title'
 import * as providerPlugin from '@deepseek-ai/dsh-session-title-first-prompt-llm'
-import { anthropicTextEvents, closeMockServers, mockServer } from '../../../llm/llm-pi-ai/tests/mock-server.ts'
+import { anthropicTextEvents, closeMockServers, mockServer, textEvents } from '../../../llm/llm-pi-ai/tests/mock-server.ts'
 
 let root: string | undefined
 let context: Context | undefined
@@ -207,6 +207,65 @@ describe('session-title Loader composition', () => {
         kind: 'provider',
         provider: 'session-title-first-prompt-llm',
         model: { provider: 'gateway', model: 'adaptive-model' },
+      },
+    })
+  })
+
+  it('disables thinking on the wire for a PaiNuo-shaped hybrid route', async () => {
+    vi.stubEnv('PI_TITLE_KEY', 'test-key')
+    const server = await mockServer([{ events: textEvents }])
+    // The route as `paiNuoProviderPatch` generates it: a hand-declared
+    // catalog whose entries carry the hybrid efforts, the deepseek thinking
+    // dialect named because the private gateway's URL detects nothing, and a
+    // route default effort for the agent conversation.
+    const ctx = await loadComposition([
+      'maxInputBytes: 4096',
+      'maxOutputTokens: 64',
+      'timeoutMs: 60000',
+    ], [
+      "- name: '@deepseek-ai/dsh-llm-pi-ai'",
+      '  config:',
+      '    providers:',
+      '      painuo:',
+      '        apiKeyEnv: PI_TITLE_KEY',
+      '        api: openai-completions',
+      `        baseURL: ${server.url}`,
+      '        reasoning: high',
+      '        compat:',
+      '          thinkingFormat: deepseek',
+      '          maxTokensField: max_tokens',
+      '        models:',
+      '          - id: deepseek-v4.1-flash',
+      '            reasoningEfforts: { off: null, low: low, high: high, max: max }',
+    ], new Map([['@deepseek-ai/dsh-llm-pi-ai', LlmPiAi]]))
+
+    const { session, messageSeq } = await promptThenRequest(ctx, 'painuo-title', {
+      provider: 'painuo',
+      model: 'deepseek-v4.1-flash',
+    })
+    await vi.waitFor(() => {
+      expect(ctx.sessionTitle.get(session)?.source.kind).toBe('provider')
+    }, { timeout: 10_000 })
+
+    // The title call takes the route's least effort — `off`, first in the
+    // declared escalation order — and the deepseek dialect spells that as the
+    // thinking switch alone. Without the declared efforts the adapter reports
+    // the model as non-reasoning, no effort is sent, the gateway's own
+    // thinking default eats the output cap, and the title arrives empty.
+    expect(server.requests).toHaveLength(1)
+    expect(server.requests[0]).toMatchObject({
+      model: 'deepseek-v4.1-flash',
+      max_tokens: 64,
+      thinking: { type: 'disabled' },
+    })
+    expect(server.requests[0]).not.toHaveProperty('reasoning_effort')
+    expect(ctx.sessionTitle.get(session)).toMatchObject({
+      title: 'hello',
+      messageSeqs: [messageSeq],
+      source: {
+        kind: 'provider',
+        provider: 'session-title-first-prompt-llm',
+        model: { provider: 'painuo', model: 'deepseek-v4.1-flash' },
       },
     })
   })

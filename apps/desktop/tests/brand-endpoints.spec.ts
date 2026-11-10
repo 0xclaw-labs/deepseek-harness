@@ -106,6 +106,14 @@ describe('brand endpoints', () => {
     // The Models page and the model selector render this catalog name; every
     // wire id stays the provider's own, so a request still names the same model.
     expect(patch).toContain(`displayName: ${BRAND_PROVIDER_DISPLAY_NAME}`)
+    // The hybrid-thinking catalog thinks by default; the declared efforts and
+    // the named deepseek dialect are what let callers reach the thinking
+    // switch — the title route picks efforts[0] (off) and the agent default
+    // effort keeps its balance. JSON's quoted "off" key must survive the
+    // parse as a string, never YAML 1.1's boolean.
+    expect(patch).toContain('reasoning: high')
+    expect(patch).toContain('thinkingFormat: deepseek')
+    expect(patch).toContain('maxTokensField: max_tokens')
     const parsed = yaml.load(patch, { schema: entryListSchema })
     expect(parsed).toEqual([
       expect.objectContaining({
@@ -114,9 +122,19 @@ describe('brand endpoints', () => {
           providers: {
             [BRAND_PROVIDER_ID]: expect.objectContaining({
               displayName: BRAND_PROVIDER_DISPLAY_NAME,
+              reasoning: 'high',
+              compat: { thinkingFormat: 'deepseek', maxTokensField: 'max_tokens' },
               models: [
-                { id: BRAND_DEFAULT_MODEL_ID, name: '派诺·DeepSeek-V4.1-Flash-1017-Local' },
-                { id: 'deepseek-v4-pro', name: '派诺·DeepSeek-V4-Pro' },
+                {
+                  id: BRAND_DEFAULT_MODEL_ID,
+                  name: '派诺·DeepSeek-V4.1-Flash-1017-Local',
+                  reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' },
+                },
+                {
+                  id: 'deepseek-v4-pro',
+                  name: '派诺·DeepSeek-V4-Pro',
+                  reasoningEfforts: { off: null, low: 'low', high: 'high', max: 'max' },
+                },
               ],
             }),
           },
