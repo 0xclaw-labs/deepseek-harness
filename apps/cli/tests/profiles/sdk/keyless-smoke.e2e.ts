@@ -203,7 +203,18 @@ describe('Python SDK dsh profile keyless smoke', () => {
       expect(log).toBeDefined()
       const compressed = await readFile(join(sessionsRoot, log!))
       expect(compressed.subarray(0, 4).toString('hex')).toBe('28b52ffd')
-      expect(JSON.parse((await decompress(compressed)).toString())).toMatchObject({ type: 'session', id: 'main' })
+      // dsh-e2e-modelxing 合流裁决：session 日志是 JSON Lines 协议（写入端
+      // session-persistence-jsonl 先写 header 行、再逐批追加事件行，各自独立
+      // JSON 文档）。base bundle 的 log-backed title 服务会在首个 prompt 后异步
+      // 生成标题并追加一条 session/title 事件——它是否在进程退出前落盘是一场与
+      // shutdown 的时序赛跑（CI 慢机上事件先落，本地快机常是纯 header），所以
+      // 整文件单文档 JSON.parse 的旧期望本身违背写入端协议；逐行解析并钉住
+      // 第一行是 session header。
+      const parsedLines = (await decompress(compressed)).toString().split('\n')
+        .filter(line => line.trim() !== '')
+        .map(line => JSON.parse(line) as Record<string, unknown>)
+      expect(parsedLines.length).toBeGreaterThanOrEqual(1)
+      expect(parsedLines[0]).toMatchObject({ type: 'session', id: 'main' })
     } finally {
       // No-op after exit; reject: false settles on every outcome, so cleanup never races teardown.
       child.kill('SIGKILL')
@@ -236,12 +247,36 @@ describe('Python SDK dsh profile keyless smoke', () => {
       expect(yaml).toBeDefined()
       await writeFile(editorPatch, yaml!)
     }
+    // dsh-e2e-modelxing 合流裁决：星模映射后的模型 id 不在官方内置目录
+    // （llm-deepseek DEFAULT_MODELS 只有 deepseek-flash/deepseek-v4-pro），而
+    // 「未编目即安全降级为纯文本」是产品的刻意默认（model-info.ts：宁拒不实
+    // 图像声明）。40f2c7e9dd 的模型映射清扫为其余图像套件按需声明了图像模态，
+    // 本文件两个 image 臂漏配——补同一模式；官方字面量 deepseek-flash 走默认
+    // 目录已含图像，无需 patch。注意 patch 行 config 是整体替换
+    // （vendor/include applyEntryPatches），同组合臂的目录声明必须与 offload
+    // 配置同写一行，分两行会互相覆盖。
+    const imageModel = process.env.DEEPSEEK_E2E_MODEL || 'deepseek-flash'
+    const needsCatalogEntry = imageEnabled && imageModel !== 'deepseek-flash'
     if (offloadEnabled) await writeFile(editorPatch, [
       '- id: llm-deepseek',
       '  config:',
       '    apiKeyEnv: DEEPSEEK_API_KEY',
       '    maxRequestFilesBytes: 1',
       '    imageOffloadByteQuantum: 1',
+      ...(needsCatalogEntry ? [
+        '    models:',
+        `      - id: ${imageModel}`,
+        '        inputModalities: [text, image]',
+      ] : []),
+      '',
+    ].join('\n'))
+    if (needsCatalogEntry && !offloadEnabled) await writeFile(editorPatch, [
+      '- id: llm-deepseek',
+      '  config:',
+      '    apiKeyEnv: DEEPSEEK_API_KEY',
+      '    models:',
+      `      - id: ${imageModel}`,
+      '        inputModalities: [text, image]',
       '',
     ].join('\n'))
     const editorFile = join(root, 'editor.txt')
@@ -289,7 +324,7 @@ describe('Python SDK dsh profile keyless smoke', () => {
       ...launch.args,
       '--profile',
       'sdk-minimal',
-      ...(editorEnabled || optOut || offloadEnabled ? ['--patch', editorPatch] : []),
+      ...(editorEnabled || optOut || offloadEnabled || needsCatalogEntry ? ['--patch', editorPatch] : []),
     ], {
       cwd: repoRoot,
       env: {
