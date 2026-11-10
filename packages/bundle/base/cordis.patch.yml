@@ -87,8 +87,13 @@
     - id: agent
       name: '@deepseek-ai/dsh-agent'
 
+    # Brand composition: the inventory plugin injects the official-route
+    # deepseekLlmApiExtensions service, which this bundle disables below — an
+    # enabled row here would stay pending forever (簇 A 根治：branding commit
+    # 428e8aa3ff 漏关本行，pending 插件连锁打红 base-backed 组合的全部套件).
     - id: plugin-package-inventory-deepseek
       name: '@deepseek-ai/dsh-plugin-package-inventory-deepseek'
+      disabled: true
 
     # The transport-independent default for Agents created by entry points.
     # Settings may supply a saved selection; consumers read it at creation time.
