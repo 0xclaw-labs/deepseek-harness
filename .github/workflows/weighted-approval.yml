@@ -26,7 +26,7 @@ jobs:
       (github.event_name != 'issue_comment' || (github.event.issue.pull_request && github.event.issue.state == 'open' &&
         (contains(github.event.comment.body, '/delegate') || contains(github.event.changes.body.from, '/delegate'))))
     name: weighted approval publisher
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 5
     steps:
       # SECURITY: the status-writing job executes policy from the trusted default
